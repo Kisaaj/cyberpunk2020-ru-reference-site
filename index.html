@@ -59,6 +59,7 @@
   </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-cp-red selection:text-white">
+
   <!-- МОДАЛЬНОЕ ОКНО 0: ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ВЕРСИИ С GITHUB -->
   <div id="versionUpdateModal" class="hidden fixed inset-0 z-[999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 select-none">
     <div class="max-w-md w-full bg-cp-panel border-2 border-cp-yellow shadow-[0_0_50px_rgba(252,238,10,0.4)] p-6 relative cp-clip text-center">
@@ -75,6 +76,7 @@
       </button>
     </div>
   </div>
+
   <!-- МОДАЛЬНОЕ ОКНО 1: «СЕТЕВОЙ ДОЗОР БДИТ!» И УВЕДОМЛЕНИЯ О БАНЕ -->
   <div id="netwatchModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-red shadow-[0_0_40px_rgba(255,0,60,0.45)] p-6 relative cp-clip">
@@ -92,7 +94,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (С КНОПКОЙ БАНА ДЛЯ АДМИНОВ) -->
+  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ -->
   <div id="publicProfileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePublicProfileModal()">
     <div class="max-w-xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_35px_rgba(0,240,255,0.25)] p-6 relative" onclick="event.stopPropagation()">
       <div class="flex items-start justify-between border-b border-gray-800 pb-4 mb-4">
@@ -193,7 +195,6 @@
             <h1 class="font-display font-black text-lg tracking-wider text-white">
               CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
             </h1>
-            <!-- ФИКСИРОВАННЫЙ ЭМОДЗИ-ИНДИКАТОР СТАТУСА СЕТИ (НЕ МЕНЯЕТ РАЗМЕР ШАПКИ) -->
             <span id="cloudRealtimeBadge" title="Подключение к Сети..." class="inline-flex items-center justify-center w-6 h-6 text-xs rounded bg-cp-panel border border-gray-800 select-none shrink-0">⏳</span>
           </div>
           <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
@@ -283,52 +284,49 @@
   <!-- ОКНО 1: КАТАЛОГ СПРАВОЧНИКА -->
   <main id="view-catalog" class="max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4">
     <section class="bg-cp-panel cp-border p-4">
-      <div class="grid grid-cols-12 gap-3.5 items-end">
-        <div class="col-span-3">
+      <div class="grid grid-cols-12 gap-3 items-end">
+        <div class="col-span-3" id="searchColBox">
           <label class="block text-[11px] uppercase text-cp-cyan font-bold mb-1 tracking-wider">Поиск по названию, бренду, описанию</label>
           <div class="relative">
             <input type="text" id="searchInput" oninput="renderCatalog()" placeholder="Соло, Minami 10, Сильверхенд, AV-4, Trauma Team..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow text-white px-3 py-2 text-xs outline-none">
             <button type="button" onclick="clearSearch()" class="absolute right-2.5 top-2 text-xs text-gray-500 hover:text-white">✕</button>
           </div>
         </div>
-        <div class="col-span-3">
+        <div class="col-span-2" id="subColBox">
           <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1" id="subFilterLabel">Категория / Раздел</label>
-          <select id="subFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan"></select>
+          <select id="subFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2.5 py-2 outline-none focus:border-cp-cyan"></select>
         </div>
-        <div class="col-span-2">
-          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1" id="extraFilterLabel">Зарплата</label>
-          <select id="extraFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan"></select>
+        <div class="col-span-2" id="extraColBox">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1" id="extraFilterLabel">Доп. фильтр / Сортировка</label>
+          <select id="extraFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2.5 py-2 outline-none focus:border-cp-cyan"></select>
         </div>
         <div class="col-span-2 hidden" id="reliabilityFilterBox">
-          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Надёжность (НАД) / Сортировка</label>
-          <select id="relFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan">
-            <option value="ALL">Без сортировки НАД</option>
-            <option value="SORT_DESC">🔽 Сортировать: ОТ → ОН → ОБ → НН</option>
-            <option value="SORT_ASC">🔼 Сортировать: НН → ОБ → ОН → ОТ</option>
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Надёжность (НАД)</label>
+          <select id="relFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2.5 py-2 outline-none focus:border-cp-cyan">
+            <option value="ALL">Любая НАД</option>
+            <option value="SORT_DESC">🔽 Сорт: ОТ → ОН → ОБ → НН</option>
+            <option value="SORT_ASC">🔼 Сорт: НН → ОБ → ОН → ОТ</option>
             <option value="ONLY_ОТ">Только ОТ (Отличное)</option>
             <option value="ONLY_ОН">Только ОН (Очень надёжное)</option>
             <option value="ONLY_ОБ">Только ОБ (Обычное)</option>
             <option value="ONLY_НН">Только НН (Ненадёжное)</option>
           </select>
         </div>
-        <div class="col-span-1">
-          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Источник</label>
-          <select id="bookFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2 py-2 outline-none focus:border-cp-cyan">
-            <option value="ALL">Все книги</option>
-            <option value="FAV">⭐ Избранное</option>
-            <option value="USER">🛠️ Добавленные</option>
-            <option value="CP20">CP20</option>
-            <option value="Chr1">Chr1</option>
-            <option value="Chr2">Chr2</option>
-            <option value="Chr3">Chr3</option>
-            <option value="Chr4">Chr4</option>
-            <option value="MM">MM (Max Metal)</option>
-            <option value="BB">BB / NET</option>
-            <option value="SOF">SOF / SOF2</option>
-            <option value="PAC">PAC</option>
-            <option value="WS">WS</option>
-            <option value="SF">SF / SW</option>
+        <div class="col-span-1 hidden" id="availabilityFilterBox">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Доступность (ДОС)</label>
+          <select id="availFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2 py-2 outline-none focus:border-cp-cyan">
+            <option value="ALL">Все ДОС</option>
+            <option value="SORT_DESC">🔽 Отл → Ред</option>
+            <option value="SORT_ASC">🔼 Ред → Отл</option>
+            <option value="ONLY_Отл">Только Отл (Отличная)</option>
+            <option value="ONLY_Обы">Только Обы (Обычная)</option>
+            <option value="ONLY_Мал">Только Мал (Малая)</option>
+            <option value="ONLY_Ред">Только Ред (Редкая)</option>
           </select>
+        </div>
+        <div class="col-span-1" id="bookColBox">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Источник</label>
+          <select id="bookFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2 py-2 outline-none focus:border-cp-cyan"></select>
         </div>
         <div class="col-span-1">
           <button type="button" onclick="resetFilters()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs py-2 border border-gray-600 font-bold">Сброс</button>
@@ -506,15 +504,16 @@
         <span class="text-lg">⚙️</span>
         <div>
           <h2 class="font-display text-base font-bold text-white uppercase tracking-wider">Панель управления Администратора</h2>
-          <p class="text-xs text-gray-400">Конструктор карточек, управление категориями, модерация пользователей и логи</p>
+          <p class="text-xs text-gray-400">Конструктор карточек, управление категориями и источниками, модерация пользователей и логи</p>
         </div>
       </div>
       <div class="flex flex-wrap items-center gap-2" id="adminSubNav">
-        <button type="button" onclick="switchAdminSubtab('builder')" data-subtab="builder" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">➕ Конструктор карточек</button>
-        <button type="button" onclick="switchAdminSubtab('categories')" data-subtab="categories" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">🗂️ Категории</button>
-        <button type="button" onclick="switchAdminSubtab('users')" data-subtab="users" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">👥 Пользователи (<span id="cnt-users">1</span>)</button>
-        <button type="button" onclick="switchAdminSubtab('logs')" data-subtab="logs" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">📋 Логи</button>
-        <button type="button" onclick="switchAdminSubtab('backup')" data-subtab="backup" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">💾 База данных (JSON)</button>
+        <button type="button" onclick="switchAdminSubtab('builder')" data-subtab="builder" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">➕ Конструктор карточек</button>
+        <button type="button" onclick="switchAdminSubtab('categories')" data-subtab="categories" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">🗂️ Категории</button>
+        <button type="button" onclick="switchAdminSubtab('books')" data-subtab="books" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">📚 Источники</button>
+        <button type="button" onclick="switchAdminSubtab('users')" data-subtab="users" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">👥 Пользователи (<span id="cnt-users">1</span>)</button>
+        <button type="button" onclick="switchAdminSubtab('logs')" data-subtab="logs" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">📋 Логи</button>
+        <button type="button" onclick="switchAdminSubtab('backup')" data-subtab="backup" class="admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all">💾 База данных (JSON)</button>
       </div>
     </section>
 
@@ -575,12 +574,17 @@
         <div class="bg-cp-bg border border-gray-800 p-5 space-y-4">
           <div class="grid grid-cols-12 gap-6 items-center">
             <div class="col-span-5 flex flex-col gap-2">
-              <label class="flex items-center gap-2.5 text-xs text-gray-200 cursor-pointer bg-cp-panel border border-gray-700 px-3 py-2 mb-1 hover:border-cp-yellow">
+              <label class="flex items-center gap-2.5 text-xs text-gray-200 cursor-pointer bg-cp-panel border border-gray-700 px-3 py-2 hover:border-cp-yellow">
                 <input type="checkbox" id="builderShowAddedCheck" checked class="accent-yellow-400 w-4 h-4">
-                <span>Отображать плашку <b class="text-cp-yellow">«ДОБАВЛЕНО»</b> на этой карточке</span>
+                <span>Отображать плашку <b class="text-cp-yellow">«HOMEBREW»</b> на этой карточке</span>
               </label>
 
-              <button type="submit" id="builderSubmitBtn" class="w-full py-3.5 px-6 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all">➕ Добавить запись в справочник</button>
+              <label id="builderNamedCharWrap" class="hidden flex items-center gap-2.5 text-xs text-gray-200 cursor-pointer bg-cp-panel border border-gray-700 px-3 py-2 hover:border-cp-cyan">
+                <input type="checkbox" id="builderNamedCharCheck" class="accent-cyan-400 w-4 h-4">
+                <span>Отображать плашку <b class="text-cp-cyan">«⭐ ИМЕННОЙ»</b> (Лорный персонаж Cyberpunk)</span>
+              </label>
+
+              <button type="submit" id="builderSubmitBtn" class="w-full py-3.5 px-6 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all mt-1">➕ Добавить запись в справочник</button>
               <span class="text-[11px] text-gray-400 text-center">После нажатия вы сразу перейдёте к созданной или обновлённой карточке</span>
             </div>
             <div class="col-span-7">
@@ -616,6 +620,21 @@
       </div>
     </section>
 
+    <!-- ПОДВКЛАДКА 4.25: УПРАВЛЕНИЕ КНИГАМИ-ИСТОЧНИКАМИ -->
+    <section id="admin-sub-books" class="hidden bg-cp-panel cp-border p-6 space-y-6">
+      <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
+        <div>
+          <h3 class="font-display text-lg font-bold text-cp-yellow uppercase">📚 Управление книгами-источниками</h3>
+          <p class="text-xs text-gray-400 mt-1">Добавляйте новые книги-источники, переименовывайте существующие (обновится во всех карточках) или удаляйте ненужные.</p>
+        </div>
+        <div class="flex gap-2">
+          <input type="text" id="newBookSourceInput" placeholder="Код или название источника (напр. Eurosource)..." class="bg-cp-bg border border-gray-700 px-3 py-1.5 text-xs text-white outline-none focus:border-cp-yellow w-80">
+          <button type="button" onclick="addNewBookSource()" class="px-4 py-1.5 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">+ Добавить источник</button>
+        </div>
+      </div>
+      <div id="bookSourcesManagerList" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1"></div>
+    </section>
+
     <!-- ПОДВКЛАДКА 4.3: ПОЛЬЗОВАТЕЛИ -->
     <section id="admin-sub-users" class="hidden bg-cp-panel cp-border p-6 space-y-6">
       <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
@@ -636,19 +655,22 @@
       <div class="space-y-2.5" id="adminUsersTableContainer"></div>
     </section>
 
-    <!-- ПОДВКЛАДКА 4.4: ЛОГИ (БАНЫ И ВСЕ КОММЕНТАРИИ) -->
+    <!-- ПОДВКЛАДКА 4.4: ЛОГИ (БАНЫ, КОММЕНТАРИИ И ИЗМЕНЕНИЯ КАРТОЧЕК) -->
     <section id="admin-sub-logs" class="hidden bg-cp-panel cp-border p-6 space-y-5">
       <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
         <div>
           <h3 class="font-display text-lg font-bold text-cp-cyan uppercase">📋 Журнал и Логи модерации</h3>
-          <p class="text-xs text-gray-400 mt-1">Активные блокировки пользователей и общий поток всех комментариев на сайте в реальном времени.</p>
+          <p class="text-xs text-gray-400 mt-1">Активные блокировки, лента всех комментариев и история добавления/редактирования карточек в реальном времени.</p>
         </div>
         <div class="flex items-center gap-2">
           <button type="button" id="logsTabBansBtn" onclick="switchAdminLogsSubtab('bans')" class="px-4 py-2 text-xs font-bold uppercase border transition-all">
             🚫 Баны (<span id="cnt-logs-bans">0</span>)
           </button>
           <button type="button" id="logsTabCommentsBtn" onclick="switchAdminLogsSubtab('comments')" class="px-4 py-2 text-xs font-bold uppercase border transition-all">
-            💬 Все комментарии (<span id="cnt-logs-comments">0</span>)
+            💬 Комментарии (<span id="cnt-logs-comments">0</span>)
+          </button>
+          <button type="button" id="logsTabChangesBtn" onclick="switchAdminLogsSubtab('changes')" class="px-4 py-2 text-xs font-bold uppercase border transition-all">
+            📝 Изменения (<span id="cnt-logs-changes">0</span>)
           </button>
         </div>
       </div>
@@ -658,13 +680,17 @@
 
       <!-- Список всех комментариев сайта -->
       <div id="adminLogsCommentsBox" class="hidden space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
+
+      <!-- Список изменений карточек -->
+      <div id="adminLogsChangesBox" class="hidden space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
     </section>
 
-    <!-- ПОДВКЛАДКА 4.5: БАЗА ДАННЫХ -->
+    <!-- ПОДВКЛАДКА 4.5: БАЗА ДАННЫХ (КНОПКИ ТОЛЬКО ДЛЯ ROOT) -->
     <section id="admin-sub-backup" class="hidden bg-cp-panel cp-border p-6 space-y-6">
-      <h4 class="font-display text-base font-bold text-cp-yellow uppercase border-b border-gray-800 pb-3">💾 Выгрузка и подгрузка внешней базы (JSON / JS)</h4>
+      <h4 class="font-display text-base font-bold text-cp-yellow uppercase border-b border-gray-800 pb-3">💾 Статистика и управление базой данных (JSON / JS)</h4>
       <div class="grid grid-cols-4 gap-4 text-center" id="adminStatsGrid"></div>
-      <div class="flex flex-wrap gap-3 pt-2">
+
+      <div id="rootOnlyBackupControls" class="hidden flex-wrap gap-3 pt-2">
         <button type="button" onclick="exportUserDatabase()" class="px-5 py-3 bg-cp-cyan text-black font-bold text-xs uppercase hover:bg-cyan-300">📥 Скачать database.json</button>
         <button type="button" onclick="exportUserDatabaseAsJS()" class="px-5 py-3 bg-cp-yellow text-black font-bold text-xs uppercase hover:bg-yellow-300">📥 Скачать database.js (для автоподгрузки)</button>
         <label class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase cursor-pointer">
@@ -672,12 +698,15 @@
         </label>
         <button type="button" onclick="clearUserAdditions()" class="px-5 py-3 bg-cp-red/20 border border-cp-red text-cp-red font-bold text-xs uppercase hover:bg-cp-red hover:text-white">🗑️ Сбросить кеш к внешнему файлу базы</button>
       </div>
+
+      <div id="nonRootBackupNotice" class="hidden bg-cp-bg border border-gray-800 p-4 text-xs text-gray-400">
+        🔒 Скачивание, загрузка из файла и полный сброс базы данных доступны только Главному Администратору (<b class="text-cp-red">ROOT</b>).
+      </div>
     </section>
   </main>
-
   <script>
     // =========================================================================
-    // СХЕМЫ ДАННЫХ
+    // СХЕМЫ ДАННЫХ И КОНСТАНТЫ
     // =========================================================================
     const DECK_TYPE_LIST = ["Сотовая", "Портативная", "Боевая дека", "Стандартная", "Дека в киберконечности"];
     const DECK_OPTION_LIST = ["Электроды", "Клавиатура", "Видеоэкран", "Принтер", "Сканер", "Вокс Бокс", "Считыватель Чипов", "Доп чипы"];
@@ -685,6 +714,12 @@
       { k: "stat_int", l: "ИНТ" }, { k: "stat_cool", l: "КРУТ" }, { k: "stat_ma", l: "ПЕР" },
       { k: "stat_ref", l: "РЕФ" }, { k: "stat_attr", l: "ПРВЛ" }, { k: "stat_body", l: "ТЕЛО" },
       { k: "stat_tech", l: "ТЕХ" }, { k: "stat_luck", l: "УДАЧА" }, { k: "stat_emp", l: "ЭМП" }
+    ];
+
+    const DEFAULT_BOOK_SOURCES = [
+      "CP20", "Chr1", "Chr2", "Chr3", "Chr4",
+      "MM (Max Metal)", "BB / NET", "SOF / SOF2",
+      "PAC", "WS", "SF / SW", "Eurosource", "Homebrew"
     ];
 
     const SECTION_LABELS = {
@@ -701,24 +736,24 @@
         { k: "ability", l: "Особая способность", ph: "Чувство Боя", stat: "Особая способность", c: "text-cp-cyan" },
         { k: "stat", l: "Ключевой СТАТ", ph: "ИНТ / РЕФ", stat: "Ключевой СТАТ", c: "text-cp-yellow" },
         { k: "salary", l: "Зарплата (Ур. 1–10)", ph: "2,000 – 12,000 eb", stat: "Зарплата", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "CP20" },
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" },
         { k: "skills", l: "10 Профессиональных навыков (через запятую)", ph: "Чувство Боя, Внимательность, Пистолеты..." }
       ],
       weapons: [
         { k: "name", l: "Название оружия", ph: "Sternmeyer M-95A4" },
         { k: "category", l: "Категория", isCat: true, ph: "Штурмовые винтовки" },
+        { k: "damage", l: "Урон", ph: "5d6", stat: "Урон", c: "text-cp-red", span: 2 },
+        { k: "ammo", l: "Боеприпас / Калибр", ph: "5.56мм", stat: "Боеприпас / Калибр", c: "text-cp-yellow", span: 2 },
         { k: "typeCode", l: "Код типа (П, ПП, ДРБ, ВИН, ТЯЖ, ОББ)", ph: "ВИН", stat: "Тип" },
         { k: "to", l: "ТО (Точность оружия)", ph: "+1", stat: "ТО (Точность)", c: "text-cp-yellow" },
         { k: "skr", l: "СКР (Кар, Кур, Плащ, Нет)", ph: "Кур", stat: "СКР (Скрыт.)", c: "text-cp-cyan" },
         { k: "dos", l: "ДОС (Отл, Обы, Мал, Ред)", ph: "Обы", stat: "ДОС (Доступ.)" },
         { k: "nad", l: "НАД (НН, ОБ, ОН, ОТ)", ph: "ОН", stat: "НАД (Надёж.)", c: "text-cp-green" },
-        { k: "damage", l: "Урон", ph: "5d6", stat: "Урон", c: "text-cp-red", span: 2 },
-        { k: "ammo", l: "Боеприпас / Калибр", ph: "5.56мм", stat: "Боеприпас / Калибр", c: "text-cp-yellow", span: 2 },
         { k: "mag", l: "МАГ (Магазин)", ph: "30", stat: "МАГ (Магазин)" },
         { k: "sko", l: "СКО (Скоростр.)", ph: "3/30", stat: "СКО (Скоростр.)" },
         { k: "range", l: "ДИС (Дистанция)", ph: "400м", stat: "ДИС (Дистанция)", c: "text-cp-cyan" },
-        { k: "cost", l: "Стоимость", ph: "750 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "cost", l: "Стоимость", ph: "750 eb", stat: "Стоимость", c: "text-cp-green", span: 4 },
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       armor: [
         { k: "name", l: "Название брони", ph: "Arasaka Combat Armor" },
@@ -727,7 +762,7 @@
         { k: "zu", l: "ЗУ (Значение утяжеления)", ph: "-1", stat: "ЗУ (Утяжеление)", c: "text-cp-yellow" },
         { k: "cost", l: "Стоимость", ph: "200 eb", stat: "Стоимость", c: "text-cp-green" },
         { k: "covers", l: "Зона защиты", ph: "Торс, Руки", stat: "Зона защиты", span: 3 },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       gear: [
         { k: "name", l: "Название снаряжения", ph: "Техсканнер" },
@@ -735,14 +770,14 @@
         { k: "weight", l: "Вес / Ноша", ph: "0.5 кг", stat: "Вес / Ноша" },
         { k: "effect", l: "Игровой эффект / Бонус", ph: "+2 к ТЕХ", stat: "Игровой эффект", c: "text-cp-cyan" },
         { k: "cost", l: "Стоимость", ph: "300 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       services: [
         { k: "name", l: "Название услуги / расхода", ph: "Аккаунт Trauma Team" },
         { k: "category", l: "Категория услуги", isCat: true, ph: "Жильё" },
         { k: "cost", l: "Тариф / Стоимость", ph: "500 eb", stat: "Тариф / Стоимость", c: "text-cp-green", span: 2 },
         { k: "unit", l: "Расчётная единица", ph: "в месяц", stat: "Расчётная единица", span: 1 },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       cyberware: [
         { k: "name", l: "Название киберимпланта", ph: "Сердце Pacesetter 2000" },
@@ -750,7 +785,7 @@
         { k: "pch", l: "ПЧ (Потеря Человечности)", ph: "2d6", stat: "ПЧ (Человечность)", c: "text-cp-red" },
         { k: "surg", l: "Код Хирургии (Н, М, С, КР)", ph: "М", stat: "Код Хирургии", c: "text-cp-yellow" },
         { k: "cost", l: "Стоимость", ph: "1,000 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       vehicles: [
         { k: "name", l: "Название модели транспорта", ph: "AV-4 Aerodyne" },
@@ -766,13 +801,13 @@
         { k: "os", l: "ОС (Броня = ОС / 10 с округлением вниз)", ph: "40", stat: "ОС (Броня)", c: "text-cp-yellow" },
         { k: "mass", l: "Масса транспорта", ph: "4 тонны", stat: "Масса" },
         { k: "cost", l: "Стоимость (eb)", ph: "600,000 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Источник", ph: "CP20 / MM" }
+        { k: "book", l: "Источник", isBook: true, ph: "CP20 / MM" }
       ],
       characters: [
         { k: "name", l: "Имя / Прозвище на улицах", ph: "Джонни Сильверхенд" },
         { k: "category", l: "Роль персонажа", isCat: true, ph: "Рокербой", stat: "Роль", c: "text-cp-yellow" },
         { k: "reputation", l: "Репутация (от 0 до 10)", ph: "10", stat: "Репутация", c: "text-cp-cyan" },
-        { k: "book", l: "Источник", ph: "CP20", stat: "Источник", c: "text-cp-green" }
+        { k: "book", l: "Источник", isBook: true, ph: "CP20", stat: "Источник", c: "text-cp-green" }
       ],
       net_program: [
         { k: "name", l: "Название программы (рус.)", ph: "Адская Стрела (Hellbolt)" },
@@ -781,7 +816,7 @@
         { k: "strength", l: "Сила программы (СИЛ)", ph: "4", stat: "Сила программы (СИЛ)", c: "text-cp-red" },
         { k: "mu", l: "Объём памяти — ЕП (MU)", ph: "2", stat: "Объём памяти — ЕП (MU)", c: "text-cp-cyan" },
         { k: "cost", l: "Стоимость", ph: "6,750 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "CP20" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
       ],
       net_deck: [
         { k: "name", l: "Название модели кибердеки", ph: "SGI Tech Elysia" },
@@ -791,7 +826,7 @@
         { k: "speed", l: "Скорость деки", ph: "+3", stat: "Скорость", c: "text-cp-green" },
         { k: "memory", l: "Память (ЕП / MU)", ph: "20 ЕП", stat: "Память (ЕП / MU)" },
         { k: "cost", l: "Стоимость", ph: "4,260 eb", stat: "Стоимость", c: "text-cp-green" },
-        { k: "book", l: "Книга-источник", ph: "Chr1" }
+        { k: "book", l: "Книга-источник", isBook: true, ph: "Chr1" }
       ]
     };
 
@@ -852,6 +887,49 @@
     let activeEditCommentId = null;
     let currentlyViewedPublicUserId = null;
 
+    // Гарантирует наличие списков источников (_books) и логов изменений (_changeLogs) внутри объекта CATEGORIES (синхронизируется с облаком автоматически)
+    function ensureMetaArraysInCategories() {
+      if (!Array.isArray(CATEGORIES._books) || CATEGORIES._books.length === 0) {
+        CATEGORIES._books = [...DEFAULT_BOOK_SOURCES];
+      }
+      if (!Array.isArray(CATEGORIES._changeLogs)) {
+        CATEGORIES._changeLogs = [];
+      }
+    }
+
+    function getAllBookSources() {
+      ensureMetaArraysInCategories();
+      const fromItems = [];
+      Object.keys(SECTION_LABELS).forEach(sec => {
+        (DB[sec] || []).forEach(it => {
+          if (it && it.book && it.book !== "—") fromItems.push(String(it.book).trim());
+        });
+      });
+      return [...new Set([...CATEGORIES._books, ...fromItems])].filter(Boolean);
+    }
+
+    function addChangeLogEntry(actionType, sectionKey, itemObj) {
+      ensureMetaArraysInCategories();
+      const u = getCurrentUser();
+      const now = new Date();
+      const entry = {
+        id: "chg-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        action: actionType, // "created" | "edited" | "deleted"
+        sectionKey,
+        itemId: itemObj.id,
+        itemName: itemObj.name || itemObj.title || "Без названия",
+        itemCategory: itemObj.category || itemObj.subsection || "—",
+        itemBook: itemObj.book || "—",
+        userId: u ? u.id : "u-root",
+        userName: u ? u.displayName : "Администратор",
+        createdAt: now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 5)
+      };
+      CATEGORIES._changeLogs.unshift(entry);
+      if (CATEGORIES._changeLogs.length > 250) {
+        CATEGORIES._changeLogs = CATEGORIES._changeLogs.slice(0, 250);
+      }
+    }
+
     function sanitizeUsersAndEnforceRoot() {
       let changed = false;
       const rootIdx = USERS.findIndex(u => u.role === "ROOT" || u.id === "u-root");
@@ -866,7 +944,6 @@
           existing.role = "ROOT";
           changed = true;
         }
-        // Гарантируем, что у ROOT никогда не может быть бана
         if (existing.banInfo) {
           delete existing.banInfo;
           changed = true;
@@ -921,15 +998,14 @@
     }
 
     // =========================================================================
-    // СИСТЕМА БАНОВ И ПРОВЕРКИ СЕССИИ В РЕАЛЬНОМ ВРЕМЕНИ
+    // СИСТЕМА БАНОВ И ПРОВЕРКИ СЕССИИ
     // =========================================================================
     function isUserCurrentlyBanned(userObj) {
       if (!userObj || userObj.role === "ROOT" || !userObj.banInfo) return false;
       const b = userObj.banInfo;
       if (b.until === "PERM") return true;
       const untilMs = Number(b.until) || 0;
-      if (Date.now() < untilMs) return true;
-      return false;
+      return Date.now() < untilMs;
     }
 
     function formatBanRemainingTime(banInfo) {
@@ -947,15 +1023,14 @@
       return `Ещё ${days} дн. ${remHours} ч. (до ${new Date(Number(banInfo.until)).toLocaleString("ru-RU")})`;
     }
 
-    // Проверяет, имеет ли текущий админ право забанить/разбанить выбранного пользователя
     function canCurrentAdminBanTarget(targetUser) {
       const cur = getCurrentUser();
       if (!cur || !targetUser) return false;
-      if (targetUser.role === "ROOT" || targetUser.id === "u-root") return false; // Рута никто не может забанить
-      if (cur.id === targetUser.id) return false; // Нельзя забанить самого себя
-      if (cur.role === "ROOT") return true; // Рут может банить и Админов, и Юзеров
-      if (cur.role === "ADMIN" && targetUser.role === "USER") return true; // Админы банят только обычных Юзеров
-      return false; // Админы физически не могут банить друг друга
+      if (targetUser.role === "ROOT" || targetUser.id === "u-root") return false;
+      if (cur.id === targetUser.id) return false;
+      if (cur.role === "ROOT") return true;
+      if (cur.role === "ADMIN" && targetUser.role === "USER") return true;
+      return false;
     }
 
     function showBanScreenModal(banInfo) {
@@ -972,12 +1047,9 @@
       document.getElementById("netwatchModal").classList.remove("hidden");
     }
 
-    // Автоматически выбрасывает пользователя из аккаунта, если его забанили или удалили
     function checkAndEnforceCurrentSessionValidity() {
       if (!currentUserId) return;
       const u = USERS.find(x => x.id === currentUserId);
-
-      // 1. Если аккаунт был удалён
       if (!u) {
         currentUserId = null;
         persistSessionOnly();
@@ -985,8 +1057,6 @@
         showNetwatchAlert("Ваш аккаунт был удалён Администратором. Сессия завершена.");
         return;
       }
-
-      // 2. Если на аккаунт наложен активный бан
       if (isUserCurrentlyBanned(u)) {
         const bInfo = u.banInfo;
         currentUserId = null;
@@ -994,7 +1064,6 @@
         switchMainView("profile");
         showBanScreenModal(bInfo);
       } else if (u.banInfo) {
-        // Если время бана уже истекло — автоматически очищаем старую запись о бане
         delete u.banInfo;
         persistUsers();
       }
@@ -1011,10 +1080,7 @@
       document.getElementById("banUserModal").classList.remove("hidden");
     }
 
-    function closeBanModal() {
-      document.getElementById("banUserModal").classList.add("hidden");
-    }
-
+    function closeBanModal() { document.getElementById("banUserModal").classList.add("hidden"); }
     function toggleCustomBanMinutes() {
       const val = document.getElementById("banDurationSelect").value;
       document.getElementById("customBanMinutesBox").classList.toggle("hidden", val !== "CUSTOM");
@@ -1096,6 +1162,13 @@
           CATEGORIES[sec] = [...new Set([...(CATEGORIES[sec] || []), ...srcCats[sec]])];
         }
       });
+
+      if (Array.isArray(srcCats._books)) {
+        CATEGORIES._books = [...new Set([...(CATEGORIES._books || DEFAULT_BOOK_SOURCES), ...srcCats._books])];
+      }
+      if (Array.isArray(srcCats._changeLogs)) {
+        CATEGORIES._changeLogs = srcCats._changeLogs;
+      }
     }
 
     async function initApp() {
@@ -1103,6 +1176,7 @@
         mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
       }
       loadSavedData();
+      ensureMetaArraysInCategories();
       sanitizeUsersAndEnforceRoot();
       checkAndEnforceCurrentSessionValidity();
       updateCounts();
@@ -1148,6 +1222,7 @@
           } catch (e) {}
         });
 
+        ensureMetaArraysInCategories();
         sanitizeUsersAndEnforceRoot();
 
         const rawComm = localStorage.getItem(STORAGE_COMMENTS_KEY);
@@ -1335,7 +1410,7 @@
     }
 
     // =========================================================================
-    // ПУБЛИЧНЫЕ ПРОФИЛИ (С КНОПКАМИ БАНА) И КОММЕНТАРИИ
+    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ
     // =========================================================================
     function countUserTotalComments(userId) {
       let total = 0;
@@ -1362,7 +1437,6 @@
       document.getElementById("pubProfCommentsCnt").textContent = countUserTotalComments(target.id);
       document.getElementById("pubProfBio").textContent = (target.bio && target.bio.trim()) ? target.bio : "Пользователь пока не заполнил публичное описание профиля.";
 
-      // Кнопки бана / разбана прямо внутри публичного профиля (доступны только уполномоченным админам)
       const adminActionsEl = document.getElementById("pubProfAdminActions");
       if (canCurrentAdminBanTarget(target)) {
         adminActionsEl.innerHTML = banned
@@ -1676,17 +1750,19 @@
 
     function switchAdminSubtab(subtab) {
       activeAdminSubtab = subtab;
-      ["builder", "categories", "users", "logs", "backup"].forEach(s => {
-        document.getElementById("admin-sub-" + s).classList.toggle("hidden", subtab !== s);
+      ["builder", "categories", "books", "users", "logs", "backup"].forEach(s => {
+        const el = document.getElementById("admin-sub-" + s);
+        if (el) el.classList.toggle("hidden", subtab !== s);
       });
       document.querySelectorAll("#adminSubNav .admin-sub-btn").forEach(btn => {
         const isCur = btn.getAttribute("data-subtab") === subtab;
         btn.className = isCur
-          ? "admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
-          : "admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
+          ? "admin-sub-btn px-3 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
+          : "admin-sub-btn px-3 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
       });
       if (subtab === "builder" && !editingItemId) setBuilderType(activeBuilderType);
       else if (subtab === "categories") renderCategoryManager();
+      else if (subtab === "books") renderBookSourcesManager();
       else if (subtab === "users") renderAdminUsersManager();
       else if (subtab === "logs") renderAdminLogsView();
       else if (subtab === "backup") renderAdminBackupStats();
@@ -1697,12 +1773,18 @@
       renderAdminLogsView();
     }
 
-    // ОТРИСОВКА НОВОЙ ВКЛАДКИ «ЛОГИ» (БАНЫ + ВСЕ КОММЕНТАРИИ САЙТА)
+    // =========================================================================
+    // ЖУРНАЛ И ЛОГИ (БАНЫ + КОММЕНТАРИИ + ИЗМЕНЕНИЯ КАРТОЧЕК)
+    // =========================================================================
     function renderAdminLogsView() {
+      ensureMetaArraysInCategories();
       const bansBtn = document.getElementById("logsTabBansBtn");
       const commsBtn = document.getElementById("logsTabCommentsBtn");
+      const changesBtn = document.getElementById("logsTabChangesBtn");
+
       const bansBox = document.getElementById("adminLogsBansBox");
       const commsBox = document.getElementById("adminLogsCommentsBox");
+      const changesBox = document.getElementById("adminLogsChangesBox");
 
       bansBtn.className = activeAdminLogsSubtab === "bans"
         ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-red text-white border-cp-red"
@@ -1710,11 +1792,15 @@
       commsBtn.className = activeAdminLogsSubtab === "comments"
         ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-yellow text-black border-cp-yellow"
         : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-yellow";
+      changesBtn.className = activeAdminLogsSubtab === "changes"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
 
       bansBox.classList.toggle("hidden", activeAdminLogsSubtab !== "bans");
       commsBox.classList.toggle("hidden", activeAdminLogsSubtab !== "comments");
+      changesBox.classList.toggle("hidden", activeAdminLogsSubtab !== "changes");
 
-      // 1. Собираем активные баны
+      // 1. Активные баны
       const bannedUsers = USERS.filter(u => isUserCurrentlyBanned(u));
       document.getElementById("cnt-logs-bans").textContent = bannedUsers.length;
 
@@ -1747,18 +1833,14 @@
         }).join("");
       }
 
-      // 2. Собираем все комментарии со всех карточек и механик
+      // 2. Все комментарии
       const allComments = [];
       Object.keys(COMMENTS).forEach(itemId => {
         const arr = COMMENTS[itemId];
         if (Array.isArray(arr)) {
-          arr.forEach(c => {
-            allComments.push({ itemId, comment: c });
-          });
+          arr.forEach(c => allComments.push({ itemId, comment: c }));
         }
       });
-
-      // Сортируем от самых новых к старым
       allComments.sort((a, b) => (b.comment.id || "").localeCompare(a.comment.id || ""));
       document.getElementById("cnt-logs-comments").textContent = allComments.length;
 
@@ -1799,6 +1881,46 @@
           `;
         }).join("");
       }
+
+      // 3. История изменений карточек (создание / редактирование / удаление)
+      const changeLogs = CATEGORIES._changeLogs || [];
+      document.getElementById("cnt-logs-changes").textContent = changeLogs.length;
+
+      if (changeLogs.length === 0) {
+        changesBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Записей о создании или редактировании карточек пока нет.</div>`;
+      } else {
+        changesBox.innerHTML = changeLogs.map(log => {
+          const actionBadge = log.action === "created"
+            ? `<span class="px-2 py-0.5 bg-cp-green/20 border border-cp-green text-cp-green text-[10px] font-bold uppercase">➕ СОЗДАНА</span>`
+            : log.action === "deleted"
+            ? `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red text-cp-red text-[10px] font-bold uppercase">🗑️ УДАЛЕНА</span>`
+            : `<span class="px-2 py-0.5 bg-cp-cyan/20 border border-cp-cyan text-cp-cyan text-[10px] font-bold uppercase">✏️ ИЗМЕНЕНА</span>`;
+
+          const secLabel = SECTION_LABELS[log.sectionKey] || log.sectionKey;
+          const stillExists = Boolean(findItemAcrossAllSections(log.itemId));
+
+          return `
+            <div ${stillExists ? `onclick="jumpToCardFromChangeLog('${log.sectionKey}', '${log.itemId}')"` : ""} class="bg-cp-bg border border-gray-800 ${stillExists ? 'hover:border-cp-yellow cursor-pointer' : 'opacity-70'} p-3.5 flex items-center justify-between gap-4 transition-colors">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2.5 flex-wrap text-xs">
+                  ${actionBadge}
+                  <span class="font-bold text-sm text-white">${dash(log.itemName)}</span>
+                  <span class="text-cp-cyan text-[11px] font-semibold">[${secLabel} • ${dash(log.itemCategory)}]</span>
+                  <span class="text-gray-500 text-[11px]">Источник: ${dash(log.itemBook)}</span>
+                </div>
+                <div class="text-[11px] text-gray-400">
+                  Выполнил: <b class="text-cp-yellow">${dash(log.userName)}</b> • Время: <span class="text-gray-300">${dash(log.createdAt)}</span>
+                </div>
+              </div>
+              <div class="shrink-0">
+                ${stillExists
+                  ? `<button type="button" onclick="event.stopPropagation(); jumpToCardFromChangeLog('${log.sectionKey}', '${log.itemId}')" class="px-3.5 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/40 text-xs font-bold">↗ К карточке</button>`
+                  : `<span class="text-[11px] text-gray-500">Карточка удалена</span>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
     }
 
     function jumpToCommentFromAdminLog(sectionKey, itemId, commentId) {
@@ -1812,10 +1934,109 @@
       setTimeout(() => scrollToAndHighlightComment(commentId), 120);
     }
 
+    function jumpToCardFromChangeLog(sectionKey, itemId) {
+      if (sectionKey === "rules") {
+        selectedRuleId = itemId;
+        switchMainView("rules");
+      } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+      }
+    }
+
+    // =========================================================================
+    // УПРАВЛЕНИЕ КНИГАМИ-ИСТОЧНИКАМИ В АДМИН-ПАНЕЛИ
+    // =========================================================================
+    function renderBookSourcesManager() {
+      ensureMetaArraysInCategories();
+      const allBooks = getAllBookSources();
+      const listEl = document.getElementById("bookSourcesManagerList");
+
+      listEl.innerHTML = allBooks.map((bookName, idx) => {
+        let count = 0;
+        Object.keys(SECTION_LABELS).forEach(sec => {
+          count += (DB[sec] || []).filter(i => i.book === bookName).length;
+        });
+        const safeBook = bookName.replace(/'/g, "\\'");
+        return `
+          <div class="bg-cp-bg border border-gray-800 p-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 flex-1">
+              <span class="text-xs font-bold text-cp-yellow w-6">${idx + 1}.</span>
+              <input type="text" id="book-src-input-${idx}" value="${bookName}" class="flex-1 bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white">
+              <span class="text-xs text-gray-400">Карточек с этим источником: <b class="text-white">${count}</b></span>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" onclick="renameBookSource('${safeBook}', 'book-src-input-${idx}')" class="px-3 py-1.5 bg-cp-cyan/20 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">💾 Переименовать</button>
+              <button type="button" onclick="deleteBookSource('${safeBook}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function addNewBookSource() {
+      ensureMetaArraysInCategories();
+      const inp = document.getElementById("newBookSourceInput");
+      const val = inp.value.trim();
+      if (!val) return;
+      if (!CATEGORIES._books.includes(val)) {
+        CATEGORIES._books.push(val);
+        persistDatabase();
+      }
+      inp.value = "";
+      renderBookSourcesManager();
+    }
+
+    function renameBookSource(oldName, inputId) {
+      ensureMetaArraysInCategories();
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const newName = inp.value.trim() || "—";
+      CATEGORIES._books = getAllBookSources().map(b => b === oldName ? newName : b);
+      Object.keys(SECTION_LABELS).forEach(sec => {
+        (DB[sec] || []).forEach(it => { if (it.book === oldName) it.book = newName; });
+      });
+      persistDatabase();
+      renderBookSourcesManager();
+    }
+
+    function deleteBookSource(bookName) {
+      if (!confirm(`Удалить источник «${bookName}» из списка? (У карточек с этим источником поле сменится на «—»)`)) return;
+      ensureMetaArraysInCategories();
+      CATEGORIES._books = getAllBookSources().filter(b => b !== bookName);
+      Object.keys(SECTION_LABELS).forEach(sec => {
+        (DB[sec] || []).forEach(it => { if (it.book === bookName) it.book = "—"; });
+      });
+      persistDatabase();
+      renderBookSourcesManager();
+    }
+
+    // =========================================================================
+    // НАСТРОЙКА ФИЛЬТРОВ КАТАЛОГА (С НОВЫМИ СОРТИРОВКАМИ И ИСТОЧНИКАМИ)
+    // =========================================================================
+    function populateBookFilterDropdown() {
+      const bookSelect = document.getElementById("bookFilter");
+      if (!bookSelect) return;
+      const prevVal = bookSelect.value || "ALL";
+      const books = getAllBookSources();
+      bookSelect.innerHTML = `
+        <option value="ALL">Все книги</option>
+        <option value="FAV">⭐ Избранное</option>
+        <option value="USER">🛠️ Homebrew</option>
+        ${books.map(b => `<option value="${b}">${b}</option>`).join("")}
+      `;
+      if ([...bookSelect.options].some(o => o.value === prevVal)) {
+        bookSelect.value = prevVal;
+      }
+    }
+
     function setupCatalogFilters() {
       const subSelect = document.getElementById("subFilter");
       const extraSelect = document.getElementById("extraFilter");
       const relBox = document.getElementById("reliabilityFilterBox");
+      const availBox = document.getElementById("availabilityFilterBox");
+      const subColBox = document.getElementById("subColBox");
+      const extraColBox = document.getElementById("extraColBox");
       const subLabel = document.getElementById("subFilterLabel");
       const extraLabel = document.getElementById("extraFilterLabel");
       const legend = document.getElementById("abbrevLegend");
@@ -1825,11 +2046,19 @@
       const prevSubVal = subSelect.value || "ALL";
       const prevExtraVal = extraSelect.value || "ALL";
 
+      populateBookFilterDropdown();
+
       subLabel.textContent = activeCatalogTab === "vehicles" ? "Тип транспорта" : activeCatalogTab === "characters" ? "Роль персонажа" : "Категория / Раздел";
       subSelect.innerHTML = `<option value="ALL">Все (${items.length})</option>` + categories.map(c => `<option value="${c}">${c}</option>`).join("");
       if (categories.includes(prevSubVal)) subSelect.value = prevSubVal;
 
-      relBox.classList.toggle("hidden", activeCatalogTab !== "weapons");
+      const isWeapons = activeCatalogTab === "weapons";
+      relBox.classList.toggle("hidden", !isWeapons);
+      availBox.classList.toggle("hidden", !isWeapons);
+
+      // Адаптивная ширина колонок фильтров
+      subColBox.className = isWeapons ? "col-span-2" : "col-span-3";
+      extraColBox.className = isWeapons ? "col-span-2" : "col-span-4";
 
       if (activeCatalogTab === "roles") {
         extraLabel.textContent = "Зарплата";
@@ -1837,28 +2066,59 @@
         legend.innerHTML = `<span><b class="text-cp-cyan">Особая способность</b> = Уникальный навык роли</span><span><b class="text-cp-cyan">40 Очков</b> = Начальный пул на 10 профессиональных навыков</span>`;
       } else if (activeCatalogTab === "weapons") {
         extraLabel.textContent = "Скрываемость";
-        extraSelect.innerHTML = `<option value="ALL">Любая скрываемость</option><option value="Кар">Кар — Карман</option><option value="Кур">Кур — Куртка</option><option value="Плащ">Плащ — Длинный плащ</option><option value="Нет">Нет — Нельзя скрыть</option>`;
+        extraSelect.innerHTML = `<option value="ALL">Любая СКР</option><option value="Кар">Кар — Карман</option><option value="Кур">Кур — Куртка</option><option value="Плащ">Плащ — Длинный плащ</option><option value="Нет">Нет — Нельзя скрыть</option>`;
         legend.innerHTML = `<span><b class="text-cp-cyan">ТО</b> = Точность</span><span><b class="text-cp-cyan">СКР</b> = Кар/Кур/Плащ/Нет</span><span><b class="text-cp-cyan">ДОС</b> = Отл/Обы/Мал/Ред</span><span><b class="text-cp-cyan">МАГ</b> = Магазин</span><span><b class="text-cp-cyan">СКО</b> = Скоростр.</span><span><b class="text-cp-cyan">НАД</b> = НН/ОБ/ОН/ОТ</span>`;
       } else if (activeCatalogTab === "armor") {
         extraLabel.textContent = "Бронированность";
         extraSelect.innerHTML = `<option value="ALL">Без сортировки ОС</option><option value="SORT_OS_ASC">🔼 По возрастанию ОС</option><option value="SORT_OS_DESC">🔽 По убыванию ОС</option>`;
         legend.innerHTML = `<span><b class="text-cp-cyan">ОС</b> = Останавливающая способность (SP)</span><span><b class="text-cp-cyan">ЗУ</b> = Значение утяжеления (EV)</span>`;
-      } else if (activeCatalogTab === "gear" || activeCatalogTab === "cyberware" || activeCatalogTab === "services") {
+      } else if (activeCatalogTab === "gear" || activeCatalogTab === "services") {
         extraLabel.textContent = "Цена";
-        extraSelect.innerHTML = `<option value="ALL">Без сортировки цен</option><option value="SORT_PRICE_ASC">🔼 Цена: по возрастанию</option><option value="SORT_PRICE_DESC">🔽 Цена: по убыванию</option>`;
-        legend.innerHTML = `<span><b class="text-cp-cyan">eb</b> = Евробаксы</span><span><b class="text-cp-cyan">ПЧ</b> = Потеря Человечности</span><span><b class="text-cp-cyan">Хирургия:</b> Н, М, С, КР</span>`;
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки цен</option><option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option><option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">eb</b> = Евробаксы</span>`;
+      } else if (activeCatalogTab === "cyberware") {
+        extraLabel.textContent = "Цена";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки цен</option><option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option><option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>`;
+        legend.innerHTML = `
+          <span><b class="text-cp-cyan">ПЧ</b> = Потеря Человечности</span>
+          <span><b class="text-cp-yellow">Коды операций (Хирургия):</b> <b>Н</b> — Незначительная • <b>М</b> — Малая • <b>С</b> — Серьёзная • <b>КР</b> — Критическая</span>
+        `;
       } else if (activeCatalogTab === "netrunning") {
-        extraLabel.textContent = "Тип";
-        extraSelect.innerHTML = `<option value="ALL">Программы и Кибердеки</option><option value="ONLY_PROGRAMS">💾 Только Программы</option><option value="ONLY_DECKS">💻 Только Кибердеки</option>`;
+        extraLabel.textContent = "Тип / Сортировка (Цена, Сила, Память)";
+        extraSelect.innerHTML = `
+          <option value="ALL">Программы и Кибердеки (Без сортировки)</option>
+          <option value="ONLY_PROGRAMS">💾 Только Программы</option>
+          <option value="ONLY_DECKS">💻 Только Кибердеки</option>
+          <option value="SORT_PRICE_DESC">💰 Цена: от большей к меньшей</option>
+          <option value="SORT_PRICE_ASC">💰 Цена: от меньшей к большей</option>
+          <option value="SORT_STR_DESC">⚡ Сила (СИЛ / Врата): от большей к меньшей</option>
+          <option value="SORT_STR_ASC">⚡ Сила (СИЛ / Врата): от меньшей к большей</option>
+          <option value="SORT_MEM_DESC">🧠 Память (ЕП / MU): от большей к меньшей</option>
+          <option value="SORT_MEM_ASC">🧠 Память (ЕП / MU): от меньшей к большей</option>
+        `;
         legend.innerHTML = `<span><b class="text-cp-cyan">ЕП (MU)</b> = Единицы Памяти</span><span><b class="text-cp-cyan">СИЛ</b> = Сила программы / Кодовых врат</span><span><b class="text-cp-cyan">Стена данных</b> = Защита деки</span>`;
       } else if (activeCatalogTab === "vehicles") {
-        extraLabel.textContent = "Сортировка по типу / ОСТ";
-        extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_TYPE_ASC">🔤 По типу транспорта (А → Я)</option><option value="SORT_TYPE_DESC">🔤 По типу транспорта (Я → А)</option><option value="SORT_SDP_DESC">🛡️ Сначала самые прочные (по ОСТ)</option>`;
+        extraLabel.textContent = "Сортировка (Тип, ОСТ, Цена)";
+        extraSelect.innerHTML = `
+          <option value="ALL">Без сортировки</option>
+          <option value="SORT_PRICE_DESC">💰 Цена: от большей к меньшей</option>
+          <option value="SORT_PRICE_ASC">💰 Цена: от меньшей к большей</option>
+          <option value="SORT_TYPE_ASC">🔤 По типу транспорта (А → Я)</option>
+          <option value="SORT_TYPE_DESC">🔤 По типу транспорта (Я → А)</option>
+          <option value="SORT_SDP_DESC">🛡️ Сначала самые прочные (по ОСТ)</option>
+        `;
         legend.innerHTML = `<span><b class="text-cp-cyan">УСК/ТОРМ</b> = Ускорение и Торможение</span><span><b class="text-cp-cyan">ОСТ</b> = Очки Структуры (ХП)</span><span><b class="text-cp-cyan">ОС (Броня)</b> = Броня равна ОС / 10 (округл. вниз)</span>`;
       } else if (activeCatalogTab === "characters") {
-        extraLabel.textContent = "Сортировка по ролям";
-        extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_ROLE_ASC">🎭 По Ролям (А → Я)</option><option value="SORT_ROLE_DESC">🎭 По Ролям (Я → А)</option><option value="SORT_REP_DESC">⭐ Сначала с высшей Репутацией</option>`;
-        legend.innerHTML = `<span><b class="text-cp-cyan">СТАТЫ</b> = ИНТ, КРУТ, ПЕР, РЕФ, ПРВЛ, ТЕЛО, ТЕХ, УДАЧА, ЭМП</span><span><b class="text-cp-cyan">Репутация</b> = Известность на улицах (0–10)</span>`;
+        extraLabel.textContent = "Статус (Именной) / Сортировка";
+        extraSelect.innerHTML = `
+          <option value="ALL">Все персонажи (Без сортировки)</option>
+          <option value="ONLY_NAMED">⭐ Только Именные (Лор Cyberpunk)</option>
+          <option value="ONLY_UNNAMED">👤 Только Неименные (Рядовые НИПы)</option>
+          <option value="SORT_ROLE_ASC">🎭 По Ролям (А → Я)</option>
+          <option value="SORT_ROLE_DESC">🎭 По Ролям (Я → А)</option>
+          <option value="SORT_REP_DESC">⭐ Сначала с высшей Репутацией</option>
+        `;
+        legend.innerHTML = `<span><b class="text-cp-cyan">⭐ ИМЕННОЙ</b> = Уникальный персонаж лора Cyberpunk</span><span><b class="text-cp-cyan">СТАТЫ</b> = ИНТ, КРУТ, ПЕР, РЕФ, ПРВЛ, ТЕЛО, ТЕХ, УДАЧА, ЭМП</span>`;
       }
 
       if ([...extraSelect.options].some(o => o.value === prevExtraVal)) {
@@ -1872,6 +2132,7 @@
       document.getElementById("subFilter").value = "ALL";
       document.getElementById("extraFilter").value = "ALL";
       document.getElementById("relFilter").value = "ALL";
+      if (document.getElementById("availFilter")) document.getElementById("availFilter").value = "ALL";
       document.getElementById("bookFilter").value = "ALL";
       renderCatalog();
     }
@@ -1882,14 +2143,32 @@
       return s.includes("ОТ") ? 4 : s.includes("ОН") ? 3 : (s.includes("ОБ") || s.includes("СТ")) ? 2 : s.includes("НН") ? 1 : 0;
     }
 
+    // Ранг доступности оружия: Отл (4) -> Обы (3) -> Мал (2) -> Ред (1)
+    function getAvailabilityRank(dosStr) {
+      if (!dosStr) return 0;
+      const s = dosStr.toUpperCase();
+      return s.includes("ОТЛ") ? 4 : s.includes("ОБЫ") ? 3 : s.includes("МАЛ") ? 2 : s.includes("РЕД") ? 1 : 0;
+    }
+
     function toggleItemAddedBadge(sectionKey, itemId, isChecked) {
       if (!isCurrentUserAdmin()) return;
       const target = (DB[sectionKey] || []).find(i => i.id === itemId);
       if (!target) return;
       target.isUser = Boolean(isChecked);
+      addChangeLogEntry("edited", sectionKey, target);
       persistDatabase();
       if (sectionKey === "rules") renderRulesView();
       else renderCatalog();
+    }
+
+    function toggleCharacterNamedBadge(itemId, isChecked) {
+      if (!isCurrentUserAdmin()) return;
+      const target = (DB.characters || []).find(i => i.id === itemId);
+      if (!target) return;
+      target.isNamed = Boolean(isChecked);
+      addChangeLogEntry("edited", "characters", target);
+      persistDatabase();
+      renderCatalog();
     }
 
     // =========================================================================
@@ -1900,29 +2179,46 @@
       const sub = document.getElementById("subFilter")?.value || "ALL";
       const extra = document.getElementById("extraFilter")?.value || "ALL";
       const rel = document.getElementById("relFilter")?.value || "ALL";
+      const avail = document.getElementById("availFilter")?.value || "ALL";
       const book = document.getElementById("bookFilter")?.value || "ALL";
 
       let filtered = (DB[activeCatalogTab] || []).filter(item => {
         const textOk = !q || Object.values(item).some(val => String(val).toLowerCase().includes(q));
         const subOk = sub === "ALL" || item.category === sub;
         const bookOk = book === "ALL" ? true : book === "FAV" ? isItemFavorited(item.id) : book === "USER" ? Boolean(item.isUser) : (item.book && item.book.includes(book));
+
         let extraOk = true;
         if (extra !== "ALL" && !extra.startsWith("SORT_")) {
           if (activeCatalogTab === "weapons") extraOk = item.skr && item.skr.includes(extra);
           else if (activeCatalogTab === "netrunning") {
             const isDeck = item.itemKind === "deck" || item.category === "Кибердеки";
             extraOk = extra === "ONLY_DECKS" ? isDeck : !isDeck;
+          } else if (activeCatalogTab === "characters") {
+            if (extra === "ONLY_NAMED") extraOk = Boolean(item.isNamed);
+            else if (extra === "ONLY_UNNAMED") extraOk = !item.isNamed;
           }
         }
+
         let relOk = true;
         if (activeCatalogTab === "weapons" && rel.startsWith("ONLY_")) {
           relOk = item.nad && item.nad.toUpperCase().includes(rel.replace("ONLY_", ""));
         }
-        return textOk && subOk && bookOk && extraOk && relOk;
+
+        let availOk = true;
+        if (activeCatalogTab === "weapons" && avail.startsWith("ONLY_")) {
+          availOk = item.dos && item.dos.toUpperCase().includes(avail.replace("ONLY_", "").toUpperCase());
+        }
+
+        return textOk && subOk && bookOk && extraOk && relOk && availOk;
       });
 
-      if (activeCatalogTab === "weapons" && (rel === "SORT_DESC" || rel === "SORT_ASC")) {
-        filtered = [...filtered].sort((a, b) => rel === "SORT_DESC" ? (getReliabilityRank(b.nad) - getReliabilityRank(a.nad)) : (getReliabilityRank(a.nad) - getReliabilityRank(b.nad)));
+      // Сортировки по вкладкам
+      if (activeCatalogTab === "weapons") {
+        if (avail === "SORT_DESC" || avail === "SORT_ASC") {
+          filtered = [...filtered].sort((a, b) => avail === "SORT_DESC" ? (getAvailabilityRank(b.dos) - getAvailabilityRank(a.dos)) : (getAvailabilityRank(a.dos) - getAvailabilityRank(b.dos)));
+        } else if (rel === "SORT_DESC" || rel === "SORT_ASC") {
+          filtered = [...filtered].sort((a, b) => rel === "SORT_DESC" ? (getReliabilityRank(b.nad) - getReliabilityRank(a.nad)) : (getReliabilityRank(a.nad) - getReliabilityRank(b.nad)));
+        }
       } else if (activeCatalogTab === "roles") {
         if (extra === "SORT_SALARY_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.salary) - extractMaxNumericValue(b.salary));
         else if (extra === "SORT_SALARY_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.salary) - extractMaxNumericValue(a.salary));
@@ -1932,8 +2228,17 @@
       } else if (activeCatalogTab === "gear" || activeCatalogTab === "cyberware" || activeCatalogTab === "services") {
         if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
         else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+      } else if (activeCatalogTab === "netrunning") {
+        if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+        else if (extra === "SORT_STR_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.strength || a.codeGate) - extractMaxNumericValue(b.strength || b.codeGate));
+        else if (extra === "SORT_STR_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.strength || b.codeGate) - extractMaxNumericValue(a.strength || a.codeGate));
+        else if (extra === "SORT_MEM_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.mu || a.memory) - extractMaxNumericValue(b.mu || b.memory));
+        else if (extra === "SORT_MEM_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.mu || b.memory) - extractMaxNumericValue(a.mu || a.memory));
       } else if (activeCatalogTab === "vehicles") {
-        if (extra === "SORT_TYPE_ASC") filtered = [...filtered].sort((a, b) => (a.category || "").localeCompare(b.category || "", "ru"));
+        if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+        else if (extra === "SORT_TYPE_ASC") filtered = [...filtered].sort((a, b) => (a.category || "").localeCompare(b.category || "", "ru"));
         else if (extra === "SORT_TYPE_DESC") filtered = [...filtered].sort((a, b) => (b.category || "").localeCompare(a.category || "", "ru"));
         else if (extra === "SORT_SDP_DESC") filtered = [...filtered].sort((a, b) => (parseInt(b.sdp) || 0) - (parseInt(a.sdp) || 0));
       } else if (activeCatalogTab === "characters") {
@@ -1958,7 +2263,8 @@
         const isSel = item.id === selectedItemId;
         const borderCls = isSel ? "cp-border-active bg-cp-card" : "border-gray-800 bg-cp-card/70 hover:border-gray-600";
         const favStar = isItemFavorited(item.id) ? `<span class="text-cp-yellow text-xs">★</span>` : "";
-        const userBadge = item.isUser ? `<span class="text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1 font-bold">ДОБАВЛЕНО</span>` : "";
+        const userBadge = item.isUser ? `<span class="text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1 font-bold">HOMEBREW</span>` : "";
+        const namedBadge = (activeCatalogTab === "characters" && item.isNamed) ? `<span class="text-[10px] bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/50 px-1.5 font-bold">⭐ ИМЕННОЙ</span>` : "";
         const imgBadge = item.image ? `<span class="text-[10px] text-cp-cyan border border-cp-cyan/40 px-1">🖼️</span>` : "";
         const commCnt = (COMMENTS[item.id] || []).length;
         const commBadge = commCnt > 0 ? `<span class="text-[10px] text-gray-400">💬 ${commCnt}</span>` : "";
@@ -2005,7 +2311,7 @@
               <div class="flex items-center gap-2 flex-wrap">
                 <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40">${dash(item.typeCode || item.category)}</span>
                 <span class="font-bold text-sm text-white">${dash(item.name)}</span>
-                ${favStar} ${userBadge} ${imgBadge} ${commBadge}
+                ${namedBadge} ${favStar} ${userBadge} ${imgBadge} ${commBadge}
                 <span class="text-[11px] text-gray-500">[${dash(item.book)}]</span>
               </div>
               <div class="text-xs text-gray-400 mt-1">${subline}</div>
@@ -2041,6 +2347,7 @@
 
       const targetObj = (DB[sectionKey] || []).find(i => i.id === itemId);
       const isAddedChecked = Boolean(targetObj && targetObj.isUser);
+      const isNamedChecked = Boolean(targetObj && targetObj.isNamed);
 
       return `
         <div class="flex flex-col items-end gap-1.5 shrink-0">
@@ -2049,10 +2356,18 @@
             <button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
             <button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
           </div>
-          <label class="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-cp-yellow cursor-pointer select-none bg-cp-bg border border-gray-800 px-2 py-0.5" title="Показать или скрыть плашку «ДОБАВЛЕНО» у этой карточки">
-            <input type="checkbox" ${isAddedChecked ? 'checked' : ''} onchange="toggleItemAddedBadge('${sectionKey}', '${itemId}', this.checked)" class="accent-yellow-400">
-            <span>Плашка «ДОБАВЛЕНО»</span>
-          </label>
+          <div class="flex items-center gap-2 flex-wrap justify-end">
+            ${sectionKey === "characters" ? `
+              <label class="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-cp-cyan cursor-pointer select-none bg-cp-bg border border-gray-800 px-2 py-0.5" title="Отметить как Именного персонажа лора Cyberpunk">
+                <input type="checkbox" ${isNamedChecked ? 'checked' : ''} onchange="toggleCharacterNamedBadge('${itemId}', this.checked)" class="accent-cyan-400">
+                <span>⭐ Именной</span>
+              </label>
+            ` : ""}
+            <label class="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-cp-yellow cursor-pointer select-none bg-cp-bg border border-gray-800 px-2 py-0.5" title="Показать или скрыть плашку «HOMEBREW» у этой карточки">
+              <input type="checkbox" ${isAddedChecked ? 'checked' : ''} onchange="toggleItemAddedBadge('${sectionKey}', '${itemId}', this.checked)" class="accent-yellow-400">
+              <span>Плашка «HOMEBREW»</span>
+            </label>
+          </div>
         </div>
       `;
     }
@@ -2079,94 +2394,128 @@
         return `<div class="bg-cp-bg border border-gray-800 p-2.5 ${spanCls}"><div class="text-[10px] text-gray-400">${f.stat}</div><div class="text-sm font-bold ${colorCls} mt-0.5">${valDisplay}</div></div>`;
       }).join("");
 
-      let extraSpecialHtml = "";
-      if (isDeck) {
-        const activeTypes = Array.isArray(item.deckTypes) ? item.deckTypes : [];
-        const activeOpts = Array.isArray(item.deckOptions) ? item.deckOptions : [];
-        const chipsCnt = (item.extraChipsCount && item.extraChipsCount !== "—" && item.extraChipsCount !== "0") ? ` (${item.extraChipsCount} шт.)` : "";
-        extraSpecialHtml = `
-          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-3">
-            <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">Типы кибердеки:</div>
-            <div class="grid grid-cols-3 gap-2 text-xs">
-              ${DECK_TYPE_LIST.map(t => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeTypes.includes(t) ? 'border-cp-yellow bg-cp-yellow/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeTypes.includes(t) ? '☑' : '☐'}</span><span>${t}</span></div>`).join("")}
-            </div>
-          </div>
-          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
-            <div class="text-[11px] font-bold uppercase text-cp-cyan mb-2">Установленные опции деки:</div>
-            <div class="grid grid-cols-2 gap-2 text-xs">
-              ${DECK_OPTION_LIST.map(o => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeOpts.includes(o) ? 'border-cp-cyan bg-cp-cyan/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeOpts.includes(o) ? '☑' : '☐'}</span><span>${o}${o === "Доп чипы" && activeOpts.includes(o) ? chipsCnt : ""}</span></div>`).join("")}
-            </div>
-          </div>
-        `;
-      } else if (activeCatalogTab === "vehicles") {
-        if (item.specialEquipment && String(item.specialEquipment).trim() !== "" && item.specialEquipment !== "—") {
-          extraSpecialHtml = `
-            <div class="bg-cp-bg border border-cp-cyan/50 p-3.5 mb-4">
-              <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1.5">🔧 Особое снаряжение и вооружение:</div>
-              <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.specialEquipment}</div>
-            </div>
-          `;
-        }
-      } else if (activeCatalogTab === "roles") {
+      const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">HOMEBREW</span>` : "";
+      const namedHeaderBadge = (activeCatalogTab === "characters" && item.isNamed) ? `<span class="ml-2 text-[10px] bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/50 px-1.5 py-0.5 font-bold align-middle">⭐ ИМЕННОЙ</span>` : "";
+
+      // ОСОБАЯ СТРУКТУРА ДЛЯ КАРТОЧКИ РОЛЕЙ (СНАЧАЛА ОСОБАЯ СПОСОБНОСТЬ, ЗАТЕМ НАВЫКИ, А ОПИСАНИЕ — ВНИЗУ)
+      if (activeCatalogTab === "roles") {
         const skillsArr = Array.isArray(item.skills) && item.skills.length > 0 ? item.skills : ["—"];
-        extraSpecialHtml = `
-          <div class="bg-cp-bg border border-gray-800 p-3.5 mt-4">
+        const abilityBlockHtml = (item.abilityDesc && String(item.abilityDesc).trim() !== "" && item.abilityDesc !== "—")
+          ? `<div class="bg-cp-bg border-l-2 border-cp-cyan p-3.5 mb-4">
+               <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1">⚡ Описание особой способности (${dash(item.ability)}):</div>
+               <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.abilityDesc}</div>
+             </div>`
+          : "";
+
+        const skillsBlockHtml = `
+          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
             <div class="text-xs font-bold uppercase text-cp-cyan mb-2">Профессиональные навыки роли:</div>
             <div class="grid grid-cols-2 gap-1.5 text-xs">
               ${skillsArr.map((sk, i) => `<div class="bg-black/40 border border-gray-800 px-2.5 py-1.5 flex items-center gap-2"><span class="text-cp-yellow font-bold">${i + 1}.</span><span class="text-gray-200">${dash(sk)}</span></div>`).join("")}
             </div>
           </div>
         `;
-      } else if (activeCatalogTab === "characters") {
-        const charBlocks = [
-          { label: "🎯 Навыки", val: item.charSkills, border: "border-cp-cyan" },
-          { label: "🦾 Кибероснащение", val: item.charCyberware, border: "border-purple-500" },
-          { label: "🛡️ Броня", val: item.charArmor, border: "border-cp-yellow" },
-          { label: "🔫 Вооружение", val: item.charWeapons, border: "border-cp-red" },
-          { label: "🎒 Снаряжение", val: item.charGear, border: "border-cp-green" }
-        ].filter(b => b.val && String(b.val).trim() !== "" && b.val !== "—");
 
-        extraSpecialHtml = `
-          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
-            <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">📊 СТАТЫ (Основные характеристики):</div>
-            <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5 text-center">
-              ${CHARACTER_STAT_KEYS.map(st => `
-                <div class="bg-black/60 border border-gray-800 p-2">
-                  <div class="text-[9px] text-gray-400 font-bold">${st.l}</div>
-                  <div class="text-sm font-display font-black text-cp-cyan mt-0.5">${dash(item[st.k])}</div>
+        const descBlockHtml = (item.desc && String(item.desc).trim() !== "")
+          ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line mb-4">
+               <div class="text-[11px] font-bold uppercase text-cp-yellow mb-1">📋 Общее описание роли:</div>
+               ${item.desc}
+             </div>`
+          : "";
+
+        box.innerHTML = `
+          <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)} ${addedHeaderBadge}</div>
+              <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
+              <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
+            </div>
+            ${renderCardActionButtons(activeCatalogTab, item.id)}
+          </div>
+          <div class="grid grid-cols-3 gap-2.5 text-center mb-4">${statsHtml}</div>
+          ${abilityBlockHtml}
+          ${skillsBlockHtml}
+          ${descBlockHtml}
+          ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img id="detail-img-${item.id}" src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
+          ${renderCommentsSectionHTML(item.id)}
+        `;
+      } else {
+        let extraSpecialHtml = "";
+        if (isDeck) {
+          const activeTypes = Array.isArray(item.deckTypes) ? item.deckTypes : [];
+          const activeOpts = Array.isArray(item.deckOptions) ? item.deckOptions : [];
+          const chipsCnt = (item.extraChipsCount && item.extraChipsCount !== "—" && item.extraChipsCount !== "0") ? ` (${item.extraChipsCount} шт.)` : "";
+          extraSpecialHtml = `
+            <div class="bg-cp-bg border border-gray-800 p-3.5 mb-3">
+              <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">Типы кибердеки:</div>
+              <div class="grid grid-cols-3 gap-2 text-xs">
+                ${DECK_TYPE_LIST.map(t => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeTypes.includes(t) ? 'border-cp-yellow bg-cp-yellow/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeTypes.includes(t) ? '☑' : '☐'}</span><span>${t}</span></div>`).join("")}
+              </div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
+              <div class="text-[11px] font-bold uppercase text-cp-cyan mb-2">Установленные опции деки:</div>
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                ${DECK_OPTION_LIST.map(o => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeOpts.includes(o) ? 'border-cp-cyan bg-cp-cyan/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeOpts.includes(o) ? '☑' : '☐'}</span><span>${o}${o === "Доп чипы" && activeOpts.includes(o) ? chipsCnt : ""}</span></div>`).join("")}
+              </div>
+            </div>
+          `;
+        } else if (activeCatalogTab === "vehicles") {
+          if (item.specialEquipment && String(item.specialEquipment).trim() !== "" && item.specialEquipment !== "—") {
+            extraSpecialHtml = `
+              <div class="bg-cp-bg border border-cp-cyan/50 p-3.5 mb-4">
+                <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1.5">🔧 Особое снаряжение и вооружение:</div>
+                <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.specialEquipment}</div>
+              </div>
+            `;
+          }
+        } else if (activeCatalogTab === "characters") {
+          const charBlocks = [
+            { label: "🎯 Навыки", val: item.charSkills, border: "border-cp-cyan" },
+            { label: "🦾 Кибероснащение", val: item.charCyberware, border: "border-purple-500" },
+            { label: "🛡️ Броня", val: item.charArmor, border: "border-cp-yellow" },
+            { label: "🔫 Вооружение", val: item.charWeapons, border: "border-cp-red" },
+            { label: "🎒 Снаряжение", val: item.charGear, border: "border-cp-green" }
+          ].filter(b => b.val && String(b.val).trim() !== "" && b.val !== "—");
+
+          extraSpecialHtml = `
+            <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
+              <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">📊 СТАТЫ (Основные характеристики):</div>
+              <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5 text-center">
+                ${CHARACTER_STAT_KEYS.map(st => `
+                  <div class="bg-black/60 border border-gray-800 p-2">
+                    <div class="text-[9px] text-gray-400 font-bold">${st.l}</div>
+                    <div class="text-sm font-display font-black text-cp-cyan mt-0.5">${dash(item[st.k])}</div>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+            <div class="space-y-3 mb-4">
+              ${charBlocks.map(b => `
+                <div class="bg-cp-bg border-l-2 ${b.border} p-3">
+                  <div class="text-[11px] font-bold uppercase text-gray-300 mb-1">${b.label}:</div>
+                  <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${b.val}</div>
                 </div>
               `).join("")}
             </div>
+          `;
+        }
+
+        box.innerHTML = `
+          <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
+            <div>
+              <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)} ${namedHeaderBadge} ${addedHeaderBadge}</div>
+              <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
+              <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
+            </div>
+            ${renderCardActionButtons(activeCatalogTab, item.id)}
           </div>
-          <div class="space-y-3 mb-4">
-            ${charBlocks.map(b => `
-              <div class="bg-cp-bg border-l-2 ${b.border} p-3">
-                <div class="text-[11px] font-bold uppercase text-gray-300 mb-1">${b.label}:</div>
-                <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${b.val}</div>
-              </div>
-            `).join("")}
-          </div>
+          <div class="grid ${gridCols} gap-2.5 text-center mb-4">${statsHtml}</div>
+          ${extraSpecialHtml}
+          ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${item.desc}</div>` : ""}
+          ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img id="detail-img-${item.id}" src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
+          ${renderCommentsSectionHTML(item.id)}
         `;
       }
-
-      const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">ДОБАВЛЕНО</span>` : "";
-
-      box.innerHTML = `
-        <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
-          <div>
-            <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)} ${addedHeaderBadge}</div>
-            <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
-            <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
-          </div>
-          ${renderCardActionButtons(activeCatalogTab, item.id)}
-        </div>
-        <div class="grid ${gridCols} gap-2.5 text-center mb-4">${statsHtml}</div>
-        ${(isDeck || activeCatalogTab === "vehicles" || activeCatalogTab === "characters") ? extraSpecialHtml : ""}
-        ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${item.desc}</div>` : ""}
-        ${(!isDeck && activeCatalogTab !== "vehicles" && activeCatalogTab !== "characters") ? extraSpecialHtml : ""}
-        ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img id="detail-img-${item.id}" src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
-        ${renderCommentsSectionHTML(item.id)}
-      `;
 
       if (isSameCard) {
         const newCommEl = document.getElementById(`comments-scroll-${item.id}`);
@@ -2189,7 +2538,8 @@
     function deleteItem(sectionKey, itemId) {
       if (!isCurrentUserAdmin()) return;
       const target = (DB[sectionKey] || []).find(i => i.id === itemId);
-      if (!confirm(`Удалить «${target ? (target.name || target.title) : itemId}»?`)) return;
+      if (!target || !confirm(`Удалить «${target.name || target.title}»?`)) return;
+      addChangeLogEntry("deleted", sectionKey, target);
       DB[sectionKey] = (DB[sectionKey] || []).filter(i => i.id !== itemId);
       persistDatabase(); updateCounts();
       if (sectionKey === "rules") { selectedRuleId = DB.rules[0]?.id || null; renderRulesView(); }
@@ -2212,15 +2562,22 @@
     function setBuilderType(type, itemToEdit = null) {
       activeBuilderType = type;
       const addedCheckEl = document.getElementById("builderShowAddedCheck");
+      const namedWrapEl = document.getElementById("builderNamedCharWrap");
+      const namedCheckEl = document.getElementById("builderNamedCharCheck");
+
+      if (namedWrapEl) namedWrapEl.classList.toggle("hidden", type !== "characters");
+
       if (!itemToEdit) {
         editingItemId = null;
         clearBuilderImage();
         if (addedCheckEl) addedCheckEl.checked = true;
+        if (namedCheckEl) namedCheckEl.checked = false;
       } else {
         currentBuilderImageData = itemToEdit.image || "";
         document.getElementById("builderImageUrl").value = (itemToEdit.image && !itemToEdit.image.startsWith("data:")) ? itemToEdit.image : "";
         updateBuilderImagePreview();
         if (addedCheckEl) addedCheckEl.checked = Boolean(itemToEdit.isUser);
+        if (namedCheckEl) namedCheckEl.checked = Boolean(itemToEdit.isNamed);
       }
 
       const isEdit = Boolean(editingItemId && itemToEdit);
@@ -2237,7 +2594,11 @@
       const container = document.getElementById("builderFieldsContainer");
       const v = itemToEdit || {};
       const cats = getAllCategoriesForSection(type);
-      const datalistHtml = `<datalist id="dl-builder-cat">${cats.map(c => `<option value="${c}">`).join("")}</datalist>`;
+      const books = getAllBookSources();
+      const datalistHtml = `
+        <datalist id="dl-builder-cat">${cats.map(c => `<option value="${c}">`).join("")}</datalist>
+        <datalist id="dl-builder-book">${books.map(b => `<option value="${b}">`).join("")}</datalist>
+      `;
 
       if (type === "rules") {
         container.innerHTML = `
@@ -2246,7 +2607,7 @@
             <div><label class="text-[11px] text-gray-400">Заголовок игровой механики</label><input name="title" value="${v.title || ''}" placeholder="Стрельба с двух рук" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
             <div><label class="text-[11px] text-cp-cyan font-bold">Подраздел механик</label><input name="subsection" list="dl-builder-cat" value="${v.subsection || ''}" placeholder="Бой и Оружие (ПВПВ)" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
             <div><label class="text-[11px] text-gray-400">Краткая суть</label><input name="summary" value="${v.summary || ''}" placeholder="Штрафы при стрельбе..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
-            <div><label class="text-[11px] text-gray-400">Книга-источник</label><input name="book" value="${v.book || ''}" placeholder="CP20 / Homebrew" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+            <div><label class="text-[11px] text-cp-yellow font-bold">Книга-источник (выберите или впишите)</label><input name="book" list="dl-builder-book" value="${v.book || ''}" placeholder="CP20 / Homebrew" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
           </div>
           <div><label class="text-[11px] text-gray-400">Текст игровой механики (необязательно)</label><textarea name="content" rows="5" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.content || ''}</textarea></div>
         `;
@@ -2269,8 +2630,17 @@
       const inputsHtml = fields.map(f => {
         let val = v[f.k] || "";
         if (f.k === "skills" && Array.isArray(val)) val = val.join(", ");
-        return `<div><label class="text-[11px] ${f.isCat ? 'text-cp-cyan font-bold' : 'text-gray-400'}">${f.l}</label><input name="${f.k}" ${f.isCat ? 'list="dl-builder-cat"' : ''} value="${val}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
+        const listAttr = f.isCat ? 'list="dl-builder-cat"' : f.isBook ? 'list="dl-builder-book"' : '';
+        const labelColor = f.isCat ? 'text-cp-cyan font-bold' : f.isBook ? 'text-cp-yellow font-bold' : 'text-gray-400';
+        return `<div><label class="text-[11px] ${labelColor}">${f.l}</label><input name="${f.k}" ${listAttr} value="${val}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
       }).join("");
+
+      const roleAbilityDescHtml = type === "roles" ? `
+        <div>
+          <label class="text-[11px] text-cp-cyan font-bold">⚡ Описание особой способности (отображается над профессиональными навыками)</label>
+          <textarea name="abilityDesc" rows="2" placeholder="Подробно опишите игровой эффект особой способности роли..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.abilityDesc || ''}</textarea>
+        </div>
+      ` : "";
 
       const selTypes = Array.isArray(v.deckTypes) ? v.deckTypes : [];
       const selOpts = Array.isArray(v.deckOptions) ? v.deckOptions : [];
@@ -2305,27 +2675,35 @@
         <div><label class="text-[11px] text-cp-green font-bold">🎒 Снаряжение</label><textarea name="charGear" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charGear || ''}</textarea></div>
       ` : "";
 
-      container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${deckChecksHtml}${vehicleExtraHtml}${characterExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
+      container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${roleAbilityDescHtml}${deckChecksHtml}${vehicleExtraHtml}${characterExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
     }
 
     function saveBuilderItem(e) {
       e.preventDefault();
       if (!isCurrentUserAdmin()) return;
+      ensureMetaArraysInCategories();
+
       const fd = new FormData(e.target);
       const raw = Object.fromEntries(fd.entries());
       const data = {};
-      const freeTextFields = ["desc", "content", "summary", "specialEquipment", "charSkills", "charCyberware", "charArmor", "charWeapons", "charGear"];
+      const freeTextFields = ["desc", "abilityDesc", "content", "summary", "specialEquipment", "charSkills", "charCyberware", "charArmor", "charWeapons", "charGear"];
       Object.keys(raw).forEach(k => {
         if (k === "deckTypeCheck" || k === "deckOptionCheck") return;
         const val = String(raw[k] || "").trim();
         data[k] = freeTextFields.includes(k) ? val : (val === "" ? "—" : val);
       });
 
+      const isEdit = Boolean(editingItemId);
       data.id = editingItemId || ("user-" + Date.now());
       data.origName = data.origName && data.origName !== "—" ? data.origName : data.name;
 
       const showAddedCheck = document.getElementById("builderShowAddedCheck");
       data.isUser = showAddedCheck ? Boolean(showAddedCheck.checked) : true;
+
+      if (activeBuilderType === "characters") {
+        const namedCheck = document.getElementById("builderNamedCharCheck");
+        data.isNamed = namedCheck ? Boolean(namedCheck.checked) : false;
+      }
 
       if (currentBuilderImageData) data.image = currentBuilderImageData;
 
@@ -2340,13 +2718,24 @@
       }
 
       const catField = activeBuilderType === "rules" ? data.subsection : data.category;
-      if (catField && catField !== "—" && !CATEGORIES[activeBuilderType].includes(catField)) CATEGORIES[activeBuilderType].push(catField);
+      if (catField && catField !== "—" && !CATEGORIES[activeBuilderType].includes(catField)) {
+        CATEGORIES[activeBuilderType].push(catField);
+      }
 
-      if (editingItemId) {
+      // Автоматически добавляем новый источник в список книг, если его вписали вручную
+      if (data.book && data.book !== "—" && !CATEGORIES._books.includes(data.book)) {
+        CATEGORIES._books.push(data.book);
+      }
+
+      if (isEdit) {
         const idx = DB[activeBuilderType].findIndex(i => i.id === editingItemId);
         if (idx !== -1) DB[activeBuilderType][idx] = data;
         else DB[activeBuilderType].unshift(data);
-      } else DB[activeBuilderType].unshift(data);
+        addChangeLogEntry("edited", activeBuilderType, data);
+      } else {
+        DB[activeBuilderType].unshift(data);
+        addChangeLogEntry("created", activeBuilderType, data);
+      }
 
       persistDatabase();
       document.getElementById("builderJsonPreview").textContent = JSON.stringify({ ...data, image: data.image ? "[Изображение прикреплено]" : undefined }, null, 2);
@@ -2394,7 +2783,7 @@
         <div onclick="openRuleArticle('${r.id}')" class="p-3 border cursor-pointer transition-all ${r.id === selectedRuleId ? 'border-cp-yellow bg-cp-card' : 'border-gray-800 bg-cp-bg hover:border-gray-600'}">
           <div class="flex items-center justify-between text-[10px] text-cp-cyan font-bold uppercase">
             <span>${dash(r.subsection)}</span>
-            <span>${r.isUser ? '<b class="text-cp-yellow mr-1">ДОБАВЛЕНО</b>' : ''}${isItemFavorited(r.id) ? '★ ' : ''}[${dash(r.book)}]</span>
+            <span>${r.isUser ? '<b class="text-cp-yellow mr-1">HOMEBREW</b>' : ''}${isItemFavorited(r.id) ? '★ ' : ''}[${dash(r.book)}]</span>
           </div>
           <div class="text-xs font-bold text-white mt-1">${dash(r.title)}</div>
           ${r.summary ? `<div class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">${r.summary}</div>` : ""}
@@ -2409,7 +2798,7 @@
       const savedCommScroll = (isSameRule && oldCommEl) ? oldCommEl.scrollTop : 0;
       areaEl.setAttribute("data-rendered-id", rule.id);
 
-      const addedBadge = rule.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold">ДОБАВЛЕНО</span>` : "";
+      const addedBadge = rule.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold">HOMEBREW</span>` : "";
       areaEl.innerHTML = `
         <div class="border-b border-gray-800 pb-4 mb-5 flex items-start justify-between gap-3">
           <div><div class="text-xs font-bold text-cp-cyan uppercase">${dash(rule.subsection)} // Источник: ${dash(rule.book)} ${addedBadge}</div><h2 class="font-display text-2xl font-black text-white mt-1">${dash(rule.title)}</h2></div>
@@ -2488,7 +2877,6 @@
           return;
         }
 
-        // Проверяем, не забанен ли пользователь!
         if (isUserCurrentlyBanned(found)) {
           errBox.classList.add("hidden");
           showBanScreenModal(found.banInfo);
@@ -2661,7 +3049,7 @@
     }
     function clearAllUserFavorites() { const u = getCurrentUser(); if (!u || !confirm("Очистить закладки?")) return; u.favorites = []; persistUsers(); renderProfileView(); }
     function findItemAcrossAllSections(itemId) {
-      for (const secKey of Object.keys(DB)) {
+      for (const secKey of Object.keys(SECTION_LABELS)) {
         const found = (DB[secKey] || []).find(i => i.id === itemId);
         if (found) return { section: secKey, item: found };
       }
@@ -2764,27 +3152,18 @@
       if (!isCurrentUserRoot()) return;
       const t = USERS.find(u => u.id === uid);
       if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями и уведомлениями?`)) return;
-      
-      // 1. Стираем логин и пароль из закрытого хранилища Supabase
       if (window.deleteUserFromCloudVault) {
         await window.deleteUserFromCloudVault(uid);
       }
-      
-      // 2. Удаляем сам профиль пользователя
       USERS = USERS.filter(u => u.id !== uid);
-      
-      // 3. Вычищаем все комментарии этого пользователя со всех карточек
       Object.keys(COMMENTS).forEach(itemId => {
         if (Array.isArray(COMMENTS[itemId])) {
           COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
           if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
         }
       });
-
-      // 4. Вычищаем все уведомления этого пользователя
       NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== uid);
 
-      // Отправляем очищенные списки в облако
       persistUsers();
       persistComments();
       persistNotifications();
@@ -2835,30 +3214,45 @@
       }).join("");
     }
 
+    // Статистика базы + показ кнопок выгрузки/сброса строго только для ROOT
     function renderAdminBackupStats() {
-      const totalItems = Object.keys(DB).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
-      const userItems = Object.keys(DB).reduce((acc, k) => acc + (DB[k]?.filter(i => i.isUser).length || 0), 0);
+      const totalItems = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
+      const userItems = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.filter(i => i.isUser).length || 0), 0);
       const totalCats = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + getAllCategoriesForSection(k).length, 0);
       document.getElementById("adminStatsGrid").innerHTML = `
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего карточек</div><div class="text-2xl font-display font-black text-cp-yellow mt-1">${totalItems}</div></div>
-        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">С плашкой «Добавлено»</div><div class="text-2xl font-display font-black text-cp-cyan mt-1">${userItems}</div></div>
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">С плашкой «Homebrew»</div><div class="text-2xl font-display font-black text-cp-cyan mt-1">${userItems}</div></div>
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего категорий</div><div class="text-2xl font-display font-black text-cp-green mt-1">${totalCats}</div></div>
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Пользователей</div><div class="text-2xl font-display font-black text-purple-400 mt-1">${USERS.length}</div></div>
       `;
+
+      const isRoot = isCurrentUserRoot();
+      const rootControls = document.getElementById("rootOnlyBackupControls");
+      const nonRootNotice = document.getElementById("nonRootBackupNotice");
+      if (rootControls) {
+        rootControls.classList.toggle("hidden", !isRoot);
+        rootControls.classList.toggle("flex", isRoot);
+      }
+      if (nonRootNotice) {
+        nonRootNotice.classList.toggle("hidden", isRoot);
+      }
     }
 
     function exportUserDatabase() {
+      if (!isCurrentUserRoot()) return;
       const blob = new Blob([JSON.stringify({ db: DB, categories: CATEGORIES, users: USERS, comments: COMMENTS, notifications: NOTIFICATIONS }, null, 2)], { type: "application/json" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "database.json"; a.click();
     }
 
     function exportUserDatabaseAsJS() {
+      if (!isCurrentUserRoot()) return;
       const jsContent = "window.CP2020_EXTERNAL_DATA = " + JSON.stringify({ categories: CATEGORIES, db: DB }, null, 2) + ";";
       const blob = new Blob([jsContent], { type: "application/javascript" });
       const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "database.js"; a.click();
     }
 
     function importDatabaseFromFile(ev) {
+      if (!isCurrentUserRoot()) return;
       const file = ev.target.files[0];
       if (!file) return;
       const reader = new FileReader();
@@ -2871,6 +3265,7 @@
             if (parsed.comments) COMMENTS = parsed.comments;
             if (Array.isArray(parsed.notifications)) NOTIFICATIONS = parsed.notifications;
           } else DB = parsed;
+          ensureMetaArraysInCategories();
           sanitizeUsersAndEnforceRoot();
           persistDatabase(); persistUsers(); persistComments(); persistNotifications(); updateCounts(); renderAdminBackupStats();
           alert("База данных успешно загружена!");
@@ -2880,6 +3275,7 @@
     }
 
     function clearUserAdditions() {
+      if (!isCurrentUserRoot()) return;
       if (!confirm("Сбросить кеш карточек браузера и перезагрузить чистую базу из внешнего файла database.js?")) return;
       ["cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30", "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_full_db_v50"].forEach(k => localStorage.removeItem(k));
       localStorage.removeItem(STORAGE_CAT_KEY);
@@ -2966,7 +3362,6 @@
       }, 1500);
     };
 
-    // Компактный эмодзи-индикатор фиксированного размера (шапка никогда не плавает)
     function setCloudStatusBadge(emojiIcon, tooltipText) {
       const badge = document.getElementById("cloudRealtimeBadge");
       if (badge) {
@@ -3070,7 +3465,8 @@
           const newCatStr = JSON.stringify(incoming.categories);
           if (newCatStr !== JSON.stringify(CATEGORIES)) {
             CATEGORIES = incoming.categories;
-            localStorage.setItem(STORAGE_CAT_KEY, newCatStr);
+            ensureMetaArraysInCategories();
+            localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
             dbChanged = true;
           }
         }
@@ -3104,7 +3500,6 @@
           return;
         }
 
-        // Мгновенно проверяем, не забанили ли и не удалили ли текущего пользователя!
         if (usersChanged) {
           checkAndEnforceCurrentSessionValidity();
           if (currentlyViewedPublicUserId && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
@@ -3134,8 +3529,8 @@
         } else if (activeMainView === "profile") {
           if (!isTyping) renderProfileView();
         } else if (activeMainView === "admin") {
-          // Мгновенно обновляем вкладки Админ-панели при регистрации пользователей, банах или новых комментариях!
           if (activeAdminSubtab === "categories" && !isTyping) renderCategoryManager();
+          else if (activeAdminSubtab === "books" && !isTyping) renderBookSourcesManager();
           else if (activeAdminSubtab === "users" && !isTyping) renderAdminUsersManager();
           else if (activeAdminSubtab === "logs") renderAdminLogsView();
           else if (activeAdminSubtab === "backup") renderAdminBackupStats();
@@ -3177,7 +3572,6 @@
       scheduleCloudPush("notifications");
     };
 
-    // Таймер автоматической проверки истечения временных банов (каждые 15 секунд)
     setInterval(() => {
       checkAndEnforceCurrentSessionValidity();
       if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
@@ -3212,6 +3606,7 @@
         if (data && data.db && Object.keys(data.db).length > 0) {
           applyCloudStateToUI(data, false);
         } else {
+          ensureMetaArraysInCategories();
           sanitizeUsersAndEnforceRoot();
           await sbClient.from("cp2020_state").upsert({
             id: "main_state",
@@ -3259,14 +3654,14 @@
       setTimeout(initRealtimeCloud, 200);
     });
   </script>
-<!-- ========================================================================= -->
+
+  <!-- ========================================================================= -->
   <!-- МОДУЛЬ АВТОМАТИЧЕСКОЙ ПРОВЕРКИ ОБНОВЛЕНИЙ КОДА НА GITHUB PAGES            -->
   <!-- ========================================================================= -->
   <script>
     let initialCodeSignature = null;
     let isUpdateLockActive = false;
 
-    // Вычисляет быстрый хеш-отпечаток текста (алгоритм djb2)
     function computeFastHash(str) {
       let hash = 5381;
       for (let i = 0; i < str.length; i++) {
@@ -3275,7 +3670,6 @@
       return (hash >>> 0).toString(16);
     }
 
-    // Скачивает свежий index.html с GitHub в обход любого кэша браузера
     async function fetchLiveHtmlSignature() {
       if (location.protocol === "file:") return null;
       try {
@@ -3295,7 +3689,6 @@
       }
     }
 
-    // Блокирует весь сайт и выводит окно обновления
     function triggerUpdateLockdown() {
       if (isUpdateLockActive) return;
       isUpdateLockActive = true;
@@ -3308,7 +3701,6 @@
       const modal = document.getElementById("versionUpdateModal");
       if (modal) modal.classList.remove("hidden");
 
-      // Блокируем нажатия любых клавиш (кроме F5 / Ctrl+R), чтобы нельзя было управлять сайтом с клавиатуры
       window.addEventListener("keydown", function(e) {
         if (e.key !== "F5" && !(e.ctrlKey && e.key.toLowerCase() === "r")) {
           e.stopPropagation();
@@ -3317,7 +3709,6 @@
       }, true);
     }
 
-    // Принудительная перезагрузка страницы со сбросом кэша URL
     function forceReloadFromGithub() {
       const url = new URL(location.href);
       url.searchParams.set("_v", Date.now());
@@ -3326,12 +3717,9 @@
 
     async function initGithubVersionWatcher() {
       if (location.protocol === "file:") return;
-
-      // 1. Запоминаем слепок версии, на которой пользователь открыл сайт
       initialCodeSignature = await fetchLiveHtmlSignature();
       if (!initialCodeSignature) return;
 
-      // 2. Проверяем наличие новой версии на GitHub каждые 45 секунд
       setInterval(async () => {
         if (isUpdateLockActive || document.hidden) return;
         const latestSig = await fetchLiveHtmlSignature();
@@ -3340,7 +3728,6 @@
         }
       }, 45000);
 
-      // 3. Дополнительно проверяем мгновенно, когда игрок возвращается на вкладку сайта
       document.addEventListener("visibilitychange", async () => {
         if (!document.hidden && !isUpdateLockActive && initialCodeSignature) {
           const latestSig = await fetchLiveHtmlSignature();
