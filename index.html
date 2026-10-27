@@ -1153,7 +1153,7 @@
                     <textarea id="edit-comm-textarea-${c.id}" rows="2" class="w-full bg-cp-panel border border-cp-yellow p-2 text-xs text-white outline-none">${c.text}</textarea>
                     <div class="flex gap-2">
                       <button type="button" onclick="saveEditedComment('${itemId}', '${c.id}')" class="px-3 py-1 bg-cp-green text-black font-bold text-[11px] uppercase">Сохранить</button>
-                      <button type="button" onclick="cancelEditComment()" class="px-3 py-1 bg-gray-800 text-gray-300 text-[11px] uppercase">Отмена</button>
+                      <button type="button" onclick="cancelEditComment('${itemId}')" class="px-3 py-1 bg-gray-800 text-gray-300 text-[11px] uppercase">Отмена</button>
                     </div>
                   </div>
                 ` : `<div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line pl-10">${c.text}</div>`}
@@ -1167,7 +1167,7 @@
                <span class="text-cp-cyan font-bold shrink-0">↩ Ответ пользователю ${activeReplyToComment.authorName}:</span>
                <span class="text-gray-300 italic truncate">«${activeReplyToComment.snippet}»</span>
              </div>
-             <button type="button" onclick="cancelReplyToComment()" class="text-white hover:text-cp-red font-bold shrink-0">✕</button>
+             <button type="button" onclick="cancelReplyToComment('${itemId}')" class="text-white hover:text-cp-red font-bold shrink-0">✕</button>
            </div>` : "";
 
       const formHtml = curUser
@@ -1184,14 +1184,40 @@
              <button type="button" onclick="switchMainView('profile')" class="px-3 py-1.5 bg-cp-yellow text-black font-bold text-[11px] uppercase shrink-0">🔑 Войти</button>
            </div>`;
 
-      return `<div class="mt-6 pt-5 border-t-2 border-gray-800">
+      return `<div id="comments-wrapper-${itemId}" class="mt-6 pt-5 border-t-2 border-gray-800">
                 <h4 class="font-display text-xs font-bold uppercase text-cp-cyan tracking-wider mb-3">💬 Комментарии (${list.length})</h4>
-                <div class="space-y-2.5 max-h-96 overflow-y-auto pr-1">${itemsHtml}</div>
+                <div id="comments-scroll-${itemId}" class="space-y-2.5 max-h-96 overflow-y-auto pr-1">${itemsHtml}</div>
                 ${formHtml}
               </div>`;
     }
 
-    function refreshCurrentCardOrRuleView() {
+    // Точечное обновление ТОЛЬКО блока комментариев с сохранением прокрутки (без прыжков карточки вверх!)
+    function refreshCurrentCardOrRuleView(options = {}) {
+      const targetId = options.itemId || (activeMainView === "rules" ? selectedRuleId : selectedItemId);
+      const wrapper = targetId ? document.getElementById(`comments-wrapper-${targetId}`) : null;
+
+      if (wrapper) {
+        const cardContainer = activeMainView === "rules" ? document.getElementById("ruleContentArea") : document.getElementById("detailCard");
+        const commScrollEl = document.getElementById(`comments-scroll-${targetId}`);
+
+        // Запоминаем точное положение ползунков перед обновлением
+        const savedCardScroll = cardContainer ? cardContainer.scrollTop : 0;
+        const savedCommScroll = commScrollEl ? commScrollEl.scrollTop : 0;
+
+        // Заменяем только блок комментариев, не трогая саму карточку
+        wrapper.outerHTML = renderCommentsSectionHTML(targetId);
+
+        // Возвращаем ползунки на место (или прокручиваем вниз к новому отправленному сообщению)
+        const newCommScrollEl = document.getElementById(`comments-scroll-${targetId}`);
+        if (newCommScrollEl) {
+          newCommScrollEl.scrollTop = options.scrollToBottom ? newCommScrollEl.scrollHeight : savedCommScroll;
+        }
+        if (cardContainer) {
+          cardContainer.scrollTop = savedCardScroll;
+        }
+        return;
+      }
+
       if (activeMainView === "rules") renderRulesSidebar();
       else if (activeMainView === "catalog") renderCatalog();
     }
@@ -1228,7 +1254,11 @@
 
       activeReplyToComment = null;
       persistComments();
-      refreshCurrentCardOrRuleView();
+      // Обновляем только блок комментариев и прокручиваем список комментариев к новому сообщению
+      refreshCurrentCardOrRuleView({ itemId, scrollToBottom: true });
+
+      const newInp = document.getElementById(`new-comment-input-${itemId}`);
+      if (newInp) newInp.focus();
     }
 
     function startReplyToComment(itemId, commentId) {
@@ -1240,19 +1270,19 @@
         authorName: author ? author.displayName : (orig.fallbackName || "Раннер"),
         snippet: truncateQuote(orig.text, 100)
       };
-      refreshCurrentCardOrRuleView();
-      setTimeout(() => { const inp = document.getElementById(`new-comment-input-${itemId}`); if (inp) inp.focus(); }, 50);
+      refreshCurrentCardOrRuleView({ itemId });
+      setTimeout(() => { const inp = document.getElementById(`new-comment-input-${itemId}`); if (inp) inp.focus(); }, 30);
     }
-    function cancelReplyToComment() { activeReplyToComment = null; refreshCurrentCardOrRuleView(); }
-    function startEditComment(itemId, commentId) { activeEditCommentId = commentId; refreshCurrentCardOrRuleView(); }
-    function cancelEditComment() { activeEditCommentId = null; refreshCurrentCardOrRuleView(); }
+    function cancelReplyToComment(itemId) { activeReplyToComment = null; refreshCurrentCardOrRuleView({ itemId }); }
+    function startEditComment(itemId, commentId) { activeEditCommentId = commentId; refreshCurrentCardOrRuleView({ itemId }); }
+    function cancelEditComment(itemId) { activeEditCommentId = null; refreshCurrentCardOrRuleView({ itemId }); }
     function saveEditedComment(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
       const area = document.getElementById(`edit-comm-textarea-${commentId}`);
       if (!u || !target || target.userId !== u.id || !area || !area.value.trim()) return;
       target.text = area.value.trim(); target.edited = true; activeEditCommentId = null;
-      persistComments(); refreshCurrentCardOrRuleView();
+      persistComments(); refreshCurrentCardOrRuleView({ itemId });
     }
     function deleteComment(itemId, commentId) {
       const u = getCurrentUser();
@@ -1260,7 +1290,7 @@
       if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
       if (!confirm("Удалить этот комментарий?")) return;
       COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
-      persistComments(); refreshCurrentCardOrRuleView();
+      persistComments(); refreshCurrentCardOrRuleView({ itemId });
     }
 
     // =========================================================================
