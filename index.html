@@ -2314,7 +2314,10 @@
     const SUPABASE_ANON_KEY = "sb_publishable_gmUGR5_KyN2m4jZ-yRVoZw__A9UwOjh";
 
     let sbClient = null;
+    let liveChannel = null;
     let isApplyingRemoteUpdate = false;
+    let lastKnownUpdatedAt = null;
+    const CLIENT_INSTANCE_ID = "cl-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7);
 
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
@@ -2397,11 +2400,34 @@
       }
     }
 
+    // Скачивание актуального состояния из базы (вызывается по радио-сигналу или таймеру)
+    async function fetchLatestStateFromCloud() {
+      if (!sbClient || isApplyingRemoteUpdate) return;
+      try {
+        const { data, error } = await sbClient
+          .from("cp2020_state")
+          .select("*")
+          .eq("id", "main_state")
+          .maybeSingle();
+
+        if (error || !data) return;
+        if (data.updated_at && data.updated_at !== lastKnownUpdatedAt) {
+          lastKnownUpdatedAt = data.updated_at;
+          applyCloudStateToUI(data);
+        }
+      } catch (e) {
+        console.error("Ошибка чтения облака:", e);
+      }
+    }
+
     async function pushStateToCloud() {
       if (!sbClient || isApplyingRemoteUpdate) return;
       try {
         sanitizeUsersAndEnforceRoot();
         setCloudStatusBadge("🔄 Синхронизация...", "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/40");
+        const newTimestamp = new Date().toISOString();
+        lastKnownUpdatedAt = newTimestamp;
+
         const payload = {
           id: "main_state",
           db: DB,
@@ -2409,13 +2435,24 @@
           users: USERS,
           comments: COMMENTS,
           notifications: NOTIFICATIONS,
-          updated_at: new Date().toISOString()
+          updated_at: newTimestamp
         };
+
         const { error } = await sbClient
           .from("cp2020_state")
           .upsert(payload, { onConflict: "id" });
 
         if (error) throw error;
+
+        // Посылаем мгновенный легковесный радио-сигнал всем остальным открытым окнам и браузерам!
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "sync_now",
+            payload: { sender: CLIENT_INSTANCE_ID, updated_at: newTimestamp }
+          });
+        }
+
         setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка отправки в облако:", err);
@@ -2428,6 +2465,7 @@
       isApplyingRemoteUpdate = true;
       let needsCleanSync = false;
       try {
+        if (row.updated_at) lastKnownUpdatedAt = row.updated_at;
         if (row.db && Object.keys(row.db).length > 0) DB = row.db;
         if (row.categories && Object.keys(row.categories).length > 0) CATEGORIES = row.categories;
         if (Array.isArray(row.users) && row.users.length > 0) USERS = row.users;
@@ -2442,18 +2480,38 @@
         localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
         localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
 
+        // Всегда мгновенно обновляем шапку и колокольчик уведомлений
         updateCounts();
+
+        // Сохраняем текст, если пользователь прямо сейчас печатает комментарий, чтобы не сбить его ввод
+        const activeEl = document.activeElement;
+        const isTypingComment = activeEl && activeEl.id && (activeEl.id.startsWith("new-comment-input-") || activeEl.id.startsWith("edit-comm-textarea-"));
+        const savedInputId = isTypingComment ? activeEl.id : null;
+        const savedInputVal = isTypingComment ? activeEl.value : "";
+
         if (activeMainView === "catalog") {
           setupCatalogFilters();
           renderCatalog();
         } else if (activeMainView === "rules") {
           renderRulesView();
         } else if (activeMainView === "profile") {
-          renderProfileView();
+          // Если пользователь не печатает в настройках профиля — обновляем вид профиля
+          if (!activeEl || (activeEl.tagName !== "INPUT" && activeEl.tagName !== "TEXTAREA")) {
+            renderProfileView();
+          }
         } else if (activeMainView === "admin") {
           if (activeAdminSubtab === "categories") renderCategoryManager();
           else if (activeAdminSubtab === "users") renderAdminUsersManager();
           else if (activeAdminSubtab === "backup") renderAdminBackupStats();
+        }
+
+        // Восстанавливаем фокус и набранный текст в поле комментария, если человек печатал в момент прилёта обновления
+        if (savedInputId) {
+          const restoredEl = document.getElementById(savedInputId);
+          if (restoredEl) {
+            restoredEl.value = savedInputVal;
+            restoredEl.focus();
+          }
         }
       } finally {
         isApplyingRemoteUpdate = false;
@@ -2507,18 +2565,44 @@
           await pushStateToCloud();
         }
 
-        sbClient
-          .channel("cp2020-live-sync")
+        // 1. Подписка на мгновенный легковесный Broadcast-сигнал + изменения Postgres
+        liveChannel = sbClient.channel("cp2020-global-room", {
+          config: { broadcast: { self: false } }
+        });
+
+        liveChannel
+          .on("broadcast", { event: "sync_now" }, (msg) => {
+            if (msg.payload && msg.payload.sender !== CLIENT_INSTANCE_ID) {
+              fetchLatestStateFromCloud();
+            }
+          })
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
             (payload) => {
-              if (payload.new) {
+              if (payload.new && payload.new.updated_at !== lastKnownUpdatedAt) {
                 applyCloudStateToUI(payload.new);
+              } else {
+                fetchLatestStateFromCloud();
               }
             }
           )
           .subscribe();
+
+        // 2. Фоновый контрольный радар каждые 3.5 секунды (проверяет только крошечное поле updated_at)
+        setInterval(async () => {
+          if (!sbClient || isApplyingRemoteUpdate || document.hidden) return;
+          try {
+            const { data: meta } = await sbClient
+              .from("cp2020_state")
+              .select("updated_at")
+              .eq("id", "main_state")
+              .maybeSingle();
+            if (meta && meta.updated_at && meta.updated_at !== lastKnownUpdatedAt) {
+              await fetchLatestStateFromCloud();
+            }
+          } catch (e) {}
+        }, 3500);
 
         setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
