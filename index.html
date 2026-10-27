@@ -3285,7 +3285,7 @@
     initApp();
   </script>
 
-  <!-- ========================================================================= -->
+<!-- ========================================================================= -->
   <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ (SUPABASE REALTIME)                       -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3297,9 +3297,9 @@
     let liveChannel = null;
     let isApplyingRemoteUpdate = false;
     let isPushingToCloud = false;
-    let lastLocalPushTimestamp = 0;
     let pendingSectionsToPush = new Set();
     let pushDebounceTimer = null;
+    let lastKnownCloudTimestamp = null;
 
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
@@ -3370,68 +3370,97 @@
       }
     }
 
+    // Скачивает из облака ТОЛЬКО изменившиеся колонки (вызывается по лёгкому сигналу)
+    async function pullUpdatedSectionsFromCloud(sectionsList) {
+      if (!sbClient || isPushingToCloud) return;
+      try {
+        const cols = (!sectionsList || sectionsList.includes("all") || sectionsList.includes("db"))
+          ? "db,categories,users,comments,notifications,updated_at"
+          : "users,comments,notifications,updated_at";
+
+        const { data, error } = await sbClient
+          .from("cp2020_state")
+          .select(cols)
+          .eq("id", "main_state")
+          .maybeSingle();
+
+        if (error) throw error;
+        if (data) {
+          if (data.updated_at) lastKnownCloudTimestamp = data.updated_at;
+          applyCloudStateToUI(data);
+          setCloudStatusBadge("🟢", "В сети");
+        }
+      } catch (err) {
+        console.error("Ошибка загрузки из облака:", err);
+      }
+    }
+
     function scheduleCloudPush(sectionName) {
       if (!sbClient || isApplyingRemoteUpdate) return;
       pendingSectionsToPush.add(sectionName);
-      lastLocalPushTimestamp = Date.now();
-
-      if (liveChannel) {
-        const deltaPayload = { sender: CLIENT_TAB_ID, section: sectionName };
-        if (sectionName === "db") { deltaPayload.db = DB; deltaPayload.categories = CATEGORIES; }
-        if (sectionName === "users") { sanitizeUsersAndEnforceRoot(); deltaPayload.users = USERS; }
-        if (sectionName === "comments") { deltaPayload.comments = COMMENTS; }
-        if (sectionName === "notifications") { deltaPayload.notifications = NOTIFICATIONS; }
-
-        liveChannel.send({
-          type: "broadcast",
-          event: "fast_delta",
-          payload: deltaPayload
-        });
-      }
 
       if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
-      pushDebounceTimer = setTimeout(flushPendingToCloud, 120);
+      pushDebounceTimer = setTimeout(flushPendingToCloud, 80);
     }
 
     async function flushPendingToCloud() {
       if (!sbClient || pendingSectionsToPush.size === 0 || isPushingToCloud) return;
       isPushingToCloud = true;
-      lastLocalPushTimestamp = Date.now();
 
       const sections = Array.from(pendingSectionsToPush);
       pendingSectionsToPush.clear();
 
       try {
+        isApplyingRemoteUpdate = true;
         sanitizeUsersAndEnforceRoot();
+        ensureMetaArraysInCategories();
+        isApplyingRemoteUpdate = false;
+
         setCloudStatusBadge("🔄", "Синхронизация...");
 
-        const updateObj = { updated_at: new Date().toISOString() };
-        if (sections.includes("all") || sections.includes("db")) {
-          updateObj.db = DB;
-          updateObj.categories = CATEGORIES;
-        }
-        if (sections.includes("all") || sections.includes("users")) {
-          updateObj.users = USERS;
-        }
-        if (sections.includes("all") || sections.includes("comments")) {
-          updateObj.comments = COMMENTS;
-        }
-        if (sections.includes("all") || sections.includes("notifications")) {
-          updateObj.notifications = NOTIFICATIONS;
+        // Вызываем серверную функцию save_cp2020_part, передавая только изменившиеся отсеки
+        const rpcParams = {
+          p_db: (sections.includes("all") || sections.includes("db")) ? DB : null,
+          p_categories: (sections.includes("all") || sections.includes("db")) ? CATEGORIES : null,
+          p_users: (sections.includes("all") || sections.includes("users")) ? USERS : null,
+          p_comments: (sections.includes("all") || sections.includes("comments")) ? COMMENTS : null,
+          p_notifications: (sections.includes("all") || sections.includes("notifications")) ? NOTIFICATIONS : null
+        };
+
+        const { data: newTs, error } = await sbClient.rpc("save_cp2020_part", rpcParams);
+
+        if (error) {
+          // Фолбэк на прямой upsert, если пользователь ещё не выполнил SQL-скрипт save_cp2020_part
+          const fallbackPayload = {
+            id: "main_state",
+            db: DB,
+            categories: CATEGORIES,
+            users: USERS,
+            comments: COMMENTS,
+            notifications: NOTIFICATIONS,
+            updated_at: new Date().toISOString()
+          };
+          const { error: upErr } = await sbClient.from("cp2020_state").upsert(fallbackPayload, { onConflict: "id" });
+          if (upErr) throw upErr;
+        } else if (newTs) {
+          lastKnownCloudTimestamp = newTs;
         }
 
-        const { error } = await sbClient
-          .from("cp2020_state")
-          .update(updateObj)
-          .eq("id", "main_state");
+        // Отправляем КРОШЕЧНЫЙ сигнал (50 байт) всем остальным браузерам — сокет никогда не упадёт от перегрузки!
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "cloud_poke",
+            payload: { sender: CLIENT_TAB_ID, sections }
+          });
+        }
 
-        if (error) throw error;
-        lastLocalPushTimestamp = Date.now();
         setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
         console.error("Ошибка сохранения в облако:", err);
-        setCloudStatusBadge("🔴", "Ошибка сети");
+        setCloudStatusBadge("🔴", "Ошибка сети: " + (err.message || JSON.stringify(err)));
       } finally {
+        isApplyingRemoteUpdate = false;
         isPushingToCloud = false;
         if (pendingSectionsToPush.size > 0) {
           setTimeout(flushPendingToCloud, 80);
@@ -3439,12 +3468,8 @@
       }
     }
 
-    function applyCloudStateToUI(incoming, isFullPostgresRow = false) {
+    function applyCloudStateToUI(incoming) {
       if (!incoming || isPushingToCloud) return;
-
-      if (isFullPostgresRow && (Date.now() - lastLocalPushTimestamp < 2000)) {
-        return;
-      }
 
       isApplyingRemoteUpdate = true;
       try {
@@ -3551,37 +3576,49 @@
     const origPersistDB = persistDatabase;
     persistDatabase = function() {
       origPersistDB();
-      scheduleCloudPush("db");
+      if (!isApplyingRemoteUpdate) scheduleCloudPush("db");
     };
 
     const origPersistUsers = persistUsers;
     persistUsers = function() {
       origPersistUsers();
-      scheduleCloudPush("users");
+      if (!isApplyingRemoteUpdate) scheduleCloudPush("users");
     };
 
     const origPersistComments = persistComments;
     persistComments = function() {
       origPersistComments();
-      scheduleCloudPush("comments");
+      if (!isApplyingRemoteUpdate) scheduleCloudPush("comments");
     };
 
     const origPersistNotifs = persistNotifications;
     persistNotifications = function() {
       origPersistNotifs();
-      scheduleCloudPush("notifications");
+      if (!isApplyingRemoteUpdate) scheduleCloudPush("notifications");
     };
 
-    setInterval(() => {
+    // Таймер проверки истечения банов + лёгкий фоновый контроль синхронизации каждые 5 секунд
+    setInterval(async () => {
       checkAndEnforceCurrentSessionValidity();
       if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
         if (activeAdminSubtab === "users") renderAdminUsersManager();
         else if (activeAdminSubtab === "logs") renderAdminLogsView();
       }
-    }, 15000);
+      if (!sbClient || isPushingToCloud || isApplyingRemoteUpdate || document.hidden) return;
+      try {
+        const { data: meta } = await sbClient
+          .from("cp2020_state")
+          .select("updated_at")
+          .eq("id", "main_state")
+          .maybeSingle();
+        if (meta && meta.updated_at && meta.updated_at !== lastKnownCloudTimestamp) {
+          await pullUpdatedSectionsFromCloud(["all"]);
+        }
+      } catch (e) {}
+    }, 5000);
 
     window.addEventListener("storage", (ev) => {
-      if (isPushingToCloud) return;
+      if (isPushingToCloud || isApplyingRemoteUpdate) return;
       try {
         if (ev.key === STORAGE_DB_KEY && ev.newValue) applyCloudStateToUI({ db: JSON.parse(ev.newValue) });
         if (ev.key === STORAGE_COMMENTS_KEY && ev.newValue) applyCloudStateToUI({ comments: JSON.parse(ev.newValue) });
@@ -3604,37 +3641,36 @@
         if (error) throw error;
 
         if (data && data.db && Object.keys(data.db).length > 0) {
-          applyCloudStateToUI(data, false);
+          if (data.updated_at) lastKnownCloudTimestamp = data.updated_at;
+          applyCloudStateToUI(data);
         } else {
           ensureMetaArraysInCategories();
           sanitizeUsersAndEnforceRoot();
-          await sbClient.from("cp2020_state").upsert({
-            id: "main_state",
-            db: DB,
-            categories: CATEGORIES,
-            users: USERS,
-            comments: COMMENTS,
-            notifications: NOTIFICATIONS,
-            updated_at: new Date().toISOString()
+          await sbClient.rpc("save_cp2020_part", {
+            p_db: DB,
+            p_categories: CATEGORIES,
+            p_users: USERS,
+            p_comments: COMMENTS,
+            p_notifications: NOTIFICATIONS
           });
         }
 
-        liveChannel = sbClient.channel("cp2020-realtime-v2", {
+        liveChannel = sbClient.channel("cp2020-realtime-v3", {
           config: { broadcast: { self: false } }
         });
 
         liveChannel
-          .on("broadcast", { event: "fast_delta" }, (msg) => {
+          .on("broadcast", { event: "cloud_poke" }, (msg) => {
             if (msg.payload && msg.payload.sender !== CLIENT_TAB_ID) {
-              applyCloudStateToUI(msg.payload, false);
+              pullUpdatedSectionsFromCloud(msg.payload.sections || ["all"]);
             }
           })
           .on(
             "postgres_changes",
-            { event: "UPDATE", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
+            { event: "*", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
             (payload) => {
-              if (payload.new && !isPushingToCloud) {
-                applyCloudStateToUI(payload.new, true);
+              if (!isPushingToCloud) {
+                pullUpdatedSectionsFromCloud(["all"]);
               }
             }
           )
@@ -3644,9 +3680,10 @@
             }
           });
 
+        setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
         console.error("Ошибка инициализации Supabase:", err);
-        setCloudStatusBadge("🔴", "Ошибка сети");
+        setCloudStatusBadge("🔴", "Ошибка сети: " + (err.message || JSON.stringify(err)));
       }
     }
 
