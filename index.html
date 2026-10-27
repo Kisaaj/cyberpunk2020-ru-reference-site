@@ -77,7 +77,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ -->
+  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (БЕЗ ОТОБРАЖЕНИЯ ЛОГИНА) -->
   <div id="publicProfileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePublicProfileModal()">
     <div class="max-w-xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_35px_rgba(0,240,255,0.25)] p-6 relative" onclick="event.stopPropagation()">
       <div class="flex items-start justify-between border-b border-gray-800 pb-4 mb-4">
@@ -86,7 +86,6 @@
           <div>
             <div id="pubProfBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1"></div>
             <h3 id="pubProfName" class="font-display text-xl font-black text-white"></h3>
-            <div class="text-xs text-gray-400">Позывной в Сети: <span id="pubProfLogin" class="text-cp-cyan font-semibold"></span></div>
             <div class="text-xs text-gray-300 mt-1">Любимая Роль: <b id="pubProfRole" class="text-cp-yellow"></b></div>
           </div>
         </div>
@@ -124,7 +123,7 @@
             <h1 class="font-display font-black text-lg tracking-wider text-white">
               CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
             </h1>
-            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.2 SECURE</span>
+            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.3 STEALTH</span>
           </div>
           <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
             Сделано в Село ДнДшеское
@@ -132,7 +131,7 @@
         </div>
       </div>
 
-      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ (БЕЗ СЧЁТЧИКОВ) -->
+      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ -->
       <nav class="flex flex-wrap items-center gap-1.5" id="mainNav">
         <button type="button" onclick="switchMainView('catalog', 'roles')" data-view="roles" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🎭 Роли</button>
         <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="weapons" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🔫 Оружие</button>
@@ -164,7 +163,7 @@
 
             <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-56 bg-cp-panel border border-cp-cyan shadow-[0_10px_30px_rgba(0,0,0,0.95)] z-50">
               <div class="px-3.5 py-2.5 bg-cp-bg border-b border-gray-800">
-                <div id="dropdownUserName" class="text-xs font-bold text-white truncate">Никнейм</div>
+                <div id="dropdownUserName" class="text-xs font-bold text-white truncate">Позывной</div>
                 <div id="dropdownUserRole" class="text-[10px] text-cp-cyan font-bold uppercase mt-0.5">Игрок</div>
               </div>
               <div class="p-1.5 flex flex-col gap-1">
@@ -246,7 +245,7 @@
           <select id="bookFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2 py-2 outline-none focus:border-cp-cyan">
             <option value="ALL">Все книги</option>
             <option value="FAV">⭐ Избранное</option>
-            <option value="USER">🛠️ Мои</option>
+            <option value="USER">🛠️ Добавленные</option>
             <option value="CP20">CP20</option>
             <option value="Chr1">Chr1</option>
             <option value="Chr2">Chr2</option>
@@ -292,18 +291,18 @@
     </div>
   </main>
 
-  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ (ПАРОЛИ ПРОВЕРЯЮТСЯ В ЗАШИФРОВАННОМ ХРАНИЛИЩЕ SUPABASE) -->
+  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ (И ЛОГИНЫ, И ПАРОЛИ СКРЫТЫ НА СЕРВЕРЕ SUPABASE) -->
   <main id="view-profile" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-5">
     <section id="authGuestContainer" class="max-w-[1150px] w-full mx-auto my-6 grid grid-cols-12 gap-6 items-stretch">
       <div class="col-span-6 bg-cp-panel cp-border p-7 flex flex-col justify-between">
         <div>
           <div class="text-xs font-bold text-cp-cyan uppercase tracking-wider">Криптографическая авторизация DataTerm</div>
           <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">🔑 Вход в аккаунт</h2>
-          <p class="text-xs text-gray-400 mb-5 leading-relaxed">Пароли зашифрованы алгоритмом Bcrypt в защищённом облачном контуре и никогда не передаются в открытом коде страницы.</p>
+          <p class="text-xs text-gray-400 mb-5 leading-relaxed">Логины и пароли хранятся исключительно в изолированном серверном хранилище и никогда не передаются в публичный код страницы.</p>
           <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
             <div>
-              <label class="block text-xs text-gray-400 mb-1">Логин пользователя:</label>
-              <input type="text" id="loginUsername" required placeholder="Введите логин..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
+              <label class="block text-xs text-gray-400 mb-1">Секретный логин (для входа):</label>
+              <input type="text" id="loginUsername" required placeholder="Введите ваш логин..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
             </div>
             <div>
               <label class="block text-xs text-gray-400 mb-1">Пароль:</label>
@@ -314,7 +313,7 @@
           </form>
         </div>
         <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">
-          🔒 Защищено серверным шифрованием pgcrypto // DataTerm v10.2
+          🔒 Полная изоляция учётных данных // DataTerm v10.3 STEALTH
         </div>
       </div>
 
@@ -324,8 +323,8 @@
           <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">📝 Регистрация игрока</h2>
           <form onsubmit="handleRegisterSubmit(event)" class="space-y-3.5">
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-xs text-gray-400 mb-1">Логин (для входа)*</label><input type="text" id="regUsername" required placeholder="edgerunner99" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
-              <div><label class="block text-xs text-gray-400 mb-1">Никнейм / Позывной*</label><input type="text" id="regDisplayName" required placeholder="Джонни Сильверхенд" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+              <div><label class="block text-xs text-gray-400 mb-1">Секретный логин (только для входа)*</label><input type="text" id="regUsername" required placeholder="Никому не виден" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+              <div><label class="block text-xs text-gray-400 mb-1">Публичный Никнейм (Позывной)*</label><input type="text" id="regDisplayName" required placeholder="Виден всем на сайте" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
               <div><label class="block text-xs text-gray-400 mb-1">Пароль*</label><input type="password" id="regPassword" required placeholder="Минимум 4 символа" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
@@ -341,7 +340,7 @@
             <button type="submit" id="regSubmitBtn" class="w-full py-3 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Зарегистрировать профиль +</button>
           </form>
         </div>
-        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Пароли игроков мгновенно шифруются на сервере и недоступны для чтения извне.</div>
+        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Ваш логин и пароль изолируются в закрытой таблице PassVault и не видны другим участникам.</div>
       </div>
     </section>
 
@@ -353,7 +352,7 @@
             <div>
               <div id="profileRoleBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1"></div>
               <h2 id="profileDisplayName" class="font-display text-xl font-black text-white"></h2>
-              <div class="text-xs text-gray-400">Логин: <span id="profileUsername" class="text-cp-yellow font-semibold"></span></div>
+              <div class="text-[11px] text-gray-500">Логин: <span class="text-cp-green font-semibold">🔒 Скрыт на сервере</span></div>
               <div class="text-xs text-cp-cyan mt-0.5">Роль в игре: <b id="profileFavRole"></b></div>
             </div>
           </div>
@@ -376,7 +375,7 @@
 
         <form onsubmit="saveUserProfileChanges(event)" class="space-y-3 pt-2 border-t border-gray-800 text-xs">
           <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройки моего профиля</div>
-          <div><label class="block text-gray-400 mb-1">Отображаемый никнейм (Позывной):</label><input type="text" id="editProfDisplayName" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-white outline-none"></div>
+          <div><label class="block text-gray-400 mb-1">Публичный Никнейм (Позывной):</label><input type="text" id="editProfDisplayName" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-white outline-none"></div>
           <div class="grid grid-cols-2 gap-2.5">
             <div>
               <label class="block text-gray-400 mb-1">Роль в CP2020:</label>
@@ -504,6 +503,12 @@
         <div class="bg-cp-bg border border-gray-800 p-5 space-y-4">
           <div class="grid grid-cols-12 gap-6 items-center">
             <div class="col-span-5 flex flex-col gap-2">
+              <!-- ГАЛОЧКА ПЛАШКИ «ДОБАВЛЕНО» В КОНСТРУКТОРЕ -->
+              <label class="flex items-center gap-2.5 text-xs text-gray-200 cursor-pointer bg-cp-panel border border-gray-700 px-3 py-2 mb-1 hover:border-cp-yellow">
+                <input type="checkbox" id="builderShowAddedCheck" checked class="accent-yellow-400 w-4 h-4">
+                <span>Отображать плашку <b class="text-cp-yellow">«ДОБАВЛЕНО»</b> на этой карточке</span>
+              </label>
+
               <button type="submit" id="builderSubmitBtn" class="w-full py-3.5 px-6 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all">➕ Добавить запись в справочник</button>
               <span class="text-[11px] text-gray-400 text-center">После нажатия вы сразу перейдёте к созданной или обновлённой карточке</span>
             </div>
@@ -545,13 +550,13 @@
       <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
         <div>
           <h3 class="font-display text-lg font-bold text-cp-yellow uppercase">👥 Пользователи</h3>
-          <p class="text-xs text-gray-400 mt-1">Нажмите на аватар или имя пользователя, чтобы открыть его <b>Публичный профиль</b>. Главный Администратор (<span class="text-cp-red font-bold">ROOT</span>) может назначать других пользователей <span class="text-cp-cyan font-bold">Администраторами (ADMIN)</span> — им сразу придёт уведомление в колокольчик.</p>
+          <p class="text-xs text-gray-400 mt-1">Логины скрыты в защищённом хранилище для всех. Нажмите на аватар или позывной пользователя, чтобы открыть его <b>Публичный профиль</b>.</p>
         </div>
         <button type="button" onclick="toggleAdminQuickUserModal()" class="px-4 py-2 bg-cp-cyan text-black font-bold text-xs uppercase hover:bg-cyan-300">+ Создать аккаунт вручную</button>
       </div>
       <form id="adminQuickUserForm" onsubmit="adminCreateUserManually(event)" class="hidden bg-cp-bg border border-cp-cyan p-4 grid grid-cols-12 gap-3 items-end">
-        <div class="col-span-2"><label class="block text-[11px] text-gray-400 mb-1">Логин*</label><input type="text" id="admNewLogin" required placeholder="moderator1" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
-        <div class="col-span-3"><label class="block text-[11px] text-gray-400 mb-1">Никнейм (Позывной)*</label><input type="text" id="admNewName" required placeholder="Морган Блэкхенд" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-2"><label class="block text-[11px] text-gray-400 mb-1">Секретный логин*</label><input type="text" id="admNewLogin" required placeholder="moderator1" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-3"><label class="block text-[11px] text-gray-400 mb-1">Публичный Позывной*</label><input type="text" id="admNewName" required placeholder="Морган Блэкхенд" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
         <div class="col-span-2"><label class="block text-[11px] text-gray-400 mb-1">Пароль*</label><input type="password" id="admNewPass" required placeholder="pass123" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
         <div class="col-span-3"><label class="block text-[11px] text-gray-400 mb-1">Ссылка на аватар</label><input type="url" id="admNewAvatar" placeholder="https://..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
         <div class="col-span-1"><label class="block text-[11px] text-gray-400 mb-1">Права</label><select id="admNewRole" class="w-full bg-cp-panel border border-gray-700 px-2 py-1.5 text-xs text-white"><option value="ADMIN">ADMIN</option><option value="USER">USER</option></select></div>
@@ -707,10 +712,9 @@
       }
     };
 
-    // ПУБЛИЧНАЯ КАРТОЧКА ГЛАВНОГО АДМИНА (БЕЗ ПАРОЛЯ В КОДЕ! ПАРОЛЬ ХРАНИТСЯ В ЗАШИФРОВАННОМ ХРАНИЛИЩЕ SUPABASE)
+    // ПУБЛИЧНАЯ КАРТОЧКА ГЛАВНОГО АДМИНА (БЕЗ ЛОГИНА И БЕЗ ПАРОЛЯ В КОДЕ!)
     const HARDCODED_ROOT_USER = {
       id: "u-root",
-      username: "loksmir",
       displayName: "Kisaaj",
       role: "ROOT",
       favRole: "Рефери (ГМ)",
@@ -752,31 +756,34 @@
     let activeReplyToComment = null;
     let activeEditCommentId = null;
 
-    // Очищает открытые пароли из профилей пользователей (переводя их в зашифрованное серверное хранилище)
+    // Вычищает и открытые пароли, и логины (username) из публичных профилей пользователей
     function sanitizeUsersAndEnforceRoot() {
       let changed = false;
-      const rootIdx = USERS.findIndex(u => u.role === "ROOT" || u.id === "u-root" || (u.username && u.username.toLowerCase() === "loksmir"));
+      const rootIdx = USERS.findIndex(u => u.role === "ROOT" || u.id === "u-root");
       if (rootIdx === -1) {
         USERS.unshift(JSON.parse(JSON.stringify(HARDCODED_ROOT_USER)));
         changed = true;
       } else {
         const existing = USERS[rootIdx];
-        if (existing.username !== "loksmir" || existing.displayName.includes("Главный Архитектор")) {
+        if (existing.id !== "u-root" || existing.displayName.includes("Главный Архитектор")) {
           existing.id = "u-root";
-          existing.username = "loksmir";
           existing.displayName = existing.displayName.includes("Главный Архитектор") ? "Kisaaj" : existing.displayName;
           existing.role = "ROOT";
           changed = true;
         }
       }
 
-      // Удаляем поле password из публичных объектов пользователей, если оно там было
+      // Удаляем поля username и password из публичных объектов пользователей
       USERS.forEach(u => {
         if (u.password !== undefined) {
-          if (window.migrateLegacyPasswordToVault) {
+          if (window.migrateLegacyPasswordToVault && u.username) {
             window.migrateLegacyPasswordToVault(u.id, u.username, u.password);
           }
           delete u.password;
+          changed = true;
+        }
+        if (u.username !== undefined) {
+          delete u.username;
           changed = true;
         }
       });
@@ -876,7 +883,7 @@
             if (Array.isArray(parsedUsers)) {
               parsedUsers.forEach(u => {
                 if (!u || !u.id) return;
-                const idx = USERS.findIndex(ex => ex.id === u.id || (ex.username && u.username && ex.username.toLowerCase() === u.username.toLowerCase()));
+                const idx = USERS.findIndex(ex => ex.id === u.id);
                 if (idx !== -1) USERS[idx] = u;
                 else USERS.push(u);
               });
@@ -1057,7 +1064,7 @@
     }
 
     // =========================================================================
-    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ
+    // ПУБЛИЧНЫЕ ПРОФИЛИ (БЕЗ ЛОГИНА) И КОММЕНТАРИИ
     // =========================================================================
     function countUserTotalComments(userId) {
       let total = 0;
@@ -1068,12 +1075,11 @@
     function openPublicProfileModal(userId) {
       const target = USERS.find(u => u.id === userId);
       if (!target) return;
-      document.getElementById("pubProfAvatar").innerHTML = target.avatar ? `<img src="${target.avatar}" class="w-full h-full object-cover">` : (target.displayName || target.username).slice(0, 2).toUpperCase();
+      document.getElementById("pubProfAvatar").innerHTML = target.avatar ? `<img src="${target.avatar}" class="w-full h-full object-cover">` : (target.displayName || "CP").slice(0, 2).toUpperCase();
       const badge = document.getElementById("pubProfBadge");
       badge.className = target.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-red text-white" : target.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-gray-800 text-cp-yellow border border-cp-yellow/40";
       badge.textContent = target.role === "ROOT" ? "👑 Главный Админ (ROOT)" : target.role === "ADMIN" ? "🛡️ Администратор" : "👤 Эджраннер (Игрок)";
-      document.getElementById("pubProfName").textContent = target.displayName || target.username;
-      document.getElementById("pubProfLogin").textContent = "@" + target.username;
+      document.getElementById("pubProfName").textContent = target.displayName || "Эджраннер";
       document.getElementById("pubProfRole").textContent = target.favRole || "Соло";
       document.getElementById("pubProfDate").textContent = target.createdAt || "2026";
       document.getElementById("pubProfCommentsCnt").textContent = countUserTotalComments(target.id);
@@ -1285,8 +1291,8 @@
       } else {
         guestBtn.classList.add("hidden");
         loggedWrap.classList.remove("hidden");
-        avatarContent.innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || u.username).slice(0, 2).toUpperCase();
-        dropName.textContent = u.displayName || u.username;
+        avatarContent.innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || "CP").slice(0, 2).toUpperCase();
+        dropName.textContent = u.displayName || "Эджраннер";
         roleDot.className = u.role === "ROOT" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-red border border-black" : u.role === "ADMIN" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-cyan border border-black" : "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-green border border-black";
         dropRole.textContent = u.role === "ROOT" ? "👑 Главный Админ (ROOT)" : u.role === "ADMIN" ? "🛡️ Администратор (ADMIN)" : `👤 Игрок (${u.favRole || 'Соло'})`;
         const isAdm = isCurrentUserAdmin();
@@ -1416,6 +1422,17 @@
       if (!nadStr) return 0;
       const s = nadStr.toUpperCase();
       return s.includes("ОТ") ? 4 : s.includes("ОН") ? 3 : (s.includes("ОБ") || s.includes("СТ")) ? 2 : s.includes("НН") ? 1 : 0;
+    }
+
+    // Переключение плашки «ДОБАВЛЕНО» напрямую с карточки (для Админов и ROOT)
+    function toggleItemAddedBadge(sectionKey, itemId, isChecked) {
+      if (!isCurrentUserAdmin()) return;
+      const target = (DB[sectionKey] || []).find(i => i.id === itemId);
+      if (!target) return;
+      target.isUser = Boolean(isChecked);
+      persistDatabase();
+      if (sectionKey === "rules") renderRulesView();
+      else renderCatalog();
     }
 
     // =========================================================================
@@ -1553,11 +1570,28 @@
       renderCatalog();
     }
 
+    // Кнопки управления карточкой + галочка плашки «ДОБАВЛЕНО» для Админов и ROOT
     function renderCardActionButtons(sectionKey, itemId) {
       const fav = isItemFavorited(itemId);
       const favBtn = `<button type="button" onclick="toggleFavoriteItem('${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${fav ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow'}">${fav ? '★ В избранном' : '☆ В избранное'}</button>`;
       if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${favBtn}</div>`;
-      return `<div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">${favBtn}<button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button><button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button></div>`;
+
+      const targetObj = (DB[sectionKey] || []).find(i => i.id === itemId);
+      const isAddedChecked = Boolean(targetObj && targetObj.isUser);
+
+      return `
+        <div class="flex flex-col items-end gap-1.5 shrink-0">
+          <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            ${favBtn}
+            <button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
+            <button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
+          </div>
+          <label class="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-cp-yellow cursor-pointer select-none bg-cp-bg border border-gray-800 px-2 py-0.5" title="Показать или скрыть плашку «ДОБАВЛЕНО» у этой карточки">
+            <input type="checkbox" ${isAddedChecked ? 'checked' : ''} onchange="toggleItemAddedBadge('${sectionKey}', '${itemId}', this.checked)" class="accent-yellow-400">
+            <span>Плашка «ДОБАВЛЕНО»</span>
+          </label>
+        </div>
+      `;
     }
 
     function renderDetailCard(item) {
@@ -1646,10 +1680,12 @@
         `;
       }
 
+      const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">ДОБАВЛЕНО</span>` : "";
+
       box.innerHTML = `
         <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
           <div>
-            <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)}</div>
+            <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)} ${addedHeaderBadge}</div>
             <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
             <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
           </div>
@@ -1665,7 +1701,7 @@
     }
 
     // =========================================================================
-    // КОНСТРУКТОР, ПРОФИЛЬ, КАТЕГОРИИ И АДМИНКА (С СЕРВЕРНЫМ ШИФРОВАНИЕМ ПАРОЛЕЙ)
+    // КОНСТРУКТОР, ПРОФИЛЬ, КАТЕГОРИИ И АДМИНКА
     // =========================================================================
     function deleteItem(sectionKey, itemId) {
       if (!isCurrentUserAdmin()) return;
@@ -1692,11 +1728,16 @@
 
     function setBuilderType(type, itemToEdit = null) {
       activeBuilderType = type;
-      if (!itemToEdit) { editingItemId = null; clearBuilderImage(); }
-      else {
+      const addedCheckEl = document.getElementById("builderShowAddedCheck");
+      if (!itemToEdit) {
+        editingItemId = null;
+        clearBuilderImage();
+        if (addedCheckEl) addedCheckEl.checked = true;
+      } else {
         currentBuilderImageData = itemToEdit.image || "";
         document.getElementById("builderImageUrl").value = (itemToEdit.image && !itemToEdit.image.startsWith("data:")) ? itemToEdit.image : "";
         updateBuilderImagePreview();
+        if (addedCheckEl) addedCheckEl.checked = Boolean(itemToEdit.isUser);
       }
 
       const isEdit = Boolean(editingItemId && itemToEdit);
@@ -1799,7 +1840,11 @@
 
       data.id = editingItemId || ("user-" + Date.now());
       data.origName = data.origName && data.origName !== "—" ? data.origName : data.name;
-      data.isUser = true;
+
+      // Учитываем выбор галочки «Отображать плашку ДОБАВЛЕНО»
+      const showAddedCheck = document.getElementById("builderShowAddedCheck");
+      data.isUser = showAddedCheck ? Boolean(showAddedCheck.checked) : true;
+
       if (currentBuilderImageData) data.image = currentBuilderImageData;
 
       if (activeBuilderType === "netrunning" && data.itemKind === "deck") {
@@ -1853,16 +1898,20 @@
       if (!selectedRuleId || !filtered.some(r => r.id === selectedRuleId)) selectedRuleId = filtered[0].id;
       listEl.innerHTML = filtered.map(r => `
         <div onclick="openRuleArticle('${r.id}')" class="p-3 border cursor-pointer transition-all ${r.id === selectedRuleId ? 'border-cp-yellow bg-cp-card' : 'border-gray-800 bg-cp-bg hover:border-gray-600'}">
-          <div class="flex items-center justify-between text-[10px] text-cp-cyan font-bold uppercase"><span>${dash(r.subsection)}</span><span>${isItemFavorited(r.id) ? '★ ' : ''}[${dash(r.book)}]</span></div>
+          <div class="flex items-center justify-between text-[10px] text-cp-cyan font-bold uppercase">
+            <span>${dash(r.subsection)}</span>
+            <span>${r.isUser ? '<b class="text-cp-yellow mr-1">ДОБАВЛЕНО</b>' : ''}${isItemFavorited(r.id) ? '★ ' : ''}[${dash(r.book)}]</span>
+          </div>
           <div class="text-xs font-bold text-white mt-1">${dash(r.title)}</div>
           ${r.summary ? `<div class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">${r.summary}</div>` : ""}
         </div>
       `).join("");
 
       const rule = filtered.find(r => r.id === selectedRuleId) || filtered[0];
+      const addedBadge = rule.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold">ДОБАВЛЕНО</span>` : "";
       document.getElementById("ruleContentArea").innerHTML = `
         <div class="border-b border-gray-800 pb-4 mb-5 flex items-start justify-between gap-3">
-          <div><div class="text-xs font-bold text-cp-cyan uppercase">${dash(rule.subsection)} // Источник: ${dash(rule.book)}</div><h2 class="font-display text-2xl font-black text-white mt-1">${dash(rule.title)}</h2></div>
+          <div><div class="text-xs font-bold text-cp-cyan uppercase">${dash(rule.subsection)} // Источник: ${dash(rule.book)} ${addedBadge}</div><h2 class="font-display text-2xl font-black text-white mt-1">${dash(rule.title)}</h2></div>
           ${renderCardActionButtons('rules', rule.id)}
         </div>
         ${rule.summary ? `<div class="bg-cp-bg/70 border-l-2 border-cp-yellow p-3.5 text-xs text-gray-300 mb-5"><strong>Краткая суть:</strong> ${rule.summary}</div>` : ""}
@@ -1896,7 +1945,7 @@
       if (box) box.innerHTML = !currentBuilderImageData ? `<span class="text-xs text-gray-500">Предпросмотр картинки появится здесь...</span>` : `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Картинка проверена Сетевым Дозором</span>`;
     }
 
-    // ВХОД ЧЕРЕЗ ЗАЩИЩЁННУЮ СЕРВЕРНУЮ ФУНКЦИЮ SUPABASE (БЕЗ ПАРОЛЕЙ В БРАУЗЕРЕ)
+    // ВХОД ЧЕРЕЗ ЗАЩИЩЁННУЮ СЕРВЕРНУЮ ФУНКЦИЮ (ВОЗВРАЩАЕТ ТОЛЬКО ID ПОЛЬЗОВАТЕЛЯ)
     async function handleLoginSubmit(e) {
       e.preventDefault();
       const login = document.getElementById("loginUsername").value.trim().toLowerCase();
@@ -1921,7 +1970,7 @@
           return;
         }
 
-        let found = USERS.find(u => u.id === verifiedUserId || (u.username && u.username.toLowerCase() === login));
+        let found = USERS.find(u => u.id === verifiedUserId);
         if (!found && verifiedUserId === "u-root") {
           sanitizeUsersAndEnforceRoot();
           found = USERS.find(u => u.id === "u-root");
@@ -1936,6 +1985,7 @@
         errBox.classList.add("hidden");
         currentUserId = found.id;
         persistUsers();
+        document.getElementById("loginUsername").value = "";
         document.getElementById("loginPassword").value = "";
         renderProfileView();
       } finally {
@@ -1944,7 +1994,7 @@
       }
     }
 
-    // РЕГИСТРАЦИЯ С МГНОВЕННЫМ ШИФРОВАНИЕМ ПАРОЛЯ НА СЕРВЕРЕ
+    // РЕГИСТРАЦИЯ БЕЗ СОХРАНЕНИЯ ЛОГИНА И ПАРОЛЯ В ПУБЛИЧНОЙ БАЗЕ
     async function handleRegisterSubmit(e) {
       e.preventDefault();
       const username = document.getElementById("regUsername").value.trim();
@@ -1957,26 +2007,33 @@
 
       if (username.length < 3) { errBox.textContent = "Логин должен содержать минимум 3 символа."; errBox.classList.remove("hidden"); return; }
       if (password.length < 4) { errBox.textContent = "Пароль должен содержать минимум 4 символа."; errBox.classList.remove("hidden"); return; }
-      if (USERS.some(u => u.username && u.username.toLowerCase() === username.toLowerCase())) { errBox.textContent = "Этот логин уже занят!"; errBox.classList.remove("hidden"); return; }
 
       btn.disabled = true;
       btn.textContent = "⏳ Шифрование профиля...";
 
       try {
+        if (window.checkUsernameTakenInVault) {
+          const isTaken = await window.checkUsernameTakenInVault(username);
+          if (isTaken) {
+            errBox.textContent = "Этот логин уже занят!";
+            errBox.classList.remove("hidden");
+            return;
+          }
+        }
+
         const newUserId = "u-" + Date.now();
         const savedOk = await window.savePasswordInCloudVault(newUserId, username, password);
         if (!savedOk) {
-          errBox.textContent = "Ошибка сохранения пароля на сервере. Проверьте, выполнен ли SQL-скрипт PassVault в Supabase.";
+          errBox.textContent = "Этот логин уже занят или произошла ошибка сервера безопасности.";
           errBox.classList.remove("hidden");
           return;
         }
 
         errBox.classList.add("hidden");
-        // Обратите внимание: поле password НЕ сохраняется в объект пользователя!
+        // В публичный профиль сохраняется только id и публичный displayName (без логина и без пароля!)
         const newUser = {
           id: newUserId,
-          username,
-          displayName: displayName || username,
+          displayName: displayName || "Эджраннер",
           role: "USER",
           favRole,
           avatar: "",
@@ -2004,7 +2061,7 @@
       document.getElementById("authUserDashboard").classList.toggle("hidden", !u);
       if (!u) return;
 
-      document.getElementById("profileAvatarBox").innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || u.username).slice(0, 2).toUpperCase();
+      document.getElementById("profileAvatarBox").innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || "CP").slice(0, 2).toUpperCase();
       const badge = document.getElementById("profileRoleBadge");
       const accessText = document.getElementById("profileAccessText");
       badge.className = u.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-red text-white" : u.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-gray-800 text-cp-yellow border border-cp-yellow/40";
@@ -2012,7 +2069,6 @@
       accessText.textContent = u.role === "ROOT" ? "Без ограничений (ROOT)" : u.role === "ADMIN" ? "JPG/PNG/GIF до 50мб" : "JPG/PNG до 10мб";
 
       document.getElementById("profileDisplayName").textContent = u.displayName;
-      document.getElementById("profileUsername").textContent = u.username;
       document.getElementById("profileFavRole").textContent = u.favRole || "Соло";
       document.getElementById("profileFavCount").textContent = (u.favorites || []).length;
 
@@ -2038,8 +2094,8 @@
       if (newUrl !== "") u.avatar = newUrl;
       u.bio = document.getElementById("editProfBio").value.trim();
 
-      if (newPass.trim() !== "") {
-        await window.savePasswordInCloudVault(u.id, u.username, newPass.trim());
+      if (newPass.trim() !== "" && window.updatePasswordByIdInVault) {
+        await window.updatePasswordByIdInVault(u.id, newPass.trim());
       }
 
       persistUsers();
@@ -2163,12 +2219,16 @@
       const password = document.getElementById("admNewPass").value.trim();
       const avatar = document.getElementById("admNewAvatar").value.trim();
       const role = document.getElementById("admNewRole").value;
-      if (USERS.some(u => u.username && u.username.toLowerCase() === username.toLowerCase())) { alert("Такой логин уже существует!"); return; }
+
+      if (window.checkUsernameTakenInVault) {
+        const isTaken = await window.checkUsernameTakenInVault(username);
+        if (isTaken) { alert("Такой логин уже существует!"); return; }
+      }
 
       const newUserId = "u-" + Date.now();
       await window.savePasswordInCloudVault(newUserId, username, password);
 
-      USERS.push({ id: newUserId, username, displayName, role: isCurrentUserRoot() ? role : "USER", favRole: "Соло", avatar: avatar || "", bio: "Аккаунт создан через панель Администратора.", favorites: [], notes: "", createdAt: new Date().toISOString().slice(0, 10) });
+      USERS.push({ id: newUserId, displayName, role: isCurrentUserRoot() ? role : "USER", favRole: "Соло", avatar: avatar || "", bio: "Аккаунт создан через панель Администратора.", favorites: [], notes: "", createdAt: new Date().toISOString().slice(0, 10) });
       persistUsers(); e.target.reset(); document.getElementById("adminQuickUserForm").classList.add("hidden"); renderAdminUsersManager();
     }
     function toggleUserAdminPrivilege(uid) {
@@ -2195,8 +2255,8 @@
         const isRoot = u.role === "ROOT";
         const isAdm = u.role === "ADMIN";
         const badge = isRoot ? `<span class="px-2 py-0.5 bg-cp-red text-white text-[10px] font-bold uppercase">👑 ROOT</span>` : isAdm ? `<span class="px-2 py-0.5 bg-cp-cyan text-black text-[10px] font-bold uppercase">🛡️ ADMIN</span>` : `<span class="px-2 py-0.5 bg-gray-800 text-gray-300 border border-gray-700 text-[10px] font-bold uppercase">👤 USER</span>`;
-        const av = u.avatar ? `<img onclick="openPublicProfileModal('${u.id}')" src="${u.avatar}" class="w-12 h-12 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${u.id}')" class="w-12 h-12 bg-cp-panel border-2 border-gray-700 text-cp-yellow flex items-center justify-center font-display font-black text-base cursor-pointer shrink-0">${(u.displayName || u.username).slice(0, 2).toUpperCase()}</div>`;
-        return `<div class="bg-cp-bg border border-gray-800 p-4 flex items-center justify-between gap-4"><div class="flex items-center gap-4">${av}<div><div class="flex items-center gap-2.5"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button><span class="text-xs text-gray-400">(@${u.username})</span>${badge}</div><div class="text-xs text-gray-500 mt-1">Роль: <b class="text-gray-300">${u.favRole || '—'}</b> • Комментариев: <b class="text-cp-green">${countUserTotalComments(u.id)}</b></div></div></div><div class="flex items-center gap-2"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>${!isRoot && rootMode ? `<button type="button" onclick="toggleUserAdminPrivilege('${u.id}')" class="px-3.5 py-1.5 text-xs font-bold uppercase border ${isAdm ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan'}">${isAdm ? '⬇️ Снять Админа' : '⬆️ Назначить Админом'}</button><button type="button" onclick="deleteUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>` : ""}</div></div>`;
+        const av = u.avatar ? `<img onclick="openPublicProfileModal('${u.id}')" src="${u.avatar}" class="w-12 h-12 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${u.id}')" class="w-12 h-12 bg-cp-panel border-2 border-gray-700 text-cp-yellow flex items-center justify-center font-display font-black text-base cursor-pointer shrink-0">${(u.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
+        return `<div class="bg-cp-bg border border-gray-800 p-4 flex items-center justify-between gap-4"><div class="flex items-center gap-4">${av}<div><div class="flex items-center gap-2.5"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button>${badge}</div><div class="text-xs text-gray-500 mt-1">Роль: <b class="text-gray-300">${u.favRole || '—'}</b> • Комментариев: <b class="text-cp-green">${countUserTotalComments(u.id)}</b></div></div></div><div class="flex items-center gap-2"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>${!isRoot && rootMode ? `<button type="button" onclick="toggleUserAdminPrivilege('${u.id}')" class="px-3.5 py-1.5 text-xs font-bold uppercase border ${isAdm ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan'}">${isAdm ? '⬇️ Снять Админа' : '⬆️ Назначить Админом'}</button><button type="button" onclick="deleteUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>` : ""}</div></div>`;
       }).join("");
     }
 
@@ -2206,7 +2266,7 @@
       const totalCats = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + getAllCategoriesForSection(k).length, 0);
       document.getElementById("adminStatsGrid").innerHTML = `
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего карточек</div><div class="text-2xl font-display font-black text-cp-yellow mt-1">${totalItems}</div></div>
-        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Создано вами</div><div class="text-2xl font-display font-black text-cp-cyan mt-1">${userItems}</div></div>
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">С плашкой «Добавлено»</div><div class="text-2xl font-display font-black text-cp-cyan mt-1">${userItems}</div></div>
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего категорий</div><div class="text-2xl font-display font-black text-cp-green mt-1">${totalCats}</div></div>
         <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Пользователей</div><div class="text-2xl font-display font-black text-purple-400 mt-1">${USERS.length}</div></div>
       `;
@@ -2256,7 +2316,7 @@
   </script>
 
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ И КРИПТО-ЗАЩИТЫ ПАРОЛЕЙ (SUPABASE)          -->
+  <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ И ПОЛНОЙ ИЗОЛЯЦИИ ЛОГИНОВ/ПАРОЛЕЙ            -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -2266,7 +2326,7 @@
     let sbClient = null;
     let isApplyingRemoteUpdate = false;
 
-    // 1. Серверная проверка пароля через защищённую RPC-функцию (пароли никогда не покидают сервер)
+    // 1. Серверная проверка логина и пароля (возвращает только внутренний user_id)
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -2274,18 +2334,28 @@
           p_username: username,
           p_password: password
         });
-        if (error) {
-          console.error("Ошибка RPC verify_cp2020_login:", error);
-          return null;
-        }
+        if (error) return null;
         return data || null;
       } catch (e) {
-        console.error("Ошибка проверки пароля:", e);
         return null;
       }
     };
 
-    // 2. Серверное сохранение/обновление пароля в зашифрованном хранилище PassVault (Bcrypt)
+    // 2. Серверная проверка занятости логина при регистрации
+    window.checkUsernameTakenInVault = async function(username) {
+      if (!sbClient) return false;
+      try {
+        const { data, error } = await sbClient.rpc("check_cp2020_username_taken", {
+          p_username: username
+        });
+        if (error) return false;
+        return Boolean(data);
+      } catch (e) {
+        return false;
+      }
+    };
+
+    // 3. Серверное создание записи в закрытом хранилище PassVault
     window.savePasswordInCloudVault = async function(userId, username, rawPassword) {
       if (!sbClient) return false;
       try {
@@ -2294,20 +2364,30 @@
           p_username: username,
           p_password: rawPassword
         });
-        if (error) {
-          console.error("Ошибка RPC set_cp2020_password:", error);
-          return false;
-        }
+        if (error) return false;
         return Boolean(data);
       } catch (e) {
-        console.error("Ошибка шифрования пароля:", e);
         return false;
       }
     };
 
-    // 3. Автоматическая миграция старых открытых паролей (если кто-то уже успел зарегистрироваться раньше) в закрытое хранилище
+    // 4. Смена пароля строго по user_id (без участия логина)
+    window.updatePasswordByIdInVault = async function(userId, newPassword) {
+      if (!sbClient) return false;
+      try {
+        const { data, error } = await sbClient.rpc("update_cp2020_password_by_id", {
+          p_user_id: userId,
+          p_new_password: newPassword
+        });
+        if (error) return false;
+        return Boolean(data);
+      } catch (e) {
+        return false;
+      }
+    };
+
     window.migrateLegacyPasswordToVault = function(userId, username, legacyPass) {
-      if (!legacyPass || userId === "u-root") return;
+      if (!legacyPass || !username || userId === "u-root") return;
       setTimeout(() => {
         if (sbClient) {
           window.savePasswordInCloudVault(userId, username, legacyPass);
@@ -2334,9 +2414,7 @@
     async function pushStateToCloud() {
       if (!sbClient || isApplyingRemoteUpdate) return;
       try {
-        // Перед отправкой гарантируем, что ни у одного пользователя нет открытого поля password
         sanitizeUsersAndEnforceRoot();
-
         setCloudStatusBadge("🔄 Синхронизация...", "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/40");
         const payload = {
           id: "main_state",
@@ -2352,7 +2430,7 @@
           .upsert(payload, { onConflict: "id" });
 
         if (error) throw error;
-        setCloudStatusBadge("🟢 ONLINE // SECURE", "bg-cp-green/15 text-cp-green border-cp-green/40");
+        setCloudStatusBadge("🟢 ONLINE // STEALTH", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка отправки в облако:", err);
         setCloudStatusBadge("🔴 Ошибка SQL/Сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
@@ -2370,7 +2448,7 @@
         if (row.comments && typeof row.comments === "object") COMMENTS = row.comments;
         if (Array.isArray(row.notifications)) NOTIFICATIONS = row.notifications;
 
-        // Вычищаем любые старые пароли из массива пользователей и проверяем ROOT
+        // Автоматически вычищаем любые старые поля username и password из публичного облака
         needsCleanSync = sanitizeUsersAndEnforceRoot();
 
         localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
@@ -2457,7 +2535,7 @@
           )
           .subscribe();
 
-        setCloudStatusBadge("🟢 ONLINE // SECURE", "bg-cp-green/15 text-cp-green border-cp-green/40");
+        setCloudStatusBadge("🟢 ONLINE // STEALTH", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка инициализации Supabase:", err);
         setCloudStatusBadge("🔴 Проверьте SQL-таблицу cp2020_state", "bg-cp-red/20 text-cp-red border-cp-red/50");
