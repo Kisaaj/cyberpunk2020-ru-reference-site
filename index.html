@@ -1183,34 +1183,61 @@
       switchMainView("catalog", "roles");
     }
 
+    // Безопасная запись в localStorage: никогда не роняет сайт при превышении 5 МБ лимита браузера!
+    function safeLocalSet(key, valueStr) {
+      try {
+        localStorage.setItem(key, valueStr);
+      } catch (quotaErr) {
+        // Если память браузера (5 МБ) переполнена из-за тяжёлых картинок/GIF — очищаем старые кэши, оставляя только сессию входа
+        const keysToClean = [
+          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
+          "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_users_v51",
+          STORAGE_DB_KEY, STORAGE_USERS_KEY, STORAGE_COMMENTS_KEY, STORAGE_NOTIF_KEY
+        ];
+        keysToClean.forEach(k => {
+          if (k !== key && k !== STORAGE_SESSION_KEY) {
+            try { localStorage.removeItem(k); } catch (e) {}
+          }
+        });
+        try {
+          localStorage.setItem(key, valueStr);
+        } catch (e2) {
+          console.warn(`Ключ ${key} превышает лимит localStorage (5 МБ) и работает напрямую через облако Supabase.`);
+        }
+      }
+    }
+
     function loadSavedData() {
       try {
-        const dbKeys = ["cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30", "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_full_db_v50"];
-        dbKeys.forEach(key => {
-          const raw = localStorage.getItem(key);
-          if (!raw) return;
+        // Сразу удаляем все устаревшие ключи прошлых версий, которые забивали память браузера
+        const legacyKeys = [
+          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
+          "cp2020_full_db_v40", "cp2020_full_db_v51",
+          "cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51",
+          "cp2020_users_v51", "cp2020_session_user_id_v51"
+        ];
+        legacyKeys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+
+        const rawDb = localStorage.getItem(STORAGE_DB_KEY);
+        if (rawDb) {
           try {
-            const parsed = JSON.parse(raw);
+            const parsed = JSON.parse(rawDb);
             if (parsed && typeof parsed === "object") mergeExternalDataIntoMemory({ db: parsed });
           } catch (e) {}
-        });
+        }
 
-        const catKeys = ["cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51", "cp2020_full_cats_v50"];
-        catKeys.forEach(key => {
-          const raw = localStorage.getItem(key);
-          if (!raw) return;
+        const rawCats = localStorage.getItem(STORAGE_CAT_KEY);
+        if (rawCats) {
           try {
-            const parsedCats = JSON.parse(raw);
+            const parsedCats = JSON.parse(rawCats);
             if (parsedCats && typeof parsedCats === "object") mergeExternalDataIntoMemory({ categories: parsedCats });
           } catch (e) {}
-        });
+        }
 
-        const userKeys = ["cp2020_users_v51", "cp2020_users_v50"];
-        userKeys.forEach(key => {
-          const raw = localStorage.getItem(key);
-          if (!raw) return;
+        const rawUsers = localStorage.getItem(STORAGE_USERS_KEY);
+        if (rawUsers) {
           try {
-            const parsedUsers = JSON.parse(raw);
+            const parsedUsers = JSON.parse(rawUsers);
             if (Array.isArray(parsedUsers)) {
               parsedUsers.forEach(u => {
                 if (!u || !u.id) return;
@@ -1220,7 +1247,7 @@
               });
             }
           } catch (e) {}
-        });
+        }
 
         ensureMetaArraysInCategories();
         sanitizeUsersAndEnforceRoot();
@@ -1237,19 +1264,14 @@
           if (Array.isArray(parsedNotifs)) NOTIFICATIONS = parsedNotifs;
         }
 
-        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY) || localStorage.getItem("cp2020_session_user_id_v51");
+        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY);
         if (savedSession && USERS.some(u => u.id === savedSession)) currentUserId = savedSession;
-
-        localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
-        localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
       } catch (e) {}
     }
 
     function persistDatabase() {
-      try {
-        localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
-        localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
-      } catch (e) {}
+      safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
+      safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
     }
 
     function persistSessionOnly() {
@@ -1262,18 +1284,21 @@
 
     function persistUsers() {
       try {
-        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
         if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
         else localStorage.removeItem(STORAGE_SESSION_KEY);
       } catch (e) {}
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
       updateAuthHeaderUI();
     }
-    function persistComments() { try { localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS)); } catch (e) {} }
-    function persistNotifications() { try { localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS)); } catch (e) {} updateNotifBellUI(); }
 
-    function getCurrentUser() { return currentUserId ? (USERS.find(u => u.id === currentUserId) || null) : null; }
-    function isCurrentUserAdmin() { const u = getCurrentUser(); return Boolean(u && (u.role === "ROOT" || u.role === "ADMIN")); }
-    function isCurrentUserRoot() { const u = getCurrentUser(); return Boolean(u && u.role === "ROOT"); }
+    function persistComments() {
+      safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+    }
+
+    function persistNotifications() {
+      safeLocalSet(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
+      updateNotifBellUI();
+    }
 
     // =========================================================================
     // КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ
@@ -3482,7 +3507,7 @@
           const newDbStr = JSON.stringify(incoming.db);
           if (newDbStr !== JSON.stringify(DB)) {
             DB = incoming.db;
-            localStorage.setItem(STORAGE_DB_KEY, newDbStr);
+            safeLocalSet(STORAGE_DB_KEY, newDbStr);
             dbChanged = true;
           }
         }
@@ -3491,7 +3516,7 @@
           if (newCatStr !== JSON.stringify(CATEGORIES)) {
             CATEGORIES = incoming.categories;
             ensureMetaArraysInCategories();
-            localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+            safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
             dbChanged = true;
           }
         }
@@ -3500,7 +3525,7 @@
           if (newUsersStr !== JSON.stringify(USERS)) {
             USERS = incoming.users;
             sanitizeUsersAndEnforceRoot();
-            localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
+            safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
             usersChanged = true;
           }
         }
@@ -3508,7 +3533,7 @@
           const newCommStr = JSON.stringify(incoming.comments);
           if (newCommStr !== JSON.stringify(COMMENTS)) {
             COMMENTS = incoming.comments;
-            localStorage.setItem(STORAGE_COMMENTS_KEY, newCommStr);
+            safeLocalSet(STORAGE_COMMENTS_KEY, newCommStr);
             commentsChanged = true;
           }
         }
@@ -3516,7 +3541,7 @@
           const newNotifStr = JSON.stringify(incoming.notifications);
           if (newNotifStr !== JSON.stringify(NOTIFICATIONS)) {
             NOTIFICATIONS = incoming.notifications;
-            localStorage.setItem(STORAGE_NOTIF_KEY, newNotifStr);
+            safeLocalSet(STORAGE_NOTIF_KEY, newNotifStr);
             notifsChanged = true;
           }
         }
