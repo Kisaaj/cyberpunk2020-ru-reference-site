@@ -6,7 +6,6 @@
   <title>CYBERPUNK 2020 // СПРАВОЧНИК И БАЗА ДАННЫХ (1920x1080)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
-  <!-- ПОДКЛЮЧЕНИЕ ВНЕШНЕГО ФАЙЛА БАЗЫ ДАННЫХ (РАБОТАЕТ ДАЖЕ БЕЗ СЕРВЕРА ЧЕРЕЗ FILE://) -->
   <script src="database.js"></script>
   <script>
     tailwind.config = {
@@ -125,7 +124,7 @@
             <h1 class="font-display font-black text-lg tracking-wider text-white">
               CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
             </h1>
-            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.0 MODULAR</span>
+            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.1</span>
           </div>
           <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
             Сделано в Село ДнДшеское
@@ -133,18 +132,18 @@
         </div>
       </div>
 
-      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ (РОЛИ ПЕРВЫЕ, УСЛУГИ СПРАВА ОТ СНАРЯЖЕНИЯ) -->
-      <nav class="flex flex-wrap items-center gap-1" id="mainNav">
-        <button type="button" onclick="switchMainView('catalog', 'roles')" data-view="roles" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🎭 Роли (<span id="cnt-roles">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="weapons" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🔫 Оружие (<span id="cnt-weapons">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'armor')" data-view="armor" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🛡️ Броня (<span id="cnt-armor">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'gear')" data-view="gear" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🎒 Снаряжение (<span id="cnt-gear">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'services')" data-view="services" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">💼 Услуги (<span id="cnt-services">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'cyberware')" data-view="cyberware" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🦾 Кибероснащение (<span id="cnt-cyberware">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'netrunning')" data-view="netrunning" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🌐 Нетраннинг (<span id="cnt-netrunning">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🚗 Транспорт (<span id="cnt-vehicles">0</span>)</button>
-        <button type="button" onclick="switchMainView('catalog', 'characters')" data-view="characters" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">👥 Персонажи (<span id="cnt-characters">0</span>)</button>
-        <button type="button" onclick="switchMainView('rules')" data-view="rules" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">⚙️ Игровые механики (<span id="cnt-rules">0</span>)</button>
+      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ (БЕЗ СЧЁТЧИКОВ КОЛИЧЕСТВА ПРЕДМЕТОВ) -->
+      <nav class="flex flex-wrap items-center gap-1.5" id="mainNav">
+        <button type="button" onclick="switchMainView('catalog', 'roles')" data-view="roles" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🎭 Роли</button>
+        <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="weapons" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🔫 Оружие</button>
+        <button type="button" onclick="switchMainView('catalog', 'armor')" data-view="armor" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🛡️ Броня</button>
+        <button type="button" onclick="switchMainView('catalog', 'gear')" data-view="gear" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🎒 Снаряжение</button>
+        <button type="button" onclick="switchMainView('catalog', 'services')" data-view="services" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">💼 Услуги</button>
+        <button type="button" onclick="switchMainView('catalog', 'cyberware')" data-view="cyberware" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🦾 Кибероснащение</button>
+        <button type="button" onclick="switchMainView('catalog', 'netrunning')" data-view="netrunning" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🌐 Нетраннинг</button>
+        <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🚗 Транспорт</button>
+        <button type="button" onclick="switchMainView('catalog', 'characters')" data-view="characters" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">👥 Персонажи</button>
+        <button type="button" onclick="switchMainView('rules')" data-view="rules" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">⚙️ Игровые механики</button>
       </nav>
 
       <!-- ПРАВЫЙ УГОЛ: КВАДРАТНАЯ КНОПКА «ВОЙТИ» ИЛИ АВАТАР + КОЛОКОЛЬЧИК -->
@@ -293,7 +292,7 @@
     </div>
   </main>
 
-  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ -->
+  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ (БЕЗ ТЕСТОВОЙ КНОПКИ БЫСТРОГО ВХОДА ROOT) -->
   <main id="view-profile" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-5">
     <section id="authGuestContainer" class="max-w-[1150px] w-full mx-auto my-6 grid grid-cols-12 gap-6 items-stretch">
       <div class="col-span-6 bg-cp-panel cp-border p-7 flex flex-col justify-between">
@@ -304,7 +303,7 @@
           <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
             <div>
               <label class="block text-xs text-gray-400 mb-1">Логин пользователя:</label>
-              <input type="text" id="loginUsername" required placeholder="Например: admin или silverhand" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
+              <input type="text" id="loginUsername" required placeholder="Введите логин..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
             </div>
             <div>
               <label class="block text-xs text-gray-400 mb-1">Пароль:</label>
@@ -314,12 +313,8 @@
             <button type="submit" class="w-full py-3 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Войти в систему →</button>
           </form>
         </div>
-        <div class="mt-6 pt-4 border-t border-gray-800 bg-black/40 p-3.5 text-xs flex items-center justify-between">
-          <div>
-            <div class="text-cp-cyan font-bold uppercase text-[11px]">⚡ Главный Администратор (ROOT):</div>
-            <div class="text-gray-300 mt-1">Логин: <code class="text-cp-yellow font-bold">admin</code> • Пароль: <code class="text-cp-yellow font-bold">admin2020</code></div>
-          </div>
-          <button type="button" onclick="quickRootLogin()" class="px-3 py-1.5 bg-cp-red hover:bg-red-600 text-white font-bold text-[11px] uppercase shrink-0">Быстрый вход ROOT</button>
+        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">
+          Защищённый терминал сети Найт-Сити // DataTerm v10.1
         </div>
       </div>
 
@@ -346,7 +341,7 @@
             <button type="submit" class="w-full py-3 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Зарегистрировать профиль +</button>
           </form>
         </div>
-        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Все зарегистрированные профили сохраняются в базе сайта и доступны во вкладке «Пользователи» в Админ-панели.</div>
+        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Все зарегистрированные профили сохраняются в облачной базе сайта в реальном времени.</div>
       </div>
     </section>
 
@@ -700,7 +695,6 @@
       ]
     };
 
-    // Резервный стартовый набор на случай, если внешний файл database.js ещё не положили рядом
     const FALLBACK_DATA = window.CP2020_EXTERNAL_DATA || {
       categories: {
         roles: ["Базовые роли (Corebook)"], weapons: ["Средние пистолеты"], armor: ["Мягкая броня"],
@@ -713,14 +707,22 @@
       }
     };
 
-    const DEFAULT_USERS = [
-      {
-        id: "u-root", username: "admin", password: "admin2020",
-        displayName: "Главный Архитектор (Село ДнДшеское)", role: "ROOT", favRole: "Рефери (ГМ)",
-        avatar: "", bio: "Создатель и Главный Администратор справочника Cyberpunk 2020.",
-        favorites: [], notes: "Добро пожаловать в терминал Главного Администратора!", createdAt: "2026-01-01"
-      }
-    ];
+    // ЖЁСТКО ЗАШИТЫЕ ДАННЫЕ ГЛАВНОГО АДМИНА (ROOT)
+    const HARDCODED_ROOT_USER = {
+      id: "u-root",
+      username: "loksmir",
+      password: "K1s@aJ#Cp2020!x9",
+      displayName: "Kisaaj",
+      role: "ROOT",
+      favRole: "Рефери (ГМ)",
+      avatar: "",
+      bio: "Главный Администратор и создатель справочника Cyberpunk 2020.",
+      favorites: [],
+      notes: "Личный терминал Главного Администратора Kisaaj.",
+      createdAt: "2026-01-01"
+    };
+
+    const DEFAULT_USERS = [JSON.parse(JSON.stringify(HARDCODED_ROOT_USER))];
 
     const STORAGE_DB_KEY = "cp2020_full_db_v50";
     const STORAGE_CAT_KEY = "cp2020_full_cats_v50";
@@ -750,6 +752,31 @@
     let activeCatManagerSection = "roles";
     let activeReplyToComment = null;
     let activeEditCommentId = null;
+
+    // Принудительно гарантирует, что аккаунт ROOT имеет логин loksmir и ник Kisaaj (убирая старый демо-аккаунт admin)
+    function enforceHardcodedRootAccount() {
+      let changed = false;
+      const rootIdx = USERS.findIndex(u => u.role === "ROOT" || u.id === "u-root" || u.username.toLowerCase() === "loksmir");
+      if (rootIdx === -1) {
+        USERS.unshift(JSON.parse(JSON.stringify(HARDCODED_ROOT_USER)));
+        changed = true;
+      } else {
+        const existing = USERS[rootIdx];
+        if (existing.username === "admin" || existing.password === "admin2020" || existing.displayName.includes("Главный Архитектор")) {
+          existing.id = "u-root";
+          existing.username = HARDCODED_ROOT_USER.username;
+          existing.password = HARDCODED_ROOT_USER.password;
+          existing.displayName = HARDCODED_ROOT_USER.displayName;
+          existing.role = "ROOT";
+          changed = true;
+        } else {
+          existing.id = "u-root";
+          existing.username = HARDCODED_ROOT_USER.username;
+          existing.role = "ROOT";
+        }
+      }
+      return changed;
+    }
 
     function dash(val) {
       if (val === undefined || val === null) return "—";
@@ -783,7 +810,7 @@
     }
 
     // =========================================================================
-    // ПОДГРУЗКА БАЗЫ (ИЗ DATABASE.JS, DATABASE.JSON И LOCALSTORAGE)
+    // ПОДГРУЗКА БАЗЫ
     // =========================================================================
     function mergeExternalDataIntoMemory(extData) {
       if (!extData) return;
@@ -804,24 +831,11 @@
     }
 
     async function initApp() {
-      // 1. Сначала берём данные из подключённого database.js
       if (window.CP2020_EXTERNAL_DATA) {
         mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
       }
-
-      // 2. Пытаемся также подтянуть database.json (если запущено на хостинге или локальном сервере)
-      try {
-        const resp = await fetch("database.json", { cache: "no-store" });
-        if (resp.ok) {
-          const jsonExt = await resp.json();
-          mergeExternalDataIntoMemory(jsonExt);
-        }
-      } catch (err) {
-        // Игнорируем ошибку CORS при локальном открытии через file://, так как database.js уже загружен
-      }
-
-      // 3. Накатываем поверх сохранения из localStorage
       loadSavedData();
+      enforceHardcodedRootAccount();
       updateCounts();
       switchMainView("catalog", "roles");
     }
@@ -864,7 +878,8 @@
             }
           } catch (e) {}
         });
-        if (!USERS.some(u => u.role === "ROOT")) USERS.unshift(DEFAULT_USERS[0]);
+
+        enforceHardcodedRootAccount();
 
         const rawComm = localStorage.getItem(STORAGE_COMMENTS_KEY);
         if (rawComm) {
@@ -1287,10 +1302,6 @@
     });
 
     function updateCounts() {
-      Object.keys(SECTION_LABELS).forEach(k => {
-        const el = document.getElementById("cnt-" + k);
-        if (el) el.textContent = (DB[k] || []).length;
-      });
       updateAuthHeaderUI();
     }
 
@@ -1314,8 +1325,8 @@
       document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
         const isCur = btn.getAttribute("data-view") === targetKey;
         btn.className = isCur
-          ? "nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all bg-cp-yellow text-black border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.3)]"
-          : "nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan";
+          ? "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all bg-cp-yellow text-black border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.3)]"
+          : "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan";
       });
 
       if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
@@ -1403,7 +1414,7 @@
     }
 
     // =========================================================================
-    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК (ОБЕ ФУНКЦИИ ВМЕСТЕ!)
+    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК
     // =========================================================================
     function renderCatalog() {
       const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
@@ -1890,7 +1901,7 @@
       errBox.classList.add("hidden"); currentUserId = found.id; persistUsers();
       document.getElementById("loginPassword").value = ""; renderProfileView();
     }
-    function quickRootLogin() { const rootUser = USERS.find(u => u.role === "ROOT") || USERS[0]; currentUserId = rootUser.id; persistUsers(); renderProfileView(); }
+
     function handleRegisterSubmit(e) {
       e.preventDefault();
       const username = document.getElementById("regUsername").value.trim();
@@ -2136,6 +2147,7 @@
             if (parsed.comments) COMMENTS = parsed.comments;
             if (Array.isArray(parsed.notifications)) NOTIFICATIONS = parsed.notifications;
           } else DB = parsed;
+          enforceHardcodedRootAccount();
           persistDatabase(); persistUsers(); persistComments(); persistNotifications(); updateCounts(); renderAdminBackupStats();
           alert("База данных успешно загружена!");
         } catch (err) { alert("Ошибка чтения JSON-файла!"); }
@@ -2144,7 +2156,7 @@
     }
 
     function clearUserAdditions() {
-      if (!confirm("Сбросить кеш карточек браузера и перезагрузить чистую базу из внешнего файла database.js / database.json?")) return;
+      if (!confirm("Сбросить кеш карточек браузера и перезагрузить чистую базу из внешнего файла database.js?")) return;
       ["cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30", "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_full_db_v50"].forEach(k => localStorage.removeItem(k));
       localStorage.removeItem(STORAGE_CAT_KEY);
       location.reload();
@@ -2153,19 +2165,18 @@
     // Старт приложения
     initApp();
   </script>
+
   <!-- ========================================================================= -->
   <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ В РЕАЛЬНОМ ВРЕМЕНИ (SUPABASE REALTIME)       -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // Ваши рабочие публичные реквизиты подключения к проекту Supabase:
     const SUPABASE_URL = "https://rlmcbowuphdwzrunugwx.supabase.co";
     const SUPABASE_ANON_KEY = "sb_publishable_gmUGR5_KyN2m4jZ-yRVoZw__A9UwOjh";
 
     let sbClient = null;
     let isApplyingRemoteUpdate = false;
 
-    // Индикатор статуса облака в шапке сайта
     function setCloudStatusBadge(statusText, colorClass) {
       let badge = document.getElementById("cloudRealtimeBadge");
       if (!badge) {
@@ -2182,7 +2193,6 @@
       }
     }
 
-    // Отправка любых изменений (карточек, профилей, комментариев, уведомлений) в облако
     async function pushStateToCloud() {
       if (!sbClient || isApplyingRemoteUpdate) return;
       try {
@@ -2208,16 +2218,19 @@
       }
     }
 
-    // Применение свежих данных, прилетевших из облака от других пользователей
     function applyCloudStateToUI(row) {
       if (!row) return;
       isApplyingRemoteUpdate = true;
+      let rootNeedsSync = false;
       try {
         if (row.db && Object.keys(row.db).length > 0) DB = row.db;
         if (row.categories && Object.keys(row.categories).length > 0) CATEGORIES = row.categories;
         if (Array.isArray(row.users) && row.users.length > 0) USERS = row.users;
         if (row.comments && typeof row.comments === "object") COMMENTS = row.comments;
         if (Array.isArray(row.notifications)) NOTIFICATIONS = row.notifications;
+
+        // Гарантируем, что аккаунт ROOT имеет логин loksmir и ник Kisaaj даже после чтения из облака
+        rootNeedsSync = enforceHardcodedRootAccount();
 
         localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
         localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
@@ -2241,9 +2254,11 @@
       } finally {
         isApplyingRemoteUpdate = false;
       }
+      if (rootNeedsSync) {
+        pushStateToCloud();
+      }
     }
 
-    // Перехватываем сохранения на сайте, чтобы они автоматически летели в облако
     const origPersistDB = persistDatabase;
     persistDatabase = function() {
       origPersistDB();
@@ -2268,7 +2283,6 @@
       pushStateToCloud();
     };
 
-    // Запуск подключения к Supabase
     async function initRealtimeCloud() {
       try {
         setCloudStatusBadge("⏳ Подключение к Сети...", "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/40");
@@ -2285,6 +2299,7 @@
         if (data && data.db && Object.keys(data.db).length > 0) {
           applyCloudStateToUI(data);
         } else {
+          enforceHardcodedRootAccount();
           await pushStateToCloud();
         }
 
