@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYBERPUNK 2020 // СПРАВОЧНИК И БАЗА ДАННЫХ (1920x1080)</title>
+  <title>CYBERPUNK 2020 // СПРАВОЧНИК</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
   <script src="database.js"></script>
@@ -77,7 +77,7 @@
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (БЕЗ ОТОБРАЖЕНИЯ ЛОГИНА) -->
+  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ -->
   <div id="publicProfileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePublicProfileModal()">
     <div class="max-w-xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_35px_rgba(0,240,255,0.25)] p-6 relative" onclick="event.stopPropagation()">
       <div class="flex items-start justify-between border-b border-gray-800 pb-4 mb-4">
@@ -123,7 +123,6 @@
             <h1 class="font-display font-black text-lg tracking-wider text-white">
               CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
             </h1>
-            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.3 STEALTH</span>
           </div>
           <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
             Сделано в Село ДнДшеское
@@ -291,17 +290,17 @@
     </div>
   </main>
 
-  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ (И ЛОГИНЫ, И ПАРОЛИ СКРЫТЫ НА СЕРВЕРЕ SUPABASE) -->
+  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ -->
   <main id="view-profile" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-5">
     <section id="authGuestContainer" class="max-w-[1150px] w-full mx-auto my-6 grid grid-cols-12 gap-6 items-stretch">
       <div class="col-span-6 bg-cp-panel cp-border p-7 flex flex-col justify-between">
         <div>
-          <div class="text-xs font-bold text-cp-cyan uppercase tracking-wider">Криптографическая авторизация DataTerm</div>
+          <div class="text-xs font-bold text-cp-cyan uppercase tracking-wider">Авторизация в терминале DataTerm</div>
           <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">🔑 Вход в аккаунт</h2>
-          <p class="text-xs text-gray-400 mb-5 leading-relaxed">Логины и пароли хранятся исключительно в изолированном серверном хранилище и никогда не передаются в публичный код страницы.</p>
+          <p class="text-xs text-gray-400 mb-5 leading-relaxed">Войдите в свой профиль, чтобы оставлять комментарии под карточками, получать уведомления об ответах, сохранять снаряжение в «Избранное» и вести личные заметки.</p>
           <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
             <div>
-              <label class="block text-xs text-gray-400 mb-1">Секретный логин (для входа):</label>
+              <label class="block text-xs text-gray-400 mb-1">Логин (для входа):</label>
               <input type="text" id="loginUsername" required placeholder="Введите ваш логин..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
             </div>
             <div>
@@ -313,7 +312,7 @@
           </form>
         </div>
         <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">
-          🔒 Полная изоляция учётных данных // DataTerm v10.3 STEALTH
+          🔒 Защищённый терминал сети Найт-Сити // DataTerm
         </div>
       </div>
 
@@ -323,7 +322,7 @@
           <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">📝 Регистрация игрока</h2>
           <form onsubmit="handleRegisterSubmit(event)" class="space-y-3.5">
             <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-xs text-gray-400 mb-1">Секретный логин (только для входа)*</label><input type="text" id="regUsername" required placeholder="Никому не виден" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+              <div><label class="block text-xs text-gray-400 mb-1">Логин (только для входа)*</label><input type="text" id="regUsername" required placeholder="Никому не виден" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
               <div><label class="block text-xs text-gray-400 mb-1">Публичный Никнейм (Позывной)*</label><input type="text" id="regDisplayName" required placeholder="Виден всем на сайте" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
             </div>
             <div class="grid grid-cols-2 gap-3">
@@ -340,7 +339,7 @@
             <button type="submit" id="regSubmitBtn" class="w-full py-3 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Зарегистрировать профиль +</button>
           </form>
         </div>
-        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Ваш логин и пароль изолируются в закрытой таблице PassVault и не видны другим участникам.</div>
+        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Ваш логин и пароль изолируются в закрытой таблице на сервере и не видны другим участникам.</div>
       </div>
     </section>
 
@@ -503,7 +502,6 @@
         <div class="bg-cp-bg border border-gray-800 p-5 space-y-4">
           <div class="grid grid-cols-12 gap-6 items-center">
             <div class="col-span-5 flex flex-col gap-2">
-              <!-- ГАЛОЧКА ПЛАШКИ «ДОБАВЛЕНО» В КОНСТРУКТОРЕ -->
               <label class="flex items-center gap-2.5 text-xs text-gray-200 cursor-pointer bg-cp-panel border border-gray-700 px-3 py-2 mb-1 hover:border-cp-yellow">
                 <input type="checkbox" id="builderShowAddedCheck" checked class="accent-yellow-400 w-4 h-4">
                 <span>Отображать плашку <b class="text-cp-yellow">«ДОБАВЛЕНО»</b> на этой карточке</span>
@@ -712,7 +710,7 @@
       }
     };
 
-    // ПУБЛИЧНАЯ КАРТОЧКА ГЛАВНОГО АДМИНА (БЕЗ ЛОГИНА И БЕЗ ПАРОЛЯ В КОДЕ!)
+    // ПУБЛИЧНАЯ КАРТОЧКА ГЛАВНОГО АДМИНА (БЕЗ ЛОГИНА И БЕЗ ПАРОЛЯ В КОДЕ)
     const HARDCODED_ROOT_USER = {
       id: "u-root",
       displayName: "Kisaaj",
@@ -756,7 +754,6 @@
     let activeReplyToComment = null;
     let activeEditCommentId = null;
 
-    // Вычищает и открытые пароли, и логины (username) из публичных профилей пользователей
     function sanitizeUsersAndEnforceRoot() {
       let changed = false;
       const rootIdx = USERS.findIndex(u => u.role === "ROOT" || u.id === "u-root");
@@ -773,7 +770,6 @@
         }
       }
 
-      // Удаляем поля username и password из публичных объектов пользователей
       USERS.forEach(u => {
         if (u.password !== undefined) {
           if (window.migrateLegacyPasswordToVault && u.username) {
@@ -1064,7 +1060,7 @@
     }
 
     // =========================================================================
-    // ПУБЛИЧНЫЕ ПРОФИЛИ (БЕЗ ЛОГИНА) И КОММЕНТАРИИ
+    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ
     // =========================================================================
     function countUserTotalComments(userId) {
       let total = 0;
@@ -1424,7 +1420,6 @@
       return s.includes("ОТ") ? 4 : s.includes("ОН") ? 3 : (s.includes("ОБ") || s.includes("СТ")) ? 2 : s.includes("НН") ? 1 : 0;
     }
 
-    // Переключение плашки «ДОБАВЛЕНО» напрямую с карточки (для Админов и ROOT)
     function toggleItemAddedBadge(sectionKey, itemId, isChecked) {
       if (!isCurrentUserAdmin()) return;
       const target = (DB[sectionKey] || []).find(i => i.id === itemId);
@@ -1570,7 +1565,6 @@
       renderCatalog();
     }
 
-    // Кнопки управления карточкой + галочка плашки «ДОБАВЛЕНО» для Админов и ROOT
     function renderCardActionButtons(sectionKey, itemId) {
       const fav = isItemFavorited(itemId);
       const favBtn = `<button type="button" onclick="toggleFavoriteItem('${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${fav ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow'}">${fav ? '★ В избранном' : '☆ В избранное'}</button>`;
@@ -1841,7 +1835,6 @@
       data.id = editingItemId || ("user-" + Date.now());
       data.origName = data.origName && data.origName !== "—" ? data.origName : data.name;
 
-      // Учитываем выбор галочки «Отображать плашку ДОБАВЛЕНО»
       const showAddedCheck = document.getElementById("builderShowAddedCheck");
       data.isUser = showAddedCheck ? Boolean(showAddedCheck.checked) : true;
 
@@ -1945,7 +1938,6 @@
       if (box) box.innerHTML = !currentBuilderImageData ? `<span class="text-xs text-gray-500">Предпросмотр картинки появится здесь...</span>` : `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Картинка проверена Сетевым Дозором</span>`;
     }
 
-    // ВХОД ЧЕРЕЗ ЗАЩИЩЁННУЮ СЕРВЕРНУЮ ФУНКЦИЮ (ВОЗВРАЩАЕТ ТОЛЬКО ID ПОЛЬЗОВАТЕЛЯ)
     async function handleLoginSubmit(e) {
       e.preventDefault();
       const login = document.getElementById("loginUsername").value.trim().toLowerCase();
@@ -1994,7 +1986,6 @@
       }
     }
 
-    // РЕГИСТРАЦИЯ БЕЗ СОХРАНЕНИЯ ЛОГИНА И ПАРОЛЯ В ПУБЛИЧНОЙ БАЗЕ
     async function handleRegisterSubmit(e) {
       e.preventDefault();
       const username = document.getElementById("regUsername").value.trim();
@@ -2030,7 +2021,6 @@
         }
 
         errBox.classList.add("hidden");
-        // В публичный профиль сохраняется только id и публичный displayName (без логина и без пароля!)
         const newUser = {
           id: newUserId,
           displayName: displayName || "Эджраннер",
@@ -2316,7 +2306,7 @@
   </script>
 
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ И ПОЛНОЙ ИЗОЛЯЦИИ ЛОГИНОВ/ПАРОЛЕЙ            -->
+  <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ И ИЗОЛЯЦИИ ЛОГИНОВ/ПАРОЛЕЙ                   -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -2326,7 +2316,6 @@
     let sbClient = null;
     let isApplyingRemoteUpdate = false;
 
-    // 1. Серверная проверка логина и пароля (возвращает только внутренний user_id)
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -2341,7 +2330,6 @@
       }
     };
 
-    // 2. Серверная проверка занятости логина при регистрации
     window.checkUsernameTakenInVault = async function(username) {
       if (!sbClient) return false;
       try {
@@ -2355,7 +2343,6 @@
       }
     };
 
-    // 3. Серверное создание записи в закрытом хранилище PassVault
     window.savePasswordInCloudVault = async function(userId, username, rawPassword) {
       if (!sbClient) return false;
       try {
@@ -2371,7 +2358,6 @@
       }
     };
 
-    // 4. Смена пароля строго по user_id (без участия логина)
     window.updatePasswordByIdInVault = async function(userId, newPassword) {
       if (!sbClient) return false;
       try {
@@ -2430,10 +2416,10 @@
           .upsert(payload, { onConflict: "id" });
 
         if (error) throw error;
-        setCloudStatusBadge("🟢 ONLINE // STEALTH", "bg-cp-green/15 text-cp-green border-cp-green/40");
+        setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка отправки в облако:", err);
-        setCloudStatusBadge("🔴 Ошибка SQL/Сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
+        setCloudStatusBadge("🔴 Ошибка сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
       }
     }
 
@@ -2448,7 +2434,6 @@
         if (row.comments && typeof row.comments === "object") COMMENTS = row.comments;
         if (Array.isArray(row.notifications)) NOTIFICATIONS = row.notifications;
 
-        // Автоматически вычищаем любые старые поля username и password из публичного облака
         needsCleanSync = sanitizeUsersAndEnforceRoot();
 
         localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
@@ -2504,7 +2489,7 @@
 
     async function initRealtimeCloud() {
       try {
-        setCloudStatusBadge("⏳ Подключение к Сети...", "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/40");
+        setCloudStatusBadge("⏳ Подключение...", "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/40");
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const { data, error } = await sbClient
@@ -2535,10 +2520,10 @@
           )
           .subscribe();
 
-        setCloudStatusBadge("🟢 ONLINE // STEALTH", "bg-cp-green/15 text-cp-green border-cp-green/40");
+        setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка инициализации Supabase:", err);
-        setCloudStatusBadge("🔴 Проверьте SQL-таблицу cp2020_state", "bg-cp-red/20 text-cp-red border-cp-red/50");
+        setCloudStatusBadge("🔴 Ошибка сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
       }
     }
 
