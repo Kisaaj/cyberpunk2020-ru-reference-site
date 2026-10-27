@@ -59,7 +59,22 @@
   </style>
 </head>
 <body class="min-h-screen flex flex-col selection:bg-cp-red selection:text-white">
-
+  <!-- МОДАЛЬНОЕ ОКНО 0: ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ВЕРСИИ С GITHUB -->
+  <div id="versionUpdateModal" class="hidden fixed inset-0 z-[999] bg-black/95 backdrop-blur-md flex items-center justify-center p-4 select-none">
+    <div class="max-w-md w-full bg-cp-panel border-2 border-cp-yellow shadow-[0_0_50px_rgba(252,238,10,0.4)] p-6 relative cp-clip text-center">
+      <div class="w-12 h-12 bg-cp-yellow text-black font-display font-black text-2xl flex items-center justify-center mx-auto mb-4 shadow-[0_0_15px_#fcee0a]">
+        ↻
+      </div>
+      <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan mb-1">СИСТЕМНЫЙ ПРОТОКОЛ DATATERM // GITHUB SYNC</div>
+      <h3 class="font-display text-lg font-black text-white uppercase mb-3">ДОСТУПНО ОБНОВЛЕНИЕ САЙТА</h3>
+      <p class="text-xs text-gray-300 leading-relaxed bg-black/60 border-l-2 border-cp-yellow p-3.5 mb-5 text-left">
+        В репозитории GitHub опубликована новая версия справочника. Для синхронизации интерфейса и предотвращения конфликтов базы данных управление заблокировано до перезагрузки страницы.
+      </p>
+      <button type="button" onclick="forceReloadFromGithub()" class="w-full py-3 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all">
+        🔄 Обновить сайт сейчас
+      </button>
+    </div>
+  </div>
   <!-- МОДАЛЬНОЕ ОКНО 1: «СЕТЕВОЙ ДОЗОР БДИТ!» И УВЕДОМЛЕНИЯ О БАНЕ -->
   <div id="netwatchModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-red shadow-[0_0_40px_rgba(255,0,60,0.45)] p-6 relative cp-clip">
@@ -2748,12 +2763,32 @@
     async function deleteUserAccount(uid) {
       if (!isCurrentUserRoot()) return;
       const t = USERS.find(u => u.id === uid);
-      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}»? Пользователь будет мгновенно разлогинен, а его логин удалён.`)) return;
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями и уведомлениями?`)) return;
+      
+      // 1. Стираем логин и пароль из закрытого хранилища Supabase
       if (window.deleteUserFromCloudVault) {
         await window.deleteUserFromCloudVault(uid);
       }
+      
+      // 2. Удаляем сам профиль пользователя
       USERS = USERS.filter(u => u.id !== uid);
-      persistUsers(); renderAdminUsersManager();
+      
+      // 3. Вычищаем все комментарии этого пользователя со всех карточек
+      Object.keys(COMMENTS).forEach(itemId => {
+        if (Array.isArray(COMMENTS[itemId])) {
+          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
+          if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
+        }
+      });
+
+      // 4. Вычищаем все уведомления этого пользователя
+      NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== uid);
+
+      // Отправляем очищенные списки в облако
+      persistUsers();
+      persistComments();
+      persistNotifications();
+      renderAdminUsersManager();
     }
     function renderAdminUsersManager() {
       const rootMode = isCurrentUserRoot();
@@ -3222,6 +3257,102 @@
 
     window.addEventListener("load", () => {
       setTimeout(initRealtimeCloud, 200);
+    });
+  </script>
+<!-- ========================================================================= -->
+  <!-- МОДУЛЬ АВТОМАТИЧЕСКОЙ ПРОВЕРКИ ОБНОВЛЕНИЙ КОДА НА GITHUB PAGES            -->
+  <!-- ========================================================================= -->
+  <script>
+    let initialCodeSignature = null;
+    let isUpdateLockActive = false;
+
+    // Вычисляет быстрый хеш-отпечаток текста (алгоритм djb2)
+    function computeFastHash(str) {
+      let hash = 5381;
+      for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) + hash) ^ str.charCodeAt(i);
+      }
+      return (hash >>> 0).toString(16);
+    }
+
+    // Скачивает свежий index.html с GitHub в обход любого кэша браузера
+    async function fetchLiveHtmlSignature() {
+      if (location.protocol === "file:") return null;
+      try {
+        const cleanUrl = location.origin + location.pathname + "?_gh_ver=" + Date.now();
+        const res = await fetch(cleanUrl, {
+          cache: "no-store",
+          headers: {
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache"
+          }
+        });
+        if (!res.ok) return null;
+        const htmlText = await res.text();
+        return computeFastHash(htmlText.replace(/\r\n/g, "\n").trim());
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Блокирует весь сайт и выводит окно обновления
+    function triggerUpdateLockdown() {
+      if (isUpdateLockActive) return;
+      isUpdateLockActive = true;
+
+      if (document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+      document.body.style.overflow = "hidden";
+
+      const modal = document.getElementById("versionUpdateModal");
+      if (modal) modal.classList.remove("hidden");
+
+      // Блокируем нажатия любых клавиш (кроме F5 / Ctrl+R), чтобы нельзя было управлять сайтом с клавиатуры
+      window.addEventListener("keydown", function(e) {
+        if (e.key !== "F5" && !(e.ctrlKey && e.key.toLowerCase() === "r")) {
+          e.stopPropagation();
+          e.preventDefault();
+        }
+      }, true);
+    }
+
+    // Принудительная перезагрузка страницы со сбросом кэша URL
+    function forceReloadFromGithub() {
+      const url = new URL(location.href);
+      url.searchParams.set("_v", Date.now());
+      location.replace(url.toString());
+    }
+
+    async function initGithubVersionWatcher() {
+      if (location.protocol === "file:") return;
+
+      // 1. Запоминаем слепок версии, на которой пользователь открыл сайт
+      initialCodeSignature = await fetchLiveHtmlSignature();
+      if (!initialCodeSignature) return;
+
+      // 2. Проверяем наличие новой версии на GitHub каждые 45 секунд
+      setInterval(async () => {
+        if (isUpdateLockActive || document.hidden) return;
+        const latestSig = await fetchLiveHtmlSignature();
+        if (latestSig && initialCodeSignature && latestSig !== initialCodeSignature) {
+          triggerUpdateLockdown();
+        }
+      }, 45000);
+
+      // 3. Дополнительно проверяем мгновенно, когда игрок возвращается на вкладку сайта
+      document.addEventListener("visibilitychange", async () => {
+        if (!document.hidden && !isUpdateLockActive && initialCodeSignature) {
+          const latestSig = await fetchLiveHtmlSignature();
+          if (latestSig && latestSig !== initialCodeSignature) {
+            triggerUpdateLockdown();
+          }
+        }
+      });
+    }
+
+    window.addEventListener("load", () => {
+      setTimeout(initGithubVersionWatcher, 1500);
     });
   </script>
 </body>
