@@ -2153,5 +2153,164 @@
     // Старт приложения
     initApp();
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ОБЛАЧНОЙ СИНХРОНИЗАЦИИ В РЕАЛЬНОМ ВРЕМЕНИ (SUPABASE REALTIME)       -->
+  <!-- ========================================================================= -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Ваши рабочие публичные реквизиты подключения к проекту Supabase:
+    const SUPABASE_URL = "https://rlmcbowuphdwzrunugwx.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_gmUGR5_KyN2m4jZ-yRVoZw__A9UwOjh";
+
+    let sbClient = null;
+    let isApplyingRemoteUpdate = false;
+
+    // Индикатор статуса облака в шапке сайта
+    function setCloudStatusBadge(statusText, colorClass) {
+      let badge = document.getElementById("cloudRealtimeBadge");
+      if (!badge) {
+        const titleRow = document.querySelector("header h1")?.parentElement;
+        if (titleRow) {
+          badge = document.createElement("span");
+          badge.id = "cloudRealtimeBadge";
+          titleRow.appendChild(badge);
+        }
+      }
+      if (badge) {
+        badge.className = `text-[10px] px-2 py-0.5 font-bold border ${colorClass}`;
+        badge.innerHTML = statusText;
+      }
+    }
+
+    // Отправка любых изменений (карточек, профилей, комментариев, уведомлений) в облако
+    async function pushStateToCloud() {
+      if (!sbClient || isApplyingRemoteUpdate) return;
+      try {
+        setCloudStatusBadge("🔄 Синхронизация...", "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/40");
+        const payload = {
+          id: "main_state",
+          db: DB,
+          categories: CATEGORIES,
+          users: USERS,
+          comments: COMMENTS,
+          notifications: NOTIFICATIONS,
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await sbClient
+          .from("cp2020_state")
+          .upsert(payload, { onConflict: "id" });
+
+        if (error) throw error;
+        setCloudStatusBadge("🟢 ONLINE // REALTIME", "bg-cp-green/15 text-cp-green border-cp-green/40");
+      } catch (err) {
+        console.error("Ошибка отправки в облако:", err);
+        setCloudStatusBadge("🔴 Ошибка SQL/Сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
+      }
+    }
+
+    // Применение свежих данных, прилетевших из облака от других пользователей
+    function applyCloudStateToUI(row) {
+      if (!row) return;
+      isApplyingRemoteUpdate = true;
+      try {
+        if (row.db && Object.keys(row.db).length > 0) DB = row.db;
+        if (row.categories && Object.keys(row.categories).length > 0) CATEGORIES = row.categories;
+        if (Array.isArray(row.users) && row.users.length > 0) USERS = row.users;
+        if (row.comments && typeof row.comments === "object") COMMENTS = row.comments;
+        if (Array.isArray(row.notifications)) NOTIFICATIONS = row.notifications;
+
+        localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
+        localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
+        localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+        localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
+
+        updateCounts();
+        if (activeMainView === "catalog") {
+          setupCatalogFilters();
+          renderCatalog();
+        } else if (activeMainView === "rules") {
+          renderRulesView();
+        } else if (activeMainView === "profile") {
+          renderProfileView();
+        } else if (activeMainView === "admin") {
+          if (activeAdminSubtab === "categories") renderCategoryManager();
+          else if (activeAdminSubtab === "users") renderAdminUsersManager();
+          else if (activeAdminSubtab === "backup") renderAdminBackupStats();
+        }
+      } finally {
+        isApplyingRemoteUpdate = false;
+      }
+    }
+
+    // Перехватываем сохранения на сайте, чтобы они автоматически летели в облако
+    const origPersistDB = persistDatabase;
+    persistDatabase = function() {
+      origPersistDB();
+      pushStateToCloud();
+    };
+
+    const origPersistUsers = persistUsers;
+    persistUsers = function() {
+      origPersistUsers();
+      pushStateToCloud();
+    };
+
+    const origPersistComments = persistComments;
+    persistComments = function() {
+      origPersistComments();
+      pushStateToCloud();
+    };
+
+    const origPersistNotifs = persistNotifications;
+    persistNotifications = function() {
+      origPersistNotifs();
+      pushStateToCloud();
+    };
+
+    // Запуск подключения к Supabase
+    async function initRealtimeCloud() {
+      try {
+        setCloudStatusBadge("⏳ Подключение к Сети...", "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/40");
+        sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const { data, error } = await sbClient
+          .from("cp2020_state")
+          .select("*")
+          .eq("id", "main_state")
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data && data.db && Object.keys(data.db).length > 0) {
+          applyCloudStateToUI(data);
+        } else {
+          await pushStateToCloud();
+        }
+
+        sbClient
+          .channel("cp2020-live-sync")
+          .on(
+            "postgres_changes",
+            { event: "*", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
+            (payload) => {
+              if (payload.new) {
+                applyCloudStateToUI(payload.new);
+              }
+            }
+          )
+          .subscribe();
+
+        setCloudStatusBadge("🟢 ONLINE // REALTIME", "bg-cp-green/15 text-cp-green border-cp-green/40");
+      } catch (err) {
+        console.error("Ошибка инициализации Supabase:", err);
+        setCloudStatusBadge("🔴 Проверьте SQL-таблицу cp2020_state", "bg-cp-red/20 text-cp-red border-cp-red/50");
+      }
+    }
+
+    window.addEventListener("load", () => {
+      setTimeout(initRealtimeCloud, 300);
+    });
+  </script>
 </body>
 </html>
