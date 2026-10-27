@@ -60,31 +60,34 @@
 </head>
 <body class="min-h-screen flex flex-col selection:bg-cp-red selection:text-white">
 
-  <!-- МОДАЛЬНОЕ ОКНО 1: «СЕТЕВОЙ ДОЗОР БДИТ!» -->
+  <!-- МОДАЛЬНОЕ ОКНО 1: «СЕТЕВОЙ ДОЗОР БДИТ!» И УВЕДОМЛЕНИЯ О БАНЕ -->
   <div id="netwatchModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
     <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-red shadow-[0_0_40px_rgba(255,0,60,0.45)] p-6 relative cp-clip">
       <div class="flex items-center gap-3 border-b border-cp-red/50 pb-3 mb-4">
         <div class="w-10 h-10 bg-cp-red text-black font-display font-black text-xl flex items-center justify-center shrink-0">!</div>
         <div>
-          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ПРОТОКОЛ БЕЗОПАСНОСТИ NETWATCH // ПЕРЕХВАТ ПАКЕТА</div>
-          <h3 class="font-display text-lg font-black text-cp-red uppercase">🚨 СЕТЕВОЙ ДОЗОР БДИТ!</h3>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ПРОТОКОЛ БЕЗОПАСНОСТИ NETWATCH // ПЕРЕХВАТ ДОСТУПА</div>
+          <h3 id="netwatchModalTitle" class="font-display text-lg font-black text-cp-red uppercase">🚨 СЕТЕВОЙ ДОЗОР БДИТ!</h3>
         </div>
       </div>
-      <p id="netwatchErrorText" class="text-xs text-gray-100 leading-relaxed bg-black/60 border-l-2 border-cp-yellow p-4 mb-5"></p>
+      <div id="netwatchErrorText" class="text-xs text-gray-100 leading-relaxed bg-black/60 border-l-2 border-cp-yellow p-4 mb-5"></div>
       <button type="button" onclick="closeNetwatchModal()" class="w-full py-2.5 bg-cp-red hover:bg-red-600 text-white font-display font-bold text-xs uppercase tracking-wider">
         Принято // Закрыть предупреждение
       </button>
     </div>
   </div>
 
-  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ -->
+  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ (С КНОПКОЙ БАНА ДЛЯ АДМИНОВ) -->
   <div id="publicProfileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePublicProfileModal()">
     <div class="max-w-xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_35px_rgba(0,240,255,0.25)] p-6 relative" onclick="event.stopPropagation()">
       <div class="flex items-start justify-between border-b border-gray-800 pb-4 mb-4">
         <div class="flex items-center gap-4">
           <div id="pubProfAvatar" class="w-20 h-20 bg-cp-bg border-2 border-cp-yellow flex items-center justify-center font-display font-black text-2xl text-cp-yellow overflow-hidden shrink-0">CP</div>
           <div>
-            <div id="pubProfBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1"></div>
+            <div class="flex items-center gap-2 flex-wrap mb-1">
+              <div id="pubProfBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase"></div>
+              <div id="pubProfBanStatusBadge" class="hidden text-[10px] px-2 py-0.5 font-bold uppercase bg-cp-red text-white">🚫 ЗАБАНЕН</div>
+            </div>
             <h3 id="pubProfName" class="font-display text-xl font-black text-white"></h3>
             <div class="text-xs text-gray-300 mt-1">Любимая Роль: <b id="pubProfRole" class="text-cp-yellow"></b></div>
           </div>
@@ -107,9 +110,61 @@
           <div id="pubProfBio" class="bg-cp-bg border-l-2 border-cp-yellow p-3.5 text-gray-200 leading-relaxed whitespace-pre-line min-h-[80px]"></div>
         </div>
       </div>
-      <div class="mt-5 pt-3 border-t border-gray-800 flex justify-end">
-        <button type="button" onclick="closePublicProfileModal()" class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold uppercase border border-gray-600">Закрыть</button>
+      <div class="mt-5 pt-3 border-t border-gray-800 flex items-center justify-between gap-3">
+        <div id="pubProfAdminActions" class="flex items-center gap-2"></div>
+        <button type="button" onclick="closePublicProfileModal()" class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold uppercase border border-gray-600 ml-auto">Закрыть</button>
       </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО 3: НАСТРОЙКА И ВЫДАЧА БАНА ПОЛЬЗОВАТЕЛЮ -->
+  <div id="banUserModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4" onclick="closeBanModal()">
+    <div class="max-w-md w-full bg-cp-panel border-2 border-cp-red shadow-[0_0_40px_rgba(255,0,60,0.4)] p-6 relative cp-clip" onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+        <div>
+          <div class="text-[10px] font-bold text-cp-red uppercase tracking-wider">Терминал блокировки DataTerm</div>
+          <h3 class="font-display text-base font-black text-white uppercase mt-0.5">🚫 Блокировка: <span id="banModalTargetName" class="text-cp-yellow"></span></h3>
+        </div>
+        <button type="button" onclick="closeBanModal()" class="text-gray-400 hover:text-white text-lg font-bold px-1.5">✕</button>
+      </div>
+
+      <form onsubmit="confirmBanUserSubmit(event)" class="space-y-4 text-xs">
+        <input type="hidden" id="banModalTargetId">
+        <div>
+          <label class="block text-gray-300 font-bold mb-1">Длительность бана:</label>
+          <select id="banDurationSelect" onchange="toggleCustomBanMinutes()" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-red px-3 py-2 text-white outline-none">
+            <option value="5">5 минут</option>
+            <option value="15">15 минут</option>
+            <option value="30">30 минут</option>
+            <option value="60">1 час</option>
+            <option value="720">12 часов</option>
+            <option value="1440">1 сутки (24 часа)</option>
+            <option value="10080">7 суток (Неделя)</option>
+            <option value="43200">30 суток (Месяц)</option>
+            <option value="PERM">Перманентный бан (Навсегда)</option>
+            <option value="CUSTOM">Указать своё время (в минутах)...</option>
+          </select>
+        </div>
+
+        <div id="customBanMinutesBox" class="hidden">
+          <label class="block text-gray-300 font-bold mb-1">Количество минут блокировки:</label>
+          <input type="number" id="banCustomMinutesInput" min="1" value="10" placeholder="Например: 45" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-white outline-none">
+        </div>
+
+        <div>
+          <label class="block text-gray-300 font-bold mb-1">Причина бана (высветится заблокированному пользователю)*:</label>
+          <textarea id="banReasonInput" required rows="3" placeholder="Нарушение правил сообщества, спам в комментариях..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-red p-2.5 text-white outline-none"></textarea>
+        </div>
+
+        <div class="flex items-center gap-2 pt-2">
+          <button type="submit" class="flex-1 py-2.5 bg-cp-red hover:bg-red-600 text-white font-display font-bold uppercase tracking-wider">
+            🚫 Заблокировать и разлогинить
+          </button>
+          <button type="button" onclick="closeBanModal()" class="px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-gray-300 font-bold uppercase border border-gray-700">
+            Отмена
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -123,6 +178,8 @@
             <h1 class="font-display font-black text-lg tracking-wider text-white">
               CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
             </h1>
+            <!-- ФИКСИРОВАННЫЙ ЭМОДЗИ-ИНДИКАТОР СТАТУСА СЕТИ (НЕ МЕНЯЕТ РАЗМЕР ШАПКИ) -->
+            <span id="cloudRealtimeBadge" title="Подключение к Сети..." class="inline-flex items-center justify-center w-6 h-6 text-xs rounded bg-cp-panel border border-gray-800 select-none shrink-0">⏳</span>
           </div>
           <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
             Сделано в Село ДнДшеское
@@ -434,14 +491,15 @@
         <span class="text-lg">⚙️</span>
         <div>
           <h2 class="font-display text-base font-bold text-white uppercase tracking-wider">Панель управления Администратора</h2>
-          <p class="text-xs text-gray-400">Конструктор и редактор карточек, управление категориями и список пользователей сайта</p>
+          <p class="text-xs text-gray-400">Конструктор карточек, управление категориями, модерация пользователей и логи</p>
         </div>
       </div>
-      <div class="flex items-center gap-2" id="adminSubNav">
-        <button type="button" onclick="switchAdminSubtab('builder')" data-subtab="builder" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">➕ Конструктор и Редактор карточек</button>
-        <button type="button" onclick="switchAdminSubtab('categories')" data-subtab="categories" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">🗂️ Управление категориями</button>
-        <button type="button" onclick="switchAdminSubtab('users')" data-subtab="users" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">👥 Пользователи (<span id="cnt-users">1</span>)</button>
-        <button type="button" onclick="switchAdminSubtab('backup')" data-subtab="backup" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">💾 База данных (JSON)</button>
+      <div class="flex flex-wrap items-center gap-2" id="adminSubNav">
+        <button type="button" onclick="switchAdminSubtab('builder')" data-subtab="builder" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">➕ Конструктор карточек</button>
+        <button type="button" onclick="switchAdminSubtab('categories')" data-subtab="categories" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">🗂️ Категории</button>
+        <button type="button" onclick="switchAdminSubtab('users')" data-subtab="users" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">👥 Пользователи (<span id="cnt-users">1</span>)</button>
+        <button type="button" onclick="switchAdminSubtab('logs')" data-subtab="logs" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">📋 Логи</button>
+        <button type="button" onclick="switchAdminSubtab('backup')" data-subtab="backup" class="admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all">💾 База данных (JSON)</button>
       </div>
     </section>
 
@@ -548,7 +606,7 @@
       <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
         <div>
           <h3 class="font-display text-lg font-bold text-cp-yellow uppercase">👥 Пользователи</h3>
-          <p class="text-xs text-gray-400 mt-1">Логины скрыты в защищённом хранилище для всех. Нажмите на аватар или позывной пользователя, чтобы открыть его <b>Публичный профиль</b>.</p>
+          <p class="text-xs text-gray-400 mt-1">Логины скрыты в защищённом хранилище для всех. Админы могут банить обычных игроков, а Главный Администратор (<span class="text-cp-red font-bold">ROOT</span>) — управлять правами и банить кого угодно.</p>
         </div>
         <button type="button" onclick="toggleAdminQuickUserModal()" class="px-4 py-2 bg-cp-cyan text-black font-bold text-xs uppercase hover:bg-cyan-300">+ Создать аккаунт вручную</button>
       </div>
@@ -563,7 +621,31 @@
       <div class="space-y-2.5" id="adminUsersTableContainer"></div>
     </section>
 
-    <!-- ПОДВКЛАДКА 4.4: БАЗА ДАННЫХ -->
+    <!-- ПОДВКЛАДКА 4.4: ЛОГИ (БАНЫ И ВСЕ КОММЕНТАРИИ) -->
+    <section id="admin-sub-logs" class="hidden bg-cp-panel cp-border p-6 space-y-5">
+      <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
+        <div>
+          <h3 class="font-display text-lg font-bold text-cp-cyan uppercase">📋 Журнал и Логи модерации</h3>
+          <p class="text-xs text-gray-400 mt-1">Активные блокировки пользователей и общий поток всех комментариев на сайте в реальном времени.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="logsTabBansBtn" onclick="switchAdminLogsSubtab('bans')" class="px-4 py-2 text-xs font-bold uppercase border transition-all">
+            🚫 Баны (<span id="cnt-logs-bans">0</span>)
+          </button>
+          <button type="button" id="logsTabCommentsBtn" onclick="switchAdminLogsSubtab('comments')" class="px-4 py-2 text-xs font-bold uppercase border transition-all">
+            💬 Все комментарии (<span id="cnt-logs-comments">0</span>)
+          </button>
+        </div>
+      </div>
+
+      <!-- Список забаненных -->
+      <div id="adminLogsBansBox" class="space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
+
+      <!-- Список всех комментариев сайта -->
+      <div id="adminLogsCommentsBox" class="hidden space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
+    </section>
+
+    <!-- ПОДВКЛАДКА 4.5: БАЗА ДАННЫХ -->
     <section id="admin-sub-backup" class="hidden bg-cp-panel cp-border p-6 space-y-6">
       <h4 class="font-display text-base font-bold text-cp-yellow uppercase border-b border-gray-800 pb-3">💾 Выгрузка и подгрузка внешней базы (JSON / JS)</h4>
       <div class="grid grid-cols-4 gap-4 text-center" id="adminStatsGrid"></div>
@@ -745,6 +827,7 @@
     let selectedRuleId = null;
 
     let activeAdminSubtab = "builder";
+    let activeAdminLogsSubtab = "bans";
     let activeBuilderType = "roles";
     let activeNetBuilderKind = "program";
     let editingItemId = null;
@@ -752,6 +835,7 @@
     let activeCatManagerSection = "roles";
     let activeReplyToComment = null;
     let activeEditCommentId = null;
+    let currentlyViewedPublicUserId = null;
 
     function sanitizeUsersAndEnforceRoot() {
       let changed = false;
@@ -765,6 +849,11 @@
           existing.id = "u-root";
           existing.displayName = existing.displayName.includes("Главный Архитектор") ? "Kisaaj" : existing.displayName;
           existing.role = "ROOT";
+          changed = true;
+        }
+        // Гарантируем, что у ROOT никогда не может быть бана
+        if (existing.banInfo) {
+          delete existing.banInfo;
           changed = true;
         }
       }
@@ -817,6 +906,163 @@
     }
 
     // =========================================================================
+    // СИСТЕМА БАНОВ И ПРОВЕРКИ СЕССИИ В РЕАЛЬНОМ ВРЕМЕНИ
+    // =========================================================================
+    function isUserCurrentlyBanned(userObj) {
+      if (!userObj || userObj.role === "ROOT" || !userObj.banInfo) return false;
+      const b = userObj.banInfo;
+      if (b.until === "PERM") return true;
+      const untilMs = Number(b.until) || 0;
+      if (Date.now() < untilMs) return true;
+      return false;
+    }
+
+    function formatBanRemainingTime(banInfo) {
+      if (!banInfo) return "";
+      if (banInfo.until === "PERM") return "Навсегда (Перманентный бан)";
+      const diffMs = Number(banInfo.until) - Date.now();
+      if (diffMs <= 0) return "Истёк";
+      const totalMins = Math.ceil(diffMs / 60000);
+      if (totalMins < 60) return `Ещё ${totalMins} мин. (до ${new Date(Number(banInfo.until)).toLocaleString("ru-RU")})`;
+      const hours = Math.floor(totalMins / 60);
+      const mins = totalMins % 60;
+      if (hours < 24) return `Ещё ${hours} ч. ${mins} мин. (до ${new Date(Number(banInfo.until)).toLocaleString("ru-RU")})`;
+      const days = Math.floor(hours / 24);
+      const remHours = hours % 24;
+      return `Ещё ${days} дн. ${remHours} ч. (до ${new Date(Number(banInfo.until)).toLocaleString("ru-RU")})`;
+    }
+
+    // Проверяет, имеет ли текущий админ право забанить/разбанить выбранного пользователя
+    function canCurrentAdminBanTarget(targetUser) {
+      const cur = getCurrentUser();
+      if (!cur || !targetUser) return false;
+      if (targetUser.role === "ROOT" || targetUser.id === "u-root") return false; // Рута никто не может забанить
+      if (cur.id === targetUser.id) return false; // Нельзя забанить самого себя
+      if (cur.role === "ROOT") return true; // Рут может банить и Админов, и Юзеров
+      if (cur.role === "ADMIN" && targetUser.role === "USER") return true; // Админы банят только обычных Юзеров
+      return false; // Админы физически не могут банить друг друга
+    }
+
+    function showBanScreenModal(banInfo) {
+      const durationText = formatBanRemainingTime(banInfo);
+      document.getElementById("netwatchModalTitle").textContent = "🚫 ВАШ ДОСТУП ЗАБЛОКИРОВАН!";
+      document.getElementById("netwatchErrorText").innerHTML = `
+        <div class="space-y-2">
+          <div class="text-cp-red font-bold uppercase">Ваш аккаунт был заблокирован Администрацией сайта.</div>
+          <div><b>Причина бана:</b> <span class="text-white">${banInfo.reason || "Нарушение правил"}</span></div>
+          <div><b>Длительность / Окончание:</b> <span class="text-cp-yellow font-bold">${durationText}</span></div>
+          <div class="text-[11px] text-gray-400 pt-1">Модератор: ${banInfo.bannedBy || "Администратор"}</div>
+        </div>
+      `;
+      document.getElementById("netwatchModal").classList.remove("hidden");
+    }
+
+    // Автоматически выбрасывает пользователя из аккаунта, если его забанили или удалили
+    function checkAndEnforceCurrentSessionValidity() {
+      if (!currentUserId) return;
+      const u = USERS.find(x => x.id === currentUserId);
+
+      // 1. Если аккаунт был удалён
+      if (!u) {
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showNetwatchAlert("Ваш аккаунт был удалён Администратором. Сессия завершена.");
+        return;
+      }
+
+      // 2. Если на аккаунт наложен активный бан
+      if (isUserCurrentlyBanned(u)) {
+        const bInfo = u.banInfo;
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showBanScreenModal(bInfo);
+      } else if (u.banInfo) {
+        // Если время бана уже истекло — автоматически очищаем старую запись о бане
+        delete u.banInfo;
+        persistUsers();
+      }
+    }
+
+    function openBanModal(targetUserId) {
+      const target = USERS.find(u => u.id === targetUserId);
+      if (!target || !canCurrentAdminBanTarget(target)) return;
+      document.getElementById("banModalTargetId").value = target.id;
+      document.getElementById("banModalTargetName").textContent = target.displayName;
+      document.getElementById("banDurationSelect").value = "60";
+      document.getElementById("customBanMinutesBox").classList.add("hidden");
+      document.getElementById("banReasonInput").value = "";
+      document.getElementById("banUserModal").classList.remove("hidden");
+    }
+
+    function closeBanModal() {
+      document.getElementById("banUserModal").classList.add("hidden");
+    }
+
+    function toggleCustomBanMinutes() {
+      const val = document.getElementById("banDurationSelect").value;
+      document.getElementById("customBanMinutesBox").classList.toggle("hidden", val !== "CUSTOM");
+    }
+
+    function confirmBanUserSubmit(e) {
+      e.preventDefault();
+      const targetId = document.getElementById("banModalTargetId").value;
+      const target = USERS.find(u => u.id === targetId);
+      const curAdmin = getCurrentUser();
+      if (!target || !curAdmin || !canCurrentAdminBanTarget(target)) return;
+
+      const durVal = document.getElementById("banDurationSelect").value;
+      const reason = document.getElementById("banReasonInput").value.trim() || "Нарушение правил";
+
+      let untilValue = "PERM";
+      let durationLabel = "Перманентно (Навсегда)";
+
+      if (durVal !== "PERM") {
+        const mins = durVal === "CUSTOM"
+          ? Math.max(1, parseInt(document.getElementById("banCustomMinutesInput").value, 10) || 10)
+          : parseInt(durVal, 10);
+        untilValue = Date.now() + mins * 60 * 1000;
+        const selEl = document.getElementById("banDurationSelect");
+        durationLabel = durVal === "CUSTOM" ? `${mins} мин.` : selEl.options[selEl.selectedIndex].text;
+      }
+
+      target.banInfo = {
+        reason,
+        until: untilValue,
+        durationLabel,
+        bannedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+        bannedBy: curAdmin.displayName
+      };
+
+      closeBanModal();
+      persistUsers();
+
+      if (currentlyViewedPublicUserId === target.id && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+        openPublicProfileModal(target.id);
+      }
+      if (activeMainView === "admin") {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
+    }
+
+    function unbanUserAccount(targetUserId) {
+      const target = USERS.find(u => u.id === targetUserId);
+      if (!target || !canCurrentAdminBanTarget(target)) return;
+      delete target.banInfo;
+      persistUsers();
+
+      if (currentlyViewedPublicUserId === target.id && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+        openPublicProfileModal(target.id);
+      }
+      if (activeMainView === "admin") {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
+    }
+
+    // =========================================================================
     // ПОДГРУЗКА БАЗЫ
     // =========================================================================
     function mergeExternalDataIntoMemory(extData) {
@@ -843,6 +1089,7 @@
       }
       loadSavedData();
       sanitizeUsersAndEnforceRoot();
+      checkAndEnforceCurrentSessionValidity();
       updateCounts();
       switchMainView("catalog", "roles");
     }
@@ -915,7 +1162,6 @@
       } catch (e) {}
     }
 
-    // Сохранение ТОЛЬКО локальной сессии (вход/выход), чтобы не дёргать облако и не сбрасывать скролл у других игроков!
     function persistSessionOnly() {
       try {
         if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
@@ -1032,7 +1278,11 @@
     // =========================================================================
     // ПРОВЕРКА ФАЙЛОВ «СЕТЕВОЙ ДОЗОР БДИТ!»
     // =========================================================================
-    function showNetwatchAlert(msg) { document.getElementById("netwatchErrorText").innerHTML = msg; document.getElementById("netwatchModal").classList.remove("hidden"); }
+    function showNetwatchAlert(msg) {
+      document.getElementById("netwatchModalTitle").textContent = "🚨 СЕТЕВОЙ ДОЗОР БДИТ!";
+      document.getElementById("netwatchErrorText").innerHTML = msg;
+      document.getElementById("netwatchModal").classList.remove("hidden");
+    }
     function closeNetwatchModal() { document.getElementById("netwatchModal").classList.add("hidden"); }
 
     function validateUploadedFile(file) {
@@ -1070,7 +1320,7 @@
     }
 
     // =========================================================================
-    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ (С ЖЕЛЕЗОБЕТОННЫМ СОХРАНЕНИЕМ СКРОЛЛА)
+    // ПУБЛИЧНЫЕ ПРОФИЛИ (С КНОПКАМИ БАНА) И КОММЕНТАРИИ
     // =========================================================================
     function countUserTotalComments(userId) {
       let total = 0;
@@ -1081,19 +1331,36 @@
     function openPublicProfileModal(userId) {
       const target = USERS.find(u => u.id === userId);
       if (!target) return;
+      currentlyViewedPublicUserId = target.id;
+
       document.getElementById("pubProfAvatar").innerHTML = target.avatar ? `<img src="${target.avatar}" class="w-full h-full object-cover">` : (target.displayName || "CP").slice(0, 2).toUpperCase();
       const badge = document.getElementById("pubProfBadge");
-      badge.className = target.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-red text-white" : target.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-gray-800 text-cp-yellow border border-cp-yellow/40";
+      badge.className = target.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase bg-cp-red text-white" : target.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase bg-gray-800 text-cp-yellow border border-cp-yellow/40";
       badge.textContent = target.role === "ROOT" ? "👑 Главный Админ (ROOT)" : target.role === "ADMIN" ? "🛡️ Администратор" : "👤 Эджраннер (Игрок)";
+
+      const banned = isUserCurrentlyBanned(target);
+      document.getElementById("pubProfBanStatusBadge").classList.toggle("hidden", !banned);
+
       document.getElementById("pubProfName").textContent = target.displayName || "Эджраннер";
       document.getElementById("pubProfRole").textContent = target.favRole || "Соло";
       document.getElementById("pubProfDate").textContent = target.createdAt || "2026";
       document.getElementById("pubProfCommentsCnt").textContent = countUserTotalComments(target.id);
       document.getElementById("pubProfBio").textContent = (target.bio && target.bio.trim()) ? target.bio : "Пользователь пока не заполнил публичное описание профиля.";
+
+      // Кнопки бана / разбана прямо внутри публичного профиля (доступны только уполномоченным админам)
+      const adminActionsEl = document.getElementById("pubProfAdminActions");
+      if (canCurrentAdminBanTarget(target)) {
+        adminActionsEl.innerHTML = banned
+          ? `<button type="button" onclick="unbanUserAccount('${target.id}')" class="px-4 py-2 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">🔓 Разбанить пользователя</button>`
+          : `<button type="button" onclick="openBanModal('${target.id}')" class="px-4 py-2 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red text-xs font-bold uppercase transition-colors">🚫 Забанить пользователя</button>`;
+      } else {
+        adminActionsEl.innerHTML = "";
+      }
+
       document.getElementById("publicProfileModal").classList.remove("hidden");
     }
     function openPublicProfileByCurrent() { const u = getCurrentUser(); if (u) openPublicProfileModal(u.id); }
-    function closePublicProfileModal() { document.getElementById("publicProfileModal").classList.add("hidden"); }
+    function closePublicProfileModal() { currentlyViewedPublicUserId = null; document.getElementById("publicProfileModal").classList.add("hidden"); }
 
     function scrollToAndHighlightComment(commentId) {
       const el = document.getElementById(`comment-box-${commentId}`);
@@ -1123,6 +1390,7 @@
             const isOwn = Boolean(curUser && curUser.id === c.userId);
             const canDel = isOwn || isAdmin;
             const roleBadge = author.role === "ROOT" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red text-white font-bold uppercase">ROOT</span>` : author.role === "ADMIN" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-cyan text-black font-bold uppercase">ADM</span>` : "";
+            const banTag = isUserCurrentlyBanned(author) ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red/30 text-cp-red border border-cp-red/50 font-bold uppercase">BANNED</span>` : "";
             const avHtml = author.avatar ? `<img src="${author.avatar}" onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 object-cover border border-cp-cyan cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 bg-cp-panel border border-gray-700 hover:border-cp-yellow text-cp-yellow flex items-center justify-center font-display font-bold text-xs cursor-pointer shrink-0">${(author.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
 
             let replyBannerHtml = "";
@@ -1147,7 +1415,7 @@
                     <div>
                       <div class="flex items-center gap-1.5">
                         <button type="button" onclick="openPublicProfileModal('${author.id}')" class="text-xs font-bold text-white hover:text-cp-yellow hover:underline">${author.displayName}</button>
-                        ${roleBadge}
+                        ${roleBadge} ${banTag}
                       </div>
                       <div class="text-[10px] text-gray-500">${c.createdAt}${c.edited ? ' (изм.)' : ''}</div>
                     </div>
@@ -1201,7 +1469,6 @@
               </div>`;
     }
 
-    // Точечное обновление ТОЛЬКО блока комментариев с сохранением прокрутки
     function refreshCurrentCardOrRuleView(options = {}) {
       const targetId = options.itemId || (activeMainView === "rules" ? selectedRuleId : selectedItemId);
       const wrapper = targetId ? document.getElementById(`comments-wrapper-${targetId}`) : null;
@@ -1213,7 +1480,6 @@
         const savedCardScroll = cardContainer ? cardContainer.scrollTop : 0;
         const savedCommScroll = commScrollEl ? commScrollEl.scrollTop : 0;
 
-        // Сохраняем недописанный текст, если прилетело чужое сообщение, пока пользователь печатает
         const activeEl = document.activeElement;
         const isTypingHere = activeEl && activeEl.id && (activeEl.id.startsWith("new-comment-input-") || activeEl.id.startsWith("edit-comm-textarea-"));
         const savedInputId = isTypingHere ? activeEl.id : null;
@@ -1309,7 +1575,9 @@
       if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
       if (!confirm("Удалить этот комментарий?")) return;
       COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
-      persistComments(); refreshCurrentCardOrRuleView({ itemId });
+      persistComments();
+      if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
+      else refreshCurrentCardOrRuleView({ itemId });
     }
 
     // =========================================================================
@@ -1393,19 +1661,140 @@
 
     function switchAdminSubtab(subtab) {
       activeAdminSubtab = subtab;
-      ["builder", "categories", "users", "backup"].forEach(s => {
+      ["builder", "categories", "users", "logs", "backup"].forEach(s => {
         document.getElementById("admin-sub-" + s).classList.toggle("hidden", subtab !== s);
       });
       document.querySelectorAll("#adminSubNav .admin-sub-btn").forEach(btn => {
         const isCur = btn.getAttribute("data-subtab") === subtab;
         btn.className = isCur
-          ? "admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
-          : "admin-sub-btn px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
+          ? "admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
+          : "admin-sub-btn px-3.5 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
       });
       if (subtab === "builder" && !editingItemId) setBuilderType(activeBuilderType);
       else if (subtab === "categories") renderCategoryManager();
       else if (subtab === "users") renderAdminUsersManager();
+      else if (subtab === "logs") renderAdminLogsView();
       else if (subtab === "backup") renderAdminBackupStats();
+    }
+
+    function switchAdminLogsSubtab(sub) {
+      activeAdminLogsSubtab = sub;
+      renderAdminLogsView();
+    }
+
+    // ОТРИСОВКА НОВОЙ ВКЛАДКИ «ЛОГИ» (БАНЫ + ВСЕ КОММЕНТАРИИ САЙТА)
+    function renderAdminLogsView() {
+      const bansBtn = document.getElementById("logsTabBansBtn");
+      const commsBtn = document.getElementById("logsTabCommentsBtn");
+      const bansBox = document.getElementById("adminLogsBansBox");
+      const commsBox = document.getElementById("adminLogsCommentsBox");
+
+      bansBtn.className = activeAdminLogsSubtab === "bans"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-red text-white border-cp-red"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-red";
+      commsBtn.className = activeAdminLogsSubtab === "comments"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-yellow text-black border-cp-yellow"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-yellow";
+
+      bansBox.classList.toggle("hidden", activeAdminLogsSubtab !== "bans");
+      commsBox.classList.toggle("hidden", activeAdminLogsSubtab !== "comments");
+
+      // 1. Собираем активные баны
+      const bannedUsers = USERS.filter(u => isUserCurrentlyBanned(u));
+      document.getElementById("cnt-logs-bans").textContent = bannedUsers.length;
+
+      if (bannedUsers.length === 0) {
+        bansBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Активных банов сейчас нет. Все эджраннеры соблюдают порядок!</div>`;
+      } else {
+        bansBox.innerHTML = bannedUsers.map(u => {
+          const b = u.banInfo;
+          const canUnban = canCurrentAdminBanTarget(u);
+          const av = u.avatar ? `<img onclick="openPublicProfileModal('${u.id}')" src="${u.avatar}" class="w-11 h-11 object-cover border border-cp-red cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${u.id}')" class="w-11 h-11 bg-cp-panel border border-cp-red text-cp-red flex items-center justify-center font-display font-bold text-sm cursor-pointer shrink-0">${(u.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
+          return `
+            <div class="bg-cp-bg border border-cp-red/60 p-4 flex items-center justify-between gap-4">
+              <div class="flex items-start gap-3.5">
+                ${av}
+                <div class="text-xs space-y-1">
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button>
+                    <span class="px-2 py-0.5 bg-cp-red text-white text-[10px] font-bold uppercase">🚫 ЗАБАНЕН</span>
+                    <span class="text-gray-500 text-[11px]">Модератор: <b class="text-gray-300">${b.bannedBy || 'Админ'}</b> (${b.bannedAt || '—'})</span>
+                  </div>
+                  <div class="text-gray-200"><b>Причина бана:</b> <span class="text-cp-yellow">${b.reason}</span></div>
+                  <div class="text-gray-400"><b>Оставшееся время:</b> <span class="text-cp-cyan font-bold">${formatBanRemainingTime(b)}</span></div>
+                </div>
+              </div>
+              <div class="shrink-0">
+                ${canUnban ? `<button type="button" onclick="unbanUserAccount('${u.id}')" class="px-4 py-2 bg-cp-green hover:bg-green-400 text-black font-bold text-xs uppercase transition-colors">🔓 Разбанить</button>` : `<span class="text-[11px] text-gray-500">Забанен Главным Админом</span>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // 2. Собираем все комментарии со всех карточек и механик
+      const allComments = [];
+      Object.keys(COMMENTS).forEach(itemId => {
+        const arr = COMMENTS[itemId];
+        if (Array.isArray(arr)) {
+          arr.forEach(c => {
+            allComments.push({ itemId, comment: c });
+          });
+        }
+      });
+
+      // Сортируем от самых новых к старым
+      allComments.sort((a, b) => (b.comment.id || "").localeCompare(a.comment.id || ""));
+      document.getElementById("cnt-logs-comments").textContent = allComments.length;
+
+      if (allComments.length === 0) {
+        commsBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">На сайте пока не оставлено ни одного комментария.</div>`;
+      } else {
+        commsBox.innerHTML = allComments.map(({ itemId, comment }) => {
+          const author = USERS.find(u => u.id === comment.userId) || { id: comment.userId, displayName: comment.fallbackName || "Раннер", role: "USER", avatar: "" };
+          const foundCard = findItemAcrossAllSections(itemId);
+          const cardTitle = foundCard ? (foundCard.item.name || foundCard.item.title) : itemId;
+          const secKey = foundCard ? foundCard.section : "weapons";
+          const secLabel = SECTION_LABELS[secKey] || secKey;
+
+          return `
+            <div class="bg-cp-bg border border-gray-800 hover:border-gray-600 p-3.5 flex items-start justify-between gap-4 transition-colors">
+              <div class="space-y-1.5 flex-1">
+                <div class="flex items-center gap-2 flex-wrap text-xs">
+                  <button type="button" onclick="openPublicProfileModal('${author.id}')" class="font-bold text-white hover:text-cp-yellow hover:underline">${author.displayName}</button>
+                  <span class="text-gray-500">• ${comment.createdAt}</span>
+                  <span class="text-gray-600">→</span>
+                  <button type="button" onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="text-cp-cyan hover:text-cp-yellow font-bold hover:underline">
+                    [${secLabel}: ${cardTitle}]
+                  </button>
+                </div>
+                <div onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="text-xs text-gray-200 bg-black/40 border-l-2 border-cp-cyan p-2.5 cursor-pointer hover:bg-cp-cyan/5 whitespace-pre-line">
+                  ${comment.text}
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/40 text-xs font-bold transition-colors">
+                  ↗ Перейти
+                </button>
+                <button type="button" onclick="deleteComment('${itemId}', '${comment.id}')" class="px-3 py-1.5 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/40 text-xs font-bold transition-colors">
+                  🗑️ Удалить
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+    }
+
+    function jumpToCommentFromAdminLog(sectionKey, itemId, commentId) {
+      if (sectionKey === "rules") {
+        selectedRuleId = itemId;
+        switchMainView("rules");
+      } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+      }
+      setTimeout(() => scrollToAndHighlightComment(commentId), 120);
     }
 
     function setupCatalogFilters() {
@@ -1489,7 +1878,7 @@
     }
 
     // =========================================================================
-    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК (С АВТОСОХРАНЕНИЕМ СКРОЛЛА ВНУТРИ КАРТОЧКИ)
+    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК
     // =========================================================================
     function renderCatalog() {
       const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
@@ -1657,7 +2046,6 @@
       const box = document.getElementById("detailCard");
       if (!item || !box) return;
 
-      // Запоминаем положение ползунков, если перерисовывается та же самая открытая карточка
       const isSameCard = box.getAttribute("data-rendered-id") === item.id;
       const savedCardScroll = isSameCard ? box.scrollTop : 0;
       const oldCommEl = document.getElementById(`comments-scroll-${item.id}`);
@@ -1765,7 +2153,6 @@
         ${renderCommentsSectionHTML(item.id)}
       `;
 
-      // Немедленно возвращаем ползунки прокрутки на прежнее место
       if (isSameCard) {
         const newCommEl = document.getElementById(`comments-scroll-${item.id}`);
         if (newCommEl) newCommEl.scrollTop = savedCommScroll;
@@ -2081,14 +2468,23 @@
         }
 
         if (!found) {
-          errBox.textContent = "Профиль не найден в списке пользователей.";
+          errBox.textContent = "Этот аккаунт был удалён Администрацией.";
           errBox.classList.remove("hidden");
           return;
         }
 
+        // Проверяем, не забанен ли пользователь!
+        if (isUserCurrentlyBanned(found)) {
+          errBox.classList.add("hidden");
+          showBanScreenModal(found.banInfo);
+          return;
+        } else if (found.banInfo) {
+          delete found.banInfo;
+          persistUsers();
+        }
+
         errBox.classList.add("hidden");
         currentUserId = found.id;
-        // Сохраняем вход ТОЛЬКО локально в сессию, не вызывая перезагрузку экрана у остальных пользователей!
         persistSessionOnly();
         document.getElementById("loginUsername").value = "";
         document.getElementById("loginPassword").value = "";
@@ -2349,10 +2745,13 @@
       createNotification(t.id, "rank", rankMsg, null);
       persistUsers(); renderAdminUsersManager();
     }
-    function deleteUserAccount(uid) {
+    async function deleteUserAccount(uid) {
       if (!isCurrentUserRoot()) return;
       const t = USERS.find(u => u.id === uid);
-      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}»?`)) return;
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}»? Пользователь будет мгновенно разлогинен, а его логин удалён.`)) return;
+      if (window.deleteUserFromCloudVault) {
+        await window.deleteUserFromCloudVault(uid);
+      }
       USERS = USERS.filter(u => u.id !== uid);
       persistUsers(); renderAdminUsersManager();
     }
@@ -2361,9 +2760,43 @@
       document.getElementById("adminUsersTableContainer").innerHTML = USERS.map(u => {
         const isRoot = u.role === "ROOT";
         const isAdm = u.role === "ADMIN";
+        const banned = isUserCurrentlyBanned(u);
+        const canBanThisUser = canCurrentAdminBanTarget(u);
+
         const badge = isRoot ? `<span class="px-2 py-0.5 bg-cp-red text-white text-[10px] font-bold uppercase">👑 ROOT</span>` : isAdm ? `<span class="px-2 py-0.5 bg-cp-cyan text-black text-[10px] font-bold uppercase">🛡️ ADMIN</span>` : `<span class="px-2 py-0.5 bg-gray-800 text-gray-300 border border-gray-700 text-[10px] font-bold uppercase">👤 USER</span>`;
+        const banBadge = banned ? `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red text-cp-red text-[10px] font-bold uppercase">🚫 ЗАБАНЕН (${u.banInfo.durationLabel || 'Активен'})</span>` : "";
+
         const av = u.avatar ? `<img onclick="openPublicProfileModal('${u.id}')" src="${u.avatar}" class="w-12 h-12 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${u.id}')" class="w-12 h-12 bg-cp-panel border-2 border-gray-700 text-cp-yellow flex items-center justify-center font-display font-black text-base cursor-pointer shrink-0">${(u.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
-        return `<div class="bg-cp-bg border border-gray-800 p-4 flex items-center justify-between gap-4"><div class="flex items-center gap-4">${av}<div><div class="flex items-center gap-2.5"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button>${badge}</div><div class="text-xs text-gray-500 mt-1">Роль: <b class="text-gray-300">${u.favRole || '—'}</b> • Комментариев: <b class="text-cp-green">${countUserTotalComments(u.id)}</b></div></div></div><div class="flex items-center gap-2"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>${!isRoot && rootMode ? `<button type="button" onclick="toggleUserAdminPrivilege('${u.id}')" class="px-3.5 py-1.5 text-xs font-bold uppercase border ${isAdm ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan'}">${isAdm ? '⬇️ Снять Админа' : '⬆️ Назначить Админом'}</button><button type="button" onclick="deleteUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>` : ""}</div></div>`;
+        return `
+          <div class="bg-cp-bg border ${banned ? 'border-cp-red/70' : 'border-gray-800'} p-4 flex items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+              ${av}
+              <div>
+                <div class="flex items-center gap-2.5 flex-wrap">
+                  <button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button>
+                  ${badge}
+                  ${banBadge}
+                </div>
+                <div class="text-xs text-gray-500 mt-1">
+                  Роль: <b class="text-gray-300">${u.favRole || '—'}</b> • Комментариев: <b class="text-cp-green">${countUserTotalComments(u.id)}</b>
+                  ${banned ? ` • Причина бана: <b class="text-cp-red">${u.banInfo.reason}</b>` : ""}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+              <button type="button" onclick="openPublicProfileModal('${u.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>
+              ${canBanThisUser ? (
+                banned
+                  ? `<button type="button" onclick="unbanUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">🔓 Разбанить</button>`
+                  : `<button type="button" onclick="openBanModal('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/60 text-xs font-bold uppercase transition-colors">🚫 Забанить</button>`
+              ) : ""}
+              ${!isRoot && rootMode ? `
+                <button type="button" onclick="toggleUserAdminPrivilege('${u.id}')" class="px-3.5 py-1.5 text-xs font-bold uppercase border ${isAdm ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan'}">${isAdm ? '⬇️ Снять Админа' : '⬆️ Назначить Админом'}</button>
+                <button type="button" onclick="deleteUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
+              ` : ""}
+            </div>
+          </div>
+        `;
       }).join("");
     }
 
@@ -2422,7 +2855,7 @@
   </script>
 
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ БЕЗ СБРОСА ПРОКРУТКИ (SUPABASE REALTIME)   -->
+  <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ (SUPABASE REALTIME)                       -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -2483,6 +2916,14 @@
       } catch (e) { return false; }
     };
 
+    window.deleteUserFromCloudVault = async function(userId) {
+      if (!sbClient) return false;
+      try {
+        await sbClient.rpc("delete_cp2020_user_vault", { p_user_id: userId });
+        return true;
+      } catch (e) { return false; }
+    };
+
     window.migrateLegacyPasswordToVault = function(userId, username, legacyPass) {
       if (!legacyPass || !username || userId === "u-root") return;
       setTimeout(() => {
@@ -2490,19 +2931,12 @@
       }, 1500);
     };
 
-    function setCloudStatusBadge(statusText, colorClass) {
-      let badge = document.getElementById("cloudRealtimeBadge");
-      if (!badge) {
-        const titleRow = document.querySelector("header h1")?.parentElement;
-        if (titleRow) {
-          badge = document.createElement("span");
-          badge.id = "cloudRealtimeBadge";
-          titleRow.appendChild(badge);
-        }
-      }
+    // Компактный эмодзи-индикатор фиксированного размера (шапка никогда не плавает)
+    function setCloudStatusBadge(emojiIcon, tooltipText) {
+      const badge = document.getElementById("cloudRealtimeBadge");
       if (badge) {
-        badge.className = `text-[10px] px-2 py-0.5 font-bold border ${colorClass}`;
-        badge.innerHTML = statusText;
+        badge.textContent = emojiIcon;
+        badge.title = tooltipText || "";
       }
     }
 
@@ -2539,7 +2973,7 @@
 
       try {
         sanitizeUsersAndEnforceRoot();
-        setCloudStatusBadge("🔄 Синхронизация...", "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/40");
+        setCloudStatusBadge("🔄", "Синхронизация...");
 
         const updateObj = { updated_at: new Date().toISOString() };
         if (sections.includes("all") || sections.includes("db")) {
@@ -2563,10 +2997,10 @@
 
         if (error) throw error;
         lastLocalPushTimestamp = Date.now();
-        setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
+        setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
         console.error("Ошибка сохранения в облако:", err);
-        setCloudStatusBadge("🔴 Ошибка сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
+        setCloudStatusBadge("🔴", "Ошибка сети");
       } finally {
         isPushingToCloud = false;
         if (pendingSectionsToPush.size > 0) {
@@ -2578,14 +3012,12 @@
     function applyCloudStateToUI(incoming, isFullPostgresRow = false) {
       if (!incoming || isPushingToCloud) return;
 
-      // Игнорируем собственное эхо от postgres_changes в течение 2 секунд после нашей же отправки
       if (isFullPostgresRow && (Date.now() - lastLocalPushTimestamp < 2000)) {
         return;
       }
 
       isApplyingRemoteUpdate = true;
       try {
-        // Проверяем, что реально изменилось по сравнению с текущей памятью, чтобы не дёргать экран зря
         let dbChanged = false;
         let usersChanged = false;
         let commentsChanged = false;
@@ -2633,9 +3065,16 @@
           }
         }
 
-        // Если вообще ничего не поменялось — выходим и не трогаем DOM!
         if (!dbChanged && !usersChanged && !commentsChanged && !notifsChanged) {
           return;
+        }
+
+        // Мгновенно проверяем, не забанили ли и не удалили ли текущего пользователя!
+        if (usersChanged) {
+          checkAndEnforceCurrentSessionValidity();
+          if (currentlyViewedPublicUserId && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+            openPublicProfileModal(currentlyViewedPublicUserId);
+          }
         }
 
         updateCounts();
@@ -2645,7 +3084,6 @@
         const savedId = isTyping ? activeEl.id : null;
         const savedVal = isTyping ? activeEl.value : "";
 
-        // Если изменились только комментарии, уведомления или пользователи (а карточки предметов не менялись) — обновляем ТОЛЬКО блок комментариев, не перерисовывая карточку!
         if (!dbChanged && (activeMainView === "catalog" || activeMainView === "rules")) {
           if (commentsChanged || usersChanged) {
             refreshCurrentCardOrRuleView();
@@ -2661,8 +3099,10 @@
         } else if (activeMainView === "profile") {
           if (!isTyping) renderProfileView();
         } else if (activeMainView === "admin") {
+          // Мгновенно обновляем вкладки Админ-панели при регистрации пользователей, банах или новых комментариях!
           if (activeAdminSubtab === "categories" && !isTyping) renderCategoryManager();
           else if (activeAdminSubtab === "users" && !isTyping) renderAdminUsersManager();
+          else if (activeAdminSubtab === "logs") renderAdminLogsView();
           else if (activeAdminSubtab === "backup") renderAdminBackupStats();
         }
 
@@ -2702,6 +3142,15 @@
       scheduleCloudPush("notifications");
     };
 
+    // Таймер автоматической проверки истечения временных банов (каждые 15 секунд)
+    setInterval(() => {
+      checkAndEnforceCurrentSessionValidity();
+      if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
+    }, 15000);
+
     window.addEventListener("storage", (ev) => {
       if (isPushingToCloud) return;
       try {
@@ -2714,7 +3163,7 @@
 
     async function initRealtimeCloud() {
       try {
-        setCloudStatusBadge("⏳ Подключение...", "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/40");
+        setCloudStatusBadge("⏳", "Подключение...");
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         const { data, error } = await sbClient
@@ -2761,13 +3210,13 @@
           )
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
-              setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
+              setCloudStatusBadge("🟢", "В сети");
             }
           });
 
       } catch (err) {
         console.error("Ошибка инициализации Supabase:", err);
-        setCloudStatusBadge("🔴 Ошибка сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
+        setCloudStatusBadge("🔴", "Ошибка сети");
       }
     }
 
