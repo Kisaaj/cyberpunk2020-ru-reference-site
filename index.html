@@ -1,0 +1,2157 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CYBERPUNK 2020 // СПРАВОЧНИК И БАЗА ДАННЫХ (1920x1080)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
+  <!-- ПОДКЛЮЧЕНИЕ ВНЕШНЕГО ФАЙЛА БАЗЫ ДАННЫХ (РАБОТАЕТ ДАЖЕ БЕЗ СЕРВЕРА ЧЕРЕЗ FILE://) -->
+  <script src="database.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            cp: {
+              bg: '#08090c',
+              panel: '#10131a',
+              card: '#151922',
+              red: '#ff003c',
+              yellow: '#fcee0a',
+              cyan: '#00f0ff',
+              green: '#00ff66',
+              purple: '#b829ff',
+              muted: '#8a94a6'
+            }
+          },
+          fontFamily: {
+            mono: ['"JetBrains Mono"', 'monospace'],
+            display: ['"Orbitron"', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #08090c;
+      color: #e2e8f0;
+      font-family: 'JetBrains Mono', monospace;
+      background-image: 
+        radial-gradient(circle at 50% 0%, rgba(255, 0, 60, 0.07) 0%, transparent 55%),
+        linear-gradient(rgba(16, 19, 26, 0.9) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(16, 19, 26, 0.9) 1px, transparent 1px);
+      background-size: 100% 100%, 32px 32px, 32px 32px;
+    }
+    .cp-border { border: 1px solid #262c3a; position: relative; }
+    .cp-border-active { border-color: #fcee0a; box-shadow: 0 0 14px rgba(252, 238, 10, 0.22); }
+    .cp-clip { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px)); }
+    @keyframes commentFlash {
+      0%, 100% { border-color: #262c3a; background-color: #08090c; }
+      25%, 75% { border-color: #fcee0a; background-color: rgba(252, 238, 10, 0.14); box-shadow: 0 0 18px rgba(252, 238, 10, 0.35); }
+    }
+    .comment-highlight { animation: commentFlash 2.2s ease-in-out; }
+    ::-webkit-scrollbar { width: 7px; height: 7px; }
+    ::-webkit-scrollbar-track { background: #08090c; }
+    ::-webkit-scrollbar-thumb { background: #ff003c; }
+    ::-webkit-scrollbar-thumb:hover { background: #fcee0a; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-cp-red selection:text-white">
+
+  <!-- МОДАЛЬНОЕ ОКНО 1: «СЕТЕВОЙ ДОЗОР БДИТ!» -->
+  <div id="netwatchModal" class="hidden fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-red shadow-[0_0_40px_rgba(255,0,60,0.45)] p-6 relative cp-clip">
+      <div class="flex items-center gap-3 border-b border-cp-red/50 pb-3 mb-4">
+        <div class="w-10 h-10 bg-cp-red text-black font-display font-black text-xl flex items-center justify-center shrink-0">!</div>
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ПРОТОКОЛ БЕЗОПАСНОСТИ NETWATCH // ПЕРЕХВАТ ПАКЕТА</div>
+          <h3 class="font-display text-lg font-black text-cp-red uppercase">🚨 СЕТЕВОЙ ДОЗОР БДИТ!</h3>
+        </div>
+      </div>
+      <p id="netwatchErrorText" class="text-xs text-gray-100 leading-relaxed bg-black/60 border-l-2 border-cp-yellow p-4 mb-5"></p>
+      <button type="button" onclick="closeNetwatchModal()" class="w-full py-2.5 bg-cp-red hover:bg-red-600 text-white font-display font-bold text-xs uppercase tracking-wider">
+        Принято // Закрыть предупреждение
+      </button>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО 2: ПУБЛИЧНЫЙ ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ -->
+  <div id="publicProfileModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onclick="closePublicProfileModal()">
+    <div class="max-w-xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_35px_rgba(0,240,255,0.25)] p-6 relative" onclick="event.stopPropagation()">
+      <div class="flex items-start justify-between border-b border-gray-800 pb-4 mb-4">
+        <div class="flex items-center gap-4">
+          <div id="pubProfAvatar" class="w-20 h-20 bg-cp-bg border-2 border-cp-yellow flex items-center justify-center font-display font-black text-2xl text-cp-yellow overflow-hidden shrink-0">CP</div>
+          <div>
+            <div id="pubProfBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1"></div>
+            <h3 id="pubProfName" class="font-display text-xl font-black text-white"></h3>
+            <div class="text-xs text-gray-400">Позывной в Сети: <span id="pubProfLogin" class="text-cp-cyan font-semibold"></span></div>
+            <div class="text-xs text-gray-300 mt-1">Любимая Роль: <b id="pubProfRole" class="text-cp-yellow"></b></div>
+          </div>
+        </div>
+        <button type="button" onclick="closePublicProfileModal()" class="text-gray-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+      <div class="space-y-4 text-xs">
+        <div class="grid grid-cols-2 gap-3 text-center">
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">Дата регистрации</div>
+            <div id="pubProfDate" class="text-sm font-bold text-white mt-0.5">—</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">Оставлено комментариев</div>
+            <div id="pubProfCommentsCnt" class="text-sm font-bold text-cp-green mt-0.5">0</div>
+          </div>
+        </div>
+        <div>
+          <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1.5">📋 Публичное описание профиля:</div>
+          <div id="pubProfBio" class="bg-cp-bg border-l-2 border-cp-yellow p-3.5 text-gray-200 leading-relaxed whitespace-pre-line min-h-[80px]"></div>
+        </div>
+      </div>
+      <div class="mt-5 pt-3 border-t border-gray-800 flex justify-end">
+        <button type="button" onclick="closePublicProfileModal()" class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold uppercase border border-gray-600">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ШАПКА САЙТА (FULL HD 1920x1080) -->
+  <header class="sticky top-0 z-40 bg-cp-bg/95 backdrop-blur-md border-b border-cp-red/60">
+    <div class="max-w-[1880px] mx-auto px-5 py-3 flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3 shrink-0">
+        <div class="w-10 h-10 bg-cp-red flex items-center justify-center font-display font-black text-black text-lg cp-clip shadow-[0_0_12px_#ff003c]">CP</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="font-display font-black text-lg tracking-wider text-white">
+              CYBERPUNK <span class="text-cp-yellow">2020</span> <span class="text-cp-red text-[11px] font-mono">// ПОМОГАЛКА</span>
+            </h1>
+            <span class="text-[10px] bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40 px-1.5 py-0.5 font-bold">v10.0 MODULAR</span>
+          </div>
+          <a href="https://vk.ru/selodnd" target="_blank" rel="noopener noreferrer" class="text-[11px] text-cp-cyan hover:text-cp-yellow underline underline-offset-4 transition-colors font-semibold">
+            Сделано в Село ДнДшеское
+          </a>
+        </div>
+      </div>
+
+      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ (РОЛИ ПЕРВЫЕ, УСЛУГИ СПРАВА ОТ СНАРЯЖЕНИЯ) -->
+      <nav class="flex flex-wrap items-center gap-1" id="mainNav">
+        <button type="button" onclick="switchMainView('catalog', 'roles')" data-view="roles" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🎭 Роли (<span id="cnt-roles">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="weapons" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🔫 Оружие (<span id="cnt-weapons">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'armor')" data-view="armor" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🛡️ Броня (<span id="cnt-armor">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'gear')" data-view="gear" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🎒 Снаряжение (<span id="cnt-gear">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'services')" data-view="services" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">💼 Услуги (<span id="cnt-services">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'cyberware')" data-view="cyberware" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🦾 Кибероснащение (<span id="cnt-cyberware">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'netrunning')" data-view="netrunning" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🌐 Нетраннинг (<span id="cnt-netrunning">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">🚗 Транспорт (<span id="cnt-vehicles">0</span>)</button>
+        <button type="button" onclick="switchMainView('catalog', 'characters')" data-view="characters" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">👥 Персонажи (<span id="cnt-characters">0</span>)</button>
+        <button type="button" onclick="switchMainView('rules')" data-view="rules" class="nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all">⚙️ Игровые механики (<span id="cnt-rules">0</span>)</button>
+      </nav>
+
+      <!-- ПРАВЫЙ УГОЛ: КВАДРАТНАЯ КНОПКА «ВОЙТИ» ИЛИ АВАТАР + КОЛОКОЛЬЧИК -->
+      <div class="relative shrink-0 pl-2.5 border-l border-gray-800 flex items-center gap-2" id="userCornerContainer">
+        <button type="button" id="guestLoginSquareBtn" onclick="switchMainView('profile')" title="Войти в аккаунт или зарегистрироваться"
+          class="w-10 h-10 bg-cp-panel hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/70 flex flex-col items-center justify-center transition-all shadow-[0_0_10px_rgba(252,238,10,0.15)]">
+          <span class="text-xs leading-none mb-0.5">🔑</span>
+          <span class="text-[8px] font-display font-black uppercase tracking-tighter leading-none">Войти</span>
+        </button>
+
+        <div id="loggedAvatarWrapper" class="hidden flex items-center gap-2 relative">
+          <div class="relative">
+            <button type="button" onclick="toggleUserDropdown(event)" title="Меню аккаунта"
+              class="w-10 h-10 bg-cp-card border-2 border-cp-cyan hover:border-cp-yellow flex items-center justify-center overflow-hidden transition-all relative shadow-[0_0_12px_rgba(0,240,255,0.2)]">
+              <div id="headerAvatarContent" class="w-full h-full flex items-center justify-center font-display font-black text-xs text-cp-cyan">CP</div>
+              <span id="headerRoleDot" class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-green border border-black"></span>
+            </button>
+
+            <div id="userDropdownMenu" class="hidden absolute right-0 mt-2 w-56 bg-cp-panel border border-cp-cyan shadow-[0_10px_30px_rgba(0,0,0,0.95)] z-50">
+              <div class="px-3.5 py-2.5 bg-cp-bg border-b border-gray-800">
+                <div id="dropdownUserName" class="text-xs font-bold text-white truncate">Никнейм</div>
+                <div id="dropdownUserRole" class="text-[10px] text-cp-cyan font-bold uppercase mt-0.5">Игрок</div>
+              </div>
+              <div class="p-1.5 flex flex-col gap-1">
+                <button type="button" onclick="openViewFromDropdown('profile')" class="w-full text-left px-3 py-2 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors flex items-center gap-2">
+                  <span>👤</span><span>Профиль</span>
+                </button>
+                <button type="button" id="dropdownAdminBtn" onclick="openViewFromDropdown('admin')" class="hidden w-full text-left px-3 py-2 text-xs font-bold text-cp-cyan hover:bg-cp-cyan hover:text-black transition-colors flex items-center gap-2">
+                  <span>⚙️</span><span>Админ-панель</span>
+                </button>
+                <div class="border-t border-gray-800 my-0.5"></div>
+                <button type="button" onclick="logoutFromDropdown()" class="w-full text-left px-3 py-2 text-xs font-bold text-cp-red hover:bg-cp-red hover:text-white transition-colors flex items-center gap-2">
+                  <span>🚪</span><span>Выйти</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ СПРАВА ОТ АВАТАРА -->
+          <div class="relative">
+            <button type="button" id="notifBellBtn" onclick="toggleNotifDropdown(event)" title="Уведомления"
+              class="w-10 h-10 bg-cp-panel border border-gray-700 hover:border-cp-cyan flex items-center justify-center transition-all relative text-gray-500 hover:text-gray-200">
+              <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+                <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+              </svg>
+              <span id="notifRedDot" class="hidden absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-cp-red rounded-full border border-black shadow-[0_0_8px_#ff003c]"></span>
+            </button>
+
+            <div id="notifDropdownMenu" class="hidden absolute right-0 mt-2 w-96 bg-cp-panel border border-cp-cyan shadow-[0_12px_35px_rgba(0,0,0,0.95)] z-50" onclick="event.stopPropagation()">
+              <div class="px-3.5 py-2.5 bg-cp-bg border-b border-gray-800 flex items-center justify-between gap-2">
+                <button type="button" onclick="clearAllMyNotifications()" class="text-[11px] font-bold text-cp-cyan hover:text-cp-yellow underline underline-offset-2 transition-colors">
+                  🗑️ Очистить уведомления
+                </button>
+                <button type="button" onclick="closeNotifDropdown()" title="Закрыть" class="text-gray-400 hover:text-white text-sm font-bold px-1.5 py-0.5">
+                  ✕
+                </button>
+              </div>
+              <div id="notifItemsList" class="max-h-80 overflow-y-auto divide-y divide-gray-800/80"></div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ОКНО 1: КАТАЛОГ СПРАВОЧНИКА -->
+  <main id="view-catalog" class="max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4">
+    <section class="bg-cp-panel cp-border p-4">
+      <div class="grid grid-cols-12 gap-3.5 items-end">
+        <div class="col-span-3">
+          <label class="block text-[11px] uppercase text-cp-cyan font-bold mb-1 tracking-wider">Поиск по названию, бренду, описанию</label>
+          <div class="relative">
+            <input type="text" id="searchInput" oninput="renderCatalog()" placeholder="Соло, Minami 10, Сильверхенд, AV-4, Trauma Team..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow text-white px-3 py-2 text-xs outline-none">
+            <button type="button" onclick="clearSearch()" class="absolute right-2.5 top-2 text-xs text-gray-500 hover:text-white">✕</button>
+          </div>
+        </div>
+        <div class="col-span-3">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1" id="subFilterLabel">Категория / Раздел</label>
+          <select id="subFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan"></select>
+        </div>
+        <div class="col-span-2">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1" id="extraFilterLabel">Зарплата</label>
+          <select id="extraFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan"></select>
+        </div>
+        <div class="col-span-2 hidden" id="reliabilityFilterBox">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Надёжность (НАД) / Сортировка</label>
+          <select id="relFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-3 py-2 outline-none focus:border-cp-cyan">
+            <option value="ALL">Без сортировки НАД</option>
+            <option value="SORT_DESC">🔽 Сортировать: ОТ → ОН → ОБ → НН</option>
+            <option value="SORT_ASC">🔼 Сортировать: НН → ОБ → ОН → ОТ</option>
+            <option value="ONLY_ОТ">Только ОТ (Отличное)</option>
+            <option value="ONLY_ОН">Только ОН (Очень надёжное)</option>
+            <option value="ONLY_ОБ">Только ОБ (Обычное)</option>
+            <option value="ONLY_НН">Только НН (Ненадёжное)</option>
+          </select>
+        </div>
+        <div class="col-span-1">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Источник</label>
+          <select id="bookFilter" onchange="renderCatalog()" class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2 py-2 outline-none focus:border-cp-cyan">
+            <option value="ALL">Все книги</option>
+            <option value="FAV">⭐ Избранное</option>
+            <option value="USER">🛠️ Мои</option>
+            <option value="CP20">CP20</option>
+            <option value="Chr1">Chr1</option>
+            <option value="Chr2">Chr2</option>
+            <option value="Chr3">Chr3</option>
+            <option value="Chr4">Chr4</option>
+            <option value="MM">MM (Max Metal)</option>
+            <option value="BB">BB / NET</option>
+            <option value="SOF">SOF / SOF2</option>
+            <option value="PAC">PAC</option>
+            <option value="WS">WS</option>
+            <option value="SF">SF / SW</option>
+          </select>
+        </div>
+        <div class="col-span-1">
+          <button type="button" onclick="resetFilters()" class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs py-2 border border-gray-600 font-bold">Сброс</button>
+        </div>
+      </div>
+      <div class="mt-3 pt-2.5 border-t border-gray-800/80 flex items-center justify-between gap-4 text-xs text-gray-400">
+        <div id="abbrevLegend" class="flex flex-wrap gap-x-5 gap-y-1"></div>
+        <div class="text-cp-yellow font-bold shrink-0">Найдено записей: <span id="foundCount">0</span></div>
+      </div>
+    </section>
+
+    <div class="grid grid-cols-12 gap-5 items-start flex-1">
+      <div class="col-span-7 flex flex-col gap-2 max-h-[76vh] overflow-y-auto pr-1.5" id="catalogList"></div>
+      <div class="col-span-5 sticky top-20 bg-cp-panel cp-border p-6 min-h-[540px] max-h-[76vh] overflow-y-auto" id="detailCard"></div>
+    </div>
+  </main>
+
+  <!-- ОКНО 2: ИГРОВЫЕ МЕХАНИКИ -->
+  <main id="view-rules" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1">
+    <div class="grid grid-cols-12 gap-6 items-start">
+      <aside class="col-span-4 bg-cp-panel cp-border p-5 flex flex-col gap-3.5">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+          <h2 class="font-display font-bold text-sm text-cp-cyan uppercase tracking-wider">⚙️ Подразделы игровых механик</h2>
+          <button type="button" id="addRuleTopBtn" onclick="openRuleCreatorModal()" class="hidden text-xs bg-cp-red hover:bg-red-600 text-white px-3 py-1 font-bold uppercase">+ Своя механика</button>
+        </div>
+        <input type="text" id="ruleSearchInput" oninput="renderRulesSidebar()" placeholder="Поиск по игровым механикам (отдача, киберпсихоз, наслоение...)" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan text-white px-3 py-2 text-xs outline-none">
+        <div class="flex flex-wrap gap-1.5" id="ruleSubsections"></div>
+        <div class="border-t border-gray-800 pt-2.5 flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1" id="ruleArticlesList"></div>
+      </aside>
+      <section class="col-span-8 bg-cp-panel cp-border p-7 min-h-[70vh] max-h-[80vh] overflow-y-auto" id="ruleContentArea"></section>
+    </div>
+  </main>
+
+  <!-- ОКНО 3: ПРОФИЛЬ И АВТОРИЗАЦИЯ -->
+  <main id="view-profile" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-5">
+    <section id="authGuestContainer" class="max-w-[1150px] w-full mx-auto my-6 grid grid-cols-12 gap-6 items-stretch">
+      <div class="col-span-6 bg-cp-panel cp-border p-7 flex flex-col justify-between">
+        <div>
+          <div class="text-xs font-bold text-cp-cyan uppercase tracking-wider">Авторизация в терминале DataTerm</div>
+          <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">🔑 Вход в аккаунт</h2>
+          <p class="text-xs text-gray-400 mb-5 leading-relaxed">Войдите в свой профиль, чтобы оставлять комментарии под карточками, получать уведомления об ответах, сохранять снаряжение в «Избранное» и вести личные заметки.</p>
+          <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Логин пользователя:</label>
+              <input type="text" id="loginUsername" required placeholder="Например: admin или silverhand" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Пароль:</label>
+              <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2.5 text-xs text-white outline-none">
+            </div>
+            <div id="loginErrorMsg" class="hidden text-xs text-cp-red font-bold bg-cp-red/10 border border-cp-red/40 p-2.5"></div>
+            <button type="submit" class="w-full py-3 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Войти в систему →</button>
+          </form>
+        </div>
+        <div class="mt-6 pt-4 border-t border-gray-800 bg-black/40 p-3.5 text-xs flex items-center justify-between">
+          <div>
+            <div class="text-cp-cyan font-bold uppercase text-[11px]">⚡ Главный Администратор (ROOT):</div>
+            <div class="text-gray-300 mt-1">Логин: <code class="text-cp-yellow font-bold">admin</code> • Пароль: <code class="text-cp-yellow font-bold">admin2020</code></div>
+          </div>
+          <button type="button" onclick="quickRootLogin()" class="px-3 py-1.5 bg-cp-red hover:bg-red-600 text-white font-bold text-[11px] uppercase shrink-0">Быстрый вход ROOT</button>
+        </div>
+      </div>
+
+      <div class="col-span-6 bg-cp-panel cp-border p-7 flex flex-col justify-between">
+        <div>
+          <div class="text-xs font-bold text-cp-green uppercase tracking-wider">Новый профиль Эджраннера</div>
+          <h2 class="font-display text-2xl font-black text-white mt-1 mb-4">📝 Регистрация игрока</h2>
+          <form onsubmit="handleRegisterSubmit(event)" class="space-y-3.5">
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs text-gray-400 mb-1">Логин (для входа)*</label><input type="text" id="regUsername" required placeholder="edgerunner99" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+              <div><label class="block text-xs text-gray-400 mb-1">Никнейм / Позывной*</label><input type="text" id="regDisplayName" required placeholder="Джонни Сильверхенд" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-xs text-gray-400 mb-1">Пароль*</label><input type="password" id="regPassword" required placeholder="Минимум 4 символа" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+              <div>
+                <label class="block text-xs text-gray-400 mb-1">Любимая Роль в CP2020</label>
+                <select id="regFavRole" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none">
+                  <option value="Соло">Соло</option><option value="Нетраннер">Нетраннер</option><option value="Рокербой">Рокербой</option><option value="Техник">Техник</option><option value="Медтехник">Медтехник</option><option value="Фиксер">Фиксер</option><option value="Корпорат">Корпорат</option><option value="Коп">Коп</option><option value="Медиа">Медиа</option><option value="Кочевник">Кочевник</option><option value="Рефери (ГМ)">Рефери (ГМ)</option>
+                </select>
+              </div>
+            </div>
+            <div><label class="block text-xs text-gray-400 mb-1">Публичное описание профиля (видно всем игрокам)</label><input type="text" id="regBio" placeholder="Стиль превыше материи. Живу на Грани." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></div>
+            <div id="regErrorMsg" class="hidden text-xs text-cp-red font-bold bg-cp-red/10 border border-cp-red/40 p-2.5"></div>
+            <button type="submit" class="w-full py-3 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">Зарегистрировать профиль +</button>
+          </form>
+        </div>
+        <div class="mt-6 pt-3 border-t border-gray-800 text-[11px] text-gray-500 text-center">Все зарегистрированные профили сохраняются в базе сайта и доступны во вкладке «Пользователи» в Админ-панели.</div>
+      </div>
+    </section>
+
+    <section id="authUserDashboard" class="hidden grid grid-cols-12 gap-6 items-start">
+      <aside class="col-span-4 bg-cp-panel cp-border p-6 space-y-5">
+        <div class="flex items-start justify-between gap-3 border-b border-gray-800 pb-4">
+          <div class="flex items-center gap-4">
+            <div id="profileAvatarBox" class="w-20 h-20 bg-cp-bg border-2 border-cp-cyan flex items-center justify-center font-display font-black text-2xl text-cp-cyan overflow-hidden shrink-0">CP</div>
+            <div>
+              <div id="profileRoleBadge" class="inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1"></div>
+              <h2 id="profileDisplayName" class="font-display text-xl font-black text-white"></h2>
+              <div class="text-xs text-gray-400">Логин: <span id="profileUsername" class="text-cp-yellow font-semibold"></span></div>
+              <div class="text-xs text-cp-cyan mt-0.5">Роль в игре: <b id="profileFavRole"></b></div>
+            </div>
+          </div>
+          <div class="flex flex-col gap-1.5">
+            <button type="button" onclick="openPublicProfileByCurrent()" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/40 text-[11px] font-bold">👁️ Публичный вид</button>
+            <button type="button" onclick="logoutCurrentUser()" class="px-2.5 py-1 bg-gray-800 hover:bg-cp-red text-gray-300 hover:text-white border border-gray-700 text-[11px] font-bold">Выйти</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2.5 text-center">
+          <div class="bg-cp-bg border border-gray-800 p-3">
+            <div class="text-[10px] text-gray-400 uppercase">В Избранном</div>
+            <div class="text-lg font-display font-black text-cp-yellow mt-0.5" id="profileFavCount">0</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3">
+            <div class="text-[10px] text-gray-400 uppercase">Допуск файлов</div>
+            <div class="text-[11px] font-bold text-cp-green mt-1.5" id="profileAccessText">JPG/PNG до 10мб</div>
+          </div>
+        </div>
+
+        <form onsubmit="saveUserProfileChanges(event)" class="space-y-3 pt-2 border-t border-gray-800 text-xs">
+          <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройки моего профиля</div>
+          <div><label class="block text-gray-400 mb-1">Отображаемый никнейм (Позывной):</label><input type="text" id="editProfDisplayName" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-white outline-none"></div>
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-gray-400 mb-1">Роль в CP2020:</label>
+              <select id="editProfFavRole" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-2.5 py-2 text-white outline-none">
+                <option value="Соло">Соло</option><option value="Нетраннер">Нетраннер</option><option value="Рокербой">Рокербой</option><option value="Техник">Техник</option><option value="Медтехник">Медтехник</option><option value="Фиксер">Фиксер</option><option value="Корпорат">Корпорат</option><option value="Коп">Коп</option><option value="Медиа">Медиа</option><option value="Кочевник">Кочевник</option><option value="Рефери (ГМ)">Рефери (ГМ)</option>
+              </select>
+            </div>
+            <div><label class="block text-gray-400 mb-1">Новый пароль (если меняете):</label><input type="password" id="editProfPassword" placeholder="Оставьте пустым..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-2.5 py-2 text-white outline-none"></div>
+          </div>
+          <div>
+            <label class="block text-gray-400 mb-1">Аватар (URL или файл с проверкой Сетевого Дозора):</label>
+            <div class="flex gap-2">
+              <input type="text" id="editProfAvatarUrl" placeholder="https://..." class="flex-1 bg-cp-bg border border-gray-700 px-3 py-1.5 text-white outline-none">
+              <label class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-200 cursor-pointer shrink-0">
+                📁 Файл<input type="file" id="profileAvatarFileInput" accept=".jpg,.jpeg,.png,.gif" onchange="handleProfileAvatarUpload(event)" class="hidden">
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-cp-yellow font-bold mb-1">🌐 Публичное описание профиля (Видно всем игрокам):</label>
+            <textarea id="editProfBio" rows="3" placeholder="Расскажите о себе и своих персонажах..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-2.5 text-white outline-none"></textarea>
+          </div>
+          <button type="submit" id="saveProfileBtn" class="w-full py-2.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold uppercase tracking-wider transition-all">💾 Сохранить профиль</button>
+        </form>
+      </aside>
+
+      <div class="col-span-8 space-y-6">
+        <div class="bg-cp-panel cp-border p-6">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-4">
+            <div>
+              <h3 class="font-display text-base font-bold text-cp-yellow uppercase">⭐ Мои закладки и Избранное снаряжение</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Нажимайте кнопку «☆ В избранное» на любых карточках, чтобы собрать свой быстрый набор.</p>
+            </div>
+            <button type="button" onclick="clearAllUserFavorites()" class="text-xs text-gray-400 hover:text-cp-red">Очистить закладки</button>
+          </div>
+          <div id="profileFavoritesList" class="grid grid-cols-2 gap-3 max-h-[340px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="bg-cp-panel cp-border p-6">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3 mb-3">
+            <div>
+              <h3 class="font-display text-base font-bold text-cp-cyan uppercase">🔒 Личный терминал заметок (Виден только вам)</h3>
+              <p class="text-xs text-gray-400 mt-0.5">Приватные записи вашего аккаунта — сохраняются автоматически при вводе.</p>
+            </div>
+            <span id="notesSavedIndicator" class="text-[11px] text-cp-green font-bold">✓ Сохранено</span>
+          </div>
+          <textarea id="userPersonalNotes" oninput="autoSaveUserNotes()" rows="7" placeholder="Записывайте сюда характеристики своего персонажа, остаток евробаксов (eb), установленный хром..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan p-4 text-xs text-gray-200 leading-relaxed outline-none"></textarea>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ОКНО 4: АДМИН-ПАНЕЛЬ -->
+  <main id="view-admin" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4">
+    <section class="bg-cp-panel cp-border p-4 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <span class="text-lg">⚙️</span>
+        <div>
+          <h2 class="font-display text-base font-bold text-white uppercase tracking-wider">Панель управления Администратора</h2>
+          <p class="text-xs text-gray-400">Конструктор и редактор карточек, управление категориями и список пользователей сайта</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2" id="adminSubNav">
+        <button type="button" onclick="switchAdminSubtab('builder')" data-subtab="builder" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">➕ Конструктор и Редактор карточек</button>
+        <button type="button" onclick="switchAdminSubtab('categories')" data-subtab="categories" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">🗂️ Управление категориями</button>
+        <button type="button" onclick="switchAdminSubtab('users')" data-subtab="users" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">👥 Пользователи (<span id="cnt-users">1</span>)</button>
+        <button type="button" onclick="switchAdminSubtab('backup')" data-subtab="backup" class="admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all">💾 База данных (JSON)</button>
+      </div>
+    </section>
+
+    <!-- ПОДВКЛАДКА 4.1: КОНСТРУКТОР -->
+    <section id="admin-sub-builder" class="bg-cp-panel cp-border p-6">
+      <div class="flex items-center justify-between gap-4 border-b border-gray-800 pb-4 mb-5">
+        <div>
+          <div class="flex items-center gap-3">
+            <h3 class="font-display text-lg font-bold text-cp-yellow uppercase" id="builderHeaderTitle">➕ Создание новой карточки</h3>
+            <span id="editModeBadge" class="hidden px-2.5 py-0.5 text-xs font-bold bg-cp-cyan text-black uppercase">Режим редактирования</span>
+          </div>
+          <p class="text-xs text-gray-400 mt-1">Ни одно поле не является обязательным — если оставить поле пустым (кроме описания), сайт автоматически подставит прочерк <b>«—»</b>.</p>
+        </div>
+        <button type="button" id="cancelEditBtn" onclick="cancelEditMode()" class="hidden px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold border border-gray-600">✕ Отменить редактирование</button>
+      </div>
+
+      <div class="mb-5">
+        <label class="block text-xs text-cp-cyan font-bold uppercase mb-2">1. Раздел справочника:</label>
+        <div class="flex flex-wrap gap-2" id="builderTypeButtons">
+          <button type="button" onclick="setBuilderType('roles')" data-btype="roles" class="btype-btn px-3 py-2 text-xs font-bold border">🎭 Роли</button>
+          <button type="button" onclick="setBuilderType('weapons')" data-btype="weapons" class="btype-btn px-3 py-2 text-xs font-bold border">🔫 Оружие</button>
+          <button type="button" onclick="setBuilderType('armor')" data-btype="armor" class="btype-btn px-3 py-2 text-xs font-bold border">🛡️ Броня</button>
+          <button type="button" onclick="setBuilderType('gear')" data-btype="gear" class="btype-btn px-3 py-2 text-xs font-bold border">🎒 Снаряжение</button>
+          <button type="button" onclick="setBuilderType('services')" data-btype="services" class="btype-btn px-3 py-2 text-xs font-bold border">💼 Услуги</button>
+          <button type="button" onclick="setBuilderType('cyberware')" data-btype="cyberware" class="btype-btn px-3 py-2 text-xs font-bold border">🦾 Кибероснащение</button>
+          <button type="button" onclick="setBuilderType('netrunning')" data-btype="netrunning" class="btype-btn px-3 py-2 text-xs font-bold border">🌐 Нетраннинг</button>
+          <button type="button" onclick="setBuilderType('vehicles')" data-btype="vehicles" class="btype-btn px-3 py-2 text-xs font-bold border">🚗 Транспорт</button>
+          <button type="button" onclick="setBuilderType('characters')" data-btype="characters" class="btype-btn px-3 py-2 text-xs font-bold border">👥 Персонажи</button>
+          <button type="button" onclick="setBuilderType('rules')" data-btype="rules" class="btype-btn px-3 py-2 text-xs font-bold border">⚙️ Игровые механики</button>
+        </div>
+      </div>
+
+      <form id="builderForm" onsubmit="saveBuilderItem(event)" class="space-y-6">
+        <div class="grid grid-cols-12 gap-6 items-start">
+          <div class="col-span-7 space-y-4 bg-cp-bg/60 border border-gray-800 p-5" id="builderFieldsContainer"></div>
+          <div class="col-span-5 bg-cp-bg border border-gray-800 p-5 flex flex-col gap-4">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+              <span class="text-xs font-bold text-cp-cyan uppercase">🖼️ Иллюстрация карточки (необязательно)</span>
+              <button type="button" onclick="clearBuilderImage()" class="text-[11px] text-gray-400 hover:text-cp-red">Очистить картинку</button>
+            </div>
+            <p class="text-xs text-gray-400 leading-relaxed">Картинка отображается в нижней части карточки под описанием.</p>
+            <label class="border-2 border-dashed border-gray-700 hover:border-cp-yellow bg-black/40 p-5 text-center cursor-pointer transition-colors flex flex-col items-center justify-center gap-2">
+              <span class="text-2xl">📁</span>
+              <span class="text-xs font-bold text-white">Нажмите, чтобы выбрать картинку с ПК</span>
+              <span class="text-[11px] text-gray-500">Контроль размера и формата осуществляет Сетевой Дозор</span>
+              <input type="file" id="builderImageFile" accept=".jpg,.jpeg,.png,.gif" onchange="handleImageUpload(event)" class="hidden">
+            </label>
+            <div>
+              <label class="block text-[11px] text-gray-400 mb-1">Или вставьте прямую ссылку на изображение (URL):</label>
+              <input type="url" id="builderImageUrl" oninput="handleImageUrlInput(event)" placeholder="https://example.com/image.jpg" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan p-2 text-xs text-white outline-none">
+            </div>
+            <div class="border border-gray-800 bg-black/60 p-3 min-h-[210px] flex flex-col items-center justify-center" id="builderImagePreviewBox">
+              <span class="text-xs text-gray-500">Предпросмотр картинки появится здесь...</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-cp-bg border border-gray-800 p-5 space-y-4">
+          <div class="grid grid-cols-12 gap-6 items-center">
+            <div class="col-span-5 flex flex-col gap-2">
+              <button type="submit" id="builderSubmitBtn" class="w-full py-3.5 px-6 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all">➕ Добавить запись в справочник</button>
+              <span class="text-[11px] text-gray-400 text-center">После нажатия вы сразу перейдёте к созданной или обновлённой карточке</span>
+            </div>
+            <div class="col-span-7">
+              <div class="text-[11px] font-bold text-cp-yellow uppercase mb-1">Готовый JSON-код записи:</div>
+              <pre id="builderJsonPreview" class="text-[11px] text-cp-green bg-black/70 p-2.5 border border-gray-800 overflow-x-auto whitespace-pre-wrap max-h-28">Заполните поля выше и нажмите кнопку сохранения...</pre>
+            </div>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ПОДВКЛАДКА 4.2: УПРАВЛЕНИЕ КАТЕГОРИЯМИ -->
+    <section id="admin-sub-categories" class="hidden bg-cp-panel cp-border p-6 space-y-6">
+      <div class="border-b border-gray-800 pb-4">
+        <h3 class="font-display text-lg font-bold text-cp-cyan uppercase">🗂️ Управление категориями и подразделами</h3>
+        <p class="text-xs text-gray-400 mt-1">Переименовывайте, удаляйте или создавайте категории для любого раздела справочника.</p>
+      </div>
+      <div class="grid grid-cols-12 gap-6 items-start">
+        <div class="col-span-4 bg-cp-bg border border-gray-800 p-4 space-y-2">
+          <div class="text-xs font-bold text-cp-yellow uppercase mb-2">1. Выберите раздел сайта:</div>
+          <div id="catManagerSectionList" class="space-y-1.5"></div>
+        </div>
+        <div class="col-span-8 bg-cp-bg border border-gray-800 p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <h4 class="font-bold text-sm text-white uppercase" id="catManagerActiveTitle">Категории раздела</h4>
+            <div class="flex gap-2">
+              <input type="text" id="newCategoryInput" placeholder="Название новой категории..." class="bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none focus:border-cp-cyan w-64">
+              <button type="button" onclick="addNewCategoryToSection()" class="px-3.5 py-1.5 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">+ Добавить категорию</button>
+            </div>
+          </div>
+          <div id="catManagerItemsList" class="space-y-2 max-h-[55vh] overflow-y-auto pr-1"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ПОДВКЛАДКА 4.3: ПОЛЬЗОВАТЕЛИ -->
+    <section id="admin-sub-users" class="hidden bg-cp-panel cp-border p-6 space-y-6">
+      <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
+        <div>
+          <h3 class="font-display text-lg font-bold text-cp-yellow uppercase">👥 Пользователи</h3>
+          <p class="text-xs text-gray-400 mt-1">Нажмите на аватар или имя пользователя, чтобы открыть его <b>Публичный профиль</b>. Главный Администратор (<span class="text-cp-red font-bold">ROOT</span>) может назначать других пользователей <span class="text-cp-cyan font-bold">Администраторами (ADMIN)</span> — им сразу придёт уведомление в колокольчик.</p>
+        </div>
+        <button type="button" onclick="toggleAdminQuickUserModal()" class="px-4 py-2 bg-cp-cyan text-black font-bold text-xs uppercase hover:bg-cyan-300">+ Создать аккаунт вручную</button>
+      </div>
+      <form id="adminQuickUserForm" onsubmit="adminCreateUserManually(event)" class="hidden bg-cp-bg border border-cp-cyan p-4 grid grid-cols-12 gap-3 items-end">
+        <div class="col-span-2"><label class="block text-[11px] text-gray-400 mb-1">Логин*</label><input type="text" id="admNewLogin" required placeholder="moderator1" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-3"><label class="block text-[11px] text-gray-400 mb-1">Никнейм (Позывной)*</label><input type="text" id="admNewName" required placeholder="Морган Блэкхенд" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-2"><label class="block text-[11px] text-gray-400 mb-1">Пароль*</label><input type="text" id="admNewPass" required placeholder="pass123" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-3"><label class="block text-[11px] text-gray-400 mb-1">Ссылка на аватар</label><input type="url" id="admNewAvatar" placeholder="https://..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white"></div>
+        <div class="col-span-1"><label class="block text-[11px] text-gray-400 mb-1">Права</label><select id="admNewRole" class="w-full bg-cp-panel border border-gray-700 px-2 py-1.5 text-xs text-white"><option value="ADMIN">ADMIN</option><option value="USER">USER</option></select></div>
+        <div class="col-span-1"><button type="submit" class="w-full py-1.5 bg-cp-green text-black font-bold text-xs uppercase">ОК</button></div>
+      </form>
+      <div class="space-y-2.5" id="adminUsersTableContainer"></div>
+    </section>
+
+    <!-- ПОДВКЛАДКА 4.4: БАЗА ДАННЫХ -->
+    <section id="admin-sub-backup" class="hidden bg-cp-panel cp-border p-6 space-y-6">
+      <h4 class="font-display text-base font-bold text-cp-yellow uppercase border-b border-gray-800 pb-3">💾 Выгрузка и подгрузка внешней базы (JSON / JS)</h4>
+      <div class="grid grid-cols-4 gap-4 text-center" id="adminStatsGrid"></div>
+      <div class="flex flex-wrap gap-3 pt-2">
+        <button type="button" onclick="exportUserDatabase()" class="px-5 py-3 bg-cp-cyan text-black font-bold text-xs uppercase hover:bg-cyan-300">📥 Скачать database.json</button>
+        <button type="button" onclick="exportUserDatabaseAsJS()" class="px-5 py-3 bg-cp-yellow text-black font-bold text-xs uppercase hover:bg-yellow-300">📥 Скачать database.js (для автоподгрузки)</button>
+        <label class="px-5 py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs uppercase cursor-pointer">
+          📤 Загрузить базу из файла (.JSON)<input type="file" accept=".json" onchange="importDatabaseFromFile(event)" class="hidden">
+        </label>
+        <button type="button" onclick="clearUserAdditions()" class="px-5 py-3 bg-cp-red/20 border border-cp-red text-cp-red font-bold text-xs uppercase hover:bg-cp-red hover:text-white">🗑️ Сбросить кеш к внешнему файлу базы</button>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // =========================================================================
+    // СХЕМЫ ДАННЫХ
+    // =========================================================================
+    const DECK_TYPE_LIST = ["Сотовая", "Портативная", "Боевая дека", "Стандартная", "Дека в киберконечности"];
+    const DECK_OPTION_LIST = ["Электроды", "Клавиатура", "Видеоэкран", "Принтер", "Сканер", "Вокс Бокс", "Считыватель Чипов", "Доп чипы"];
+    const CHARACTER_STAT_KEYS = [
+      { k: "stat_int", l: "ИНТ" }, { k: "stat_cool", l: "КРУТ" }, { k: "stat_ma", l: "ПЕР" },
+      { k: "stat_ref", l: "РЕФ" }, { k: "stat_attr", l: "ПРВЛ" }, { k: "stat_body", l: "ТЕЛО" },
+      { k: "stat_tech", l: "ТЕХ" }, { k: "stat_luck", l: "УДАЧА" }, { k: "stat_emp", l: "ЭМП" }
+    ];
+
+    const SECTION_LABELS = {
+      roles: "🎭 Роли", weapons: "🔫 Оружие", armor: "🛡️ Броня", gear: "🎒 Снаряжение",
+      services: "💼 Услуги", cyberware: "🦾 Кибероснащение", netrunning: "🌐 Нетраннинг",
+      vehicles: "🚗 Транспорт", characters: "👥 Персонажи", rules: "⚙️ Игровые механики"
+    };
+
+    const SCHEMAS = {
+      roles: [
+        { k: "name", l: "Название роли (рус.)", ph: "Соло" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Solo" },
+        { k: "category", l: "Категория роли", isCat: true, ph: "Базовые роли (Corebook)" },
+        { k: "ability", l: "Особая способность", ph: "Чувство Боя", stat: "Особая способность", c: "text-cp-cyan" },
+        { k: "stat", l: "Ключевой СТАТ", ph: "ИНТ / РЕФ", stat: "Ключевой СТАТ", c: "text-cp-yellow" },
+        { k: "salary", l: "Зарплата (Ур. 1–10)", ph: "2,000 – 12,000 eb", stat: "Зарплата", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "CP20" },
+        { k: "skills", l: "10 Профессиональных навыков (через запятую)", ph: "Чувство Боя, Внимательность, Пистолеты..." }
+      ],
+      weapons: [
+        { k: "name", l: "Название оружия", ph: "Sternmeyer M-95A4" },
+        { k: "category", l: "Категория", isCat: true, ph: "Штурмовые винтовки" },
+        { k: "typeCode", l: "Код типа (П, ПП, ДРБ, ВИН, ТЯЖ, ОББ)", ph: "ВИН", stat: "Тип" },
+        { k: "to", l: "ТО (Точность оружия)", ph: "+1", stat: "ТО (Точность)", c: "text-cp-yellow" },
+        { k: "skr", l: "СКР (Кар, Кур, Плащ, Нет)", ph: "Кур", stat: "СКР (Скрыт.)", c: "text-cp-cyan" },
+        { k: "dos", l: "ДОС (Отл, Обы, Мал, Ред)", ph: "Обы", stat: "ДОС (Доступ.)" },
+        { k: "nad", l: "НАД (НН, ОБ, ОН, ОТ)", ph: "ОН", stat: "НАД (Надёж.)", c: "text-cp-green" },
+        { k: "damage", l: "Урон", ph: "5d6", stat: "Урон", c: "text-cp-red", span: 2 },
+        { k: "ammo", l: "Боеприпас / Калибр", ph: "5.56мм", stat: "Боеприпас / Калибр", c: "text-cp-yellow", span: 2 },
+        { k: "mag", l: "МАГ (Магазин)", ph: "30", stat: "МАГ (Магазин)" },
+        { k: "sko", l: "СКО (Скоростр.)", ph: "3/30", stat: "СКО (Скоростр.)" },
+        { k: "range", l: "ДИС (Дистанция)", ph: "400м", stat: "ДИС (Дистанция)", c: "text-cp-cyan" },
+        { k: "cost", l: "Стоимость", ph: "750 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      armor: [
+        { k: "name", l: "Название брони", ph: "Arasaka Combat Armor" },
+        { k: "category", l: "Категория брони", isCat: true, ph: "Мягкая броня" },
+        { k: "os", l: "ОС (Останавливающая способность)", ph: "18", stat: "ОС (Броня)", c: "text-cp-cyan" },
+        { k: "zu", l: "ЗУ (Значение утяжеления)", ph: "-1", stat: "ЗУ (Утяжеление)", c: "text-cp-yellow" },
+        { k: "cost", l: "Стоимость", ph: "200 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "covers", l: "Зона защиты", ph: "Торс, Руки", stat: "Зона защиты", span: 3 },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      gear: [
+        { k: "name", l: "Название снаряжения", ph: "Техсканнер" },
+        { k: "category", l: "Раздел снаряжения", isCat: true, ph: "Инструменты и Ремонт" },
+        { k: "weight", l: "Вес / Ноша", ph: "0.5 кг", stat: "Вес / Ноша" },
+        { k: "effect", l: "Игровой эффект / Бонус", ph: "+2 к ТЕХ", stat: "Игровой эффект", c: "text-cp-cyan" },
+        { k: "cost", l: "Стоимость", ph: "300 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      services: [
+        { k: "name", l: "Название услуги / расхода", ph: "Аккаунт Trauma Team" },
+        { k: "category", l: "Категория услуги", isCat: true, ph: "Жильё" },
+        { k: "cost", l: "Тариф / Стоимость", ph: "500 eb", stat: "Тариф / Стоимость", c: "text-cp-green", span: 2 },
+        { k: "unit", l: "Расчётная единица", ph: "в месяц", stat: "Расчётная единица", span: 1 },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      cyberware: [
+        { k: "name", l: "Название киберимпланта", ph: "Сердце Pacesetter 2000" },
+        { k: "category", l: "Раздел кибернетики", isCat: true, ph: "Импланты" },
+        { k: "pch", l: "ПЧ (Потеря Человечности)", ph: "2d6", stat: "ПЧ (Человечность)", c: "text-cp-red" },
+        { k: "surg", l: "Код Хирургии (Н, М, С, КР)", ph: "М", stat: "Код Хирургии", c: "text-cp-yellow" },
+        { k: "cost", l: "Стоимость", ph: "1,000 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      vehicles: [
+        { k: "name", l: "Название модели транспорта", ph: "AV-4 Aerodyne" },
+        { k: "category", l: "Тип транспорта", isCat: true, ph: "Аэродайн (AV)", stat: "Тип транспорта", c: "text-cp-cyan" },
+        { k: "topSpeed", l: "Макс. скорость (км/ч)", ph: "560 км/ч", stat: "Макс. скорость", c: "text-cp-yellow" },
+        { k: "accDec", l: "УСК/ТОРМ (Ускорение / Торможение)", ph: "50 / 50", stat: "УСК/ТОРМ" },
+        { k: "maneuver", l: "Манёвренность", ph: "+0", stat: "Манёвренность", c: "text-cp-green" },
+        { k: "crew", l: "Экипаж", ph: "1–2", stat: "Экипаж" },
+        { k: "passengers", l: "Пассажиры", ph: "6", stat: "Пассажиры" },
+        { k: "range", l: "Дистанция (запас хода)", ph: "800 км", stat: "Дистанция", c: "text-cp-cyan" },
+        { k: "cargo", l: "Груз (грузоподъёмность в кг)", ph: "1300 кг", stat: "Груз" },
+        { k: "sdp", l: "ОСТ (Очки Структуры)", ph: "100", stat: "ОСТ (Структура)", c: "text-cp-red" },
+        { k: "os", l: "ОС (Броня = ОС / 10 с округлением вниз)", ph: "40", stat: "ОС (Броня)", c: "text-cp-yellow" },
+        { k: "mass", l: "Масса транспорта", ph: "4 тонны", stat: "Масса" },
+        { k: "cost", l: "Стоимость (eb)", ph: "600,000 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Источник", ph: "CP20 / MM" }
+      ],
+      characters: [
+        { k: "name", l: "Имя / Прозвище на улицах", ph: "Джонни Сильверхенд" },
+        { k: "category", l: "Роль персонажа", isCat: true, ph: "Рокербой", stat: "Роль", c: "text-cp-yellow" },
+        { k: "reputation", l: "Репутация (от 0 до 10)", ph: "10", stat: "Репутация", c: "text-cp-cyan" },
+        { k: "book", l: "Источник", ph: "CP20", stat: "Источник", c: "text-cp-green" }
+      ],
+      net_program: [
+        { k: "name", l: "Название программы (рус.)", ph: "Адская Стрела (Hellbolt)" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Hellbolt" },
+        { k: "category", l: "Категория программы", isCat: true, ph: "Анти-Личностные" },
+        { k: "strength", l: "Сила программы (СИЛ)", ph: "4", stat: "Сила программы (СИЛ)", c: "text-cp-red" },
+        { k: "mu", l: "Объём памяти — ЕП (MU)", ph: "2", stat: "Объём памяти — ЕП (MU)", c: "text-cp-cyan" },
+        { k: "cost", l: "Стоимость", ph: "6,750 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "CP20" }
+      ],
+      net_deck: [
+        { k: "name", l: "Название модели кибердеки", ph: "SGI Tech Elysia" },
+        { k: "cpu", l: "Количество ЦПУ", ph: "1", stat: "Количество ЦПУ" },
+        { k: "dataWall", l: "Стена данных (Data Wall)", ph: "+5", stat: "Стена данных", c: "text-cp-cyan" },
+        { k: "codeGate", l: "Сила кодовых врат", ph: "3", stat: "Сила кодовых врат", c: "text-cp-yellow" },
+        { k: "speed", l: "Скорость деки", ph: "+3", stat: "Скорость", c: "text-cp-green" },
+        { k: "memory", l: "Память (ЕП / MU)", ph: "20 ЕП", stat: "Память (ЕП / MU)" },
+        { k: "cost", l: "Стоимость", ph: "4,260 eb", stat: "Стоимость", c: "text-cp-green" },
+        { k: "book", l: "Книга-источник", ph: "Chr1" }
+      ]
+    };
+
+    // Резервный стартовый набор на случай, если внешний файл database.js ещё не положили рядом
+    const FALLBACK_DATA = window.CP2020_EXTERNAL_DATA || {
+      categories: {
+        roles: ["Базовые роли (Corebook)"], weapons: ["Средние пистолеты"], armor: ["Мягкая броня"],
+        gear: ["Инструменты и Ремонт"], services: ["Медицина и Trauma Team"], cyberware: ["Нейрооснащение"],
+        netrunning: ["Вторжение", "Кибердеки"], vehicles: ["Аэродайн (AV)"], characters: ["Соло"], rules: ["Бой и Оружие (ПВПВ)"]
+      },
+      db: {
+        roles: [{ id: "r-solo", name: "Соло", origName: "Solo", category: "Базовые роли (Corebook)", ability: "Чувство Боя", stat: "ИНТ / РЕФ", skills: ["Чувство Боя", "Внимательность", "Пистолеты"], salary: "2,000 – 12,000 eb/мес", book: "CP20", desc: "Положите файл database.js в одну папку с index.html, чтобы загрузить полный каталог." }],
+        weapons: [], armor: [], gear: [], services: [], cyberware: [], netrunning: [], vehicles: [], characters: [], rules: []
+      }
+    };
+
+    const DEFAULT_USERS = [
+      {
+        id: "u-root", username: "admin", password: "admin2020",
+        displayName: "Главный Архитектор (Село ДнДшеское)", role: "ROOT", favRole: "Рефери (ГМ)",
+        avatar: "", bio: "Создатель и Главный Администратор справочника Cyberpunk 2020.",
+        favorites: [], notes: "Добро пожаловать в терминал Главного Администратора!", createdAt: "2026-01-01"
+      }
+    ];
+
+    const STORAGE_DB_KEY = "cp2020_full_db_v50";
+    const STORAGE_CAT_KEY = "cp2020_full_cats_v50";
+    const STORAGE_USERS_KEY = "cp2020_users_v50";
+    const STORAGE_SESSION_KEY = "cp2020_session_user_id_v50";
+    const STORAGE_COMMENTS_KEY = "cp2020_comments_v60";
+    const STORAGE_NOTIF_KEY = "cp2020_notifs_v80";
+
+    let DB = JSON.parse(JSON.stringify(FALLBACK_DATA.db));
+    let CATEGORIES = JSON.parse(JSON.stringify(FALLBACK_DATA.categories));
+    let USERS = JSON.parse(JSON.stringify(DEFAULT_USERS));
+    let COMMENTS = {};
+    let NOTIFICATIONS = [];
+    let currentUserId = null;
+
+    let activeMainView = "catalog";
+    let activeCatalogTab = "roles";
+    let selectedItemId = null;
+    let activeRuleSubsection = "ALL";
+    let selectedRuleId = null;
+
+    let activeAdminSubtab = "builder";
+    let activeBuilderType = "roles";
+    let activeNetBuilderKind = "program";
+    let editingItemId = null;
+    let currentBuilderImageData = "";
+    let activeCatManagerSection = "roles";
+    let activeReplyToComment = null;
+    let activeEditCommentId = null;
+
+    function dash(val) {
+      if (val === undefined || val === null) return "—";
+      const s = String(val).trim();
+      return s === "" ? "—" : s;
+    }
+
+    function formatVehicleArmorOS(osVal) {
+      if (osVal === undefined || osVal === null || String(osVal).trim() === "" || String(osVal).trim() === "—") return "—";
+      const num = parseInt(String(osVal).replace(/[^\d]/g, ""), 10);
+      if (isNaN(num)) return String(osVal);
+      return `${num} (Броня: ${Math.floor(num / 10)})`;
+    }
+
+    function extractMaxNumericValue(str) {
+      if (!str) return 0;
+      const s = String(str).replace(/,/g, "");
+      const matches = s.match(/\d+(\.\d+)?/g);
+      if (!matches || matches.length === 0) return 0;
+      let nums = matches.map(Number);
+      const lower = s.toLowerCase();
+      if (lower.includes("миллион") || lower.includes("млн") || lower.includes("m ")) nums = nums.map(n => n < 1000 ? n * 1000000 : n);
+      else if (lower.includes("тыс")) nums = nums.map(n => n < 1000 ? n * 1000 : n);
+      return Math.max(...nums);
+    }
+
+    function truncateQuote(str, maxLen = 100) {
+      if (!str) return "";
+      const clean = String(str).replace(/\s+/g, " ").trim();
+      return clean.length > maxLen ? clean.slice(0, maxLen) + "..." : clean;
+    }
+
+    // =========================================================================
+    // ПОДГРУЗКА БАЗЫ (ИЗ DATABASE.JS, DATABASE.JSON И LOCALSTORAGE)
+    // =========================================================================
+    function mergeExternalDataIntoMemory(extData) {
+      if (!extData) return;
+      const srcDb = extData.db || extData;
+      const srcCats = extData.categories || {};
+
+      Object.keys(SECTION_LABELS).forEach(sec => {
+        if (Array.isArray(srcDb[sec]) && srcDb[sec].length > 0) {
+          const mapById = new Map();
+          srcDb[sec].forEach(it => { if (it && it.id) mapById.set(it.id, it); });
+          (DB[sec] || []).forEach(it => { if (it && it.id) mapById.set(it.id, it); });
+          DB[sec] = Array.from(mapById.values());
+        }
+        if (Array.isArray(srcCats[sec])) {
+          CATEGORIES[sec] = [...new Set([...(CATEGORIES[sec] || []), ...srcCats[sec]])];
+        }
+      });
+    }
+
+    async function initApp() {
+      // 1. Сначала берём данные из подключённого database.js
+      if (window.CP2020_EXTERNAL_DATA) {
+        mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
+      }
+
+      // 2. Пытаемся также подтянуть database.json (если запущено на хостинге или локальном сервере)
+      try {
+        const resp = await fetch("database.json", { cache: "no-store" });
+        if (resp.ok) {
+          const jsonExt = await resp.json();
+          mergeExternalDataIntoMemory(jsonExt);
+        }
+      } catch (err) {
+        // Игнорируем ошибку CORS при локальном открытии через file://, так как database.js уже загружен
+      }
+
+      // 3. Накатываем поверх сохранения из localStorage
+      loadSavedData();
+      updateCounts();
+      switchMainView("catalog", "roles");
+    }
+
+    function loadSavedData() {
+      try {
+        const dbKeys = ["cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30", "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_full_db_v50"];
+        dbKeys.forEach(key => {
+          const raw = localStorage.getItem(key);
+          if (!raw) return;
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") mergeExternalDataIntoMemory({ db: parsed });
+          } catch (e) {}
+        });
+
+        const catKeys = ["cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51", "cp2020_full_cats_v50"];
+        catKeys.forEach(key => {
+          const raw = localStorage.getItem(key);
+          if (!raw) return;
+          try {
+            const parsedCats = JSON.parse(raw);
+            if (parsedCats && typeof parsedCats === "object") mergeExternalDataIntoMemory({ categories: parsedCats });
+          } catch (e) {}
+        });
+
+        const userKeys = ["cp2020_users_v51", "cp2020_users_v50"];
+        userKeys.forEach(key => {
+          const raw = localStorage.getItem(key);
+          if (!raw) return;
+          try {
+            const parsedUsers = JSON.parse(raw);
+            if (Array.isArray(parsedUsers)) {
+              parsedUsers.forEach(u => {
+                if (!u || !u.id) return;
+                const idx = USERS.findIndex(ex => ex.id === u.id || ex.username.toLowerCase() === u.username.toLowerCase());
+                if (idx !== -1) USERS[idx] = u;
+                else USERS.push(u);
+              });
+            }
+          } catch (e) {}
+        });
+        if (!USERS.some(u => u.role === "ROOT")) USERS.unshift(DEFAULT_USERS[0]);
+
+        const rawComm = localStorage.getItem(STORAGE_COMMENTS_KEY);
+        if (rawComm) {
+          const parsedComm = JSON.parse(rawComm);
+          if (parsedComm && typeof parsedComm === "object") COMMENTS = parsedComm;
+        }
+
+        const rawNotifs = localStorage.getItem(STORAGE_NOTIF_KEY);
+        if (rawNotifs) {
+          const parsedNotifs = JSON.parse(rawNotifs);
+          if (Array.isArray(parsedNotifs)) NOTIFICATIONS = parsedNotifs;
+        }
+
+        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY) || localStorage.getItem("cp2020_session_user_id_v51");
+        if (savedSession && USERS.some(u => u.id === savedSession)) currentUserId = savedSession;
+
+        persistDatabase();
+      } catch (e) {}
+    }
+
+    function persistDatabase() {
+      try {
+        localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
+        localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+      } catch (e) {}
+    }
+    function persistUsers() {
+      try {
+        localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
+        if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
+        else localStorage.removeItem(STORAGE_SESSION_KEY);
+      } catch (e) {}
+      updateAuthHeaderUI();
+    }
+    function persistComments() { try { localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS)); } catch (e) {} }
+    function persistNotifications() { try { localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS)); } catch (e) {} updateNotifBellUI(); }
+
+    function getCurrentUser() { return currentUserId ? (USERS.find(u => u.id === currentUserId) || null) : null; }
+    function isCurrentUserAdmin() { const u = getCurrentUser(); return Boolean(u && (u.role === "ROOT" || u.role === "ADMIN")); }
+    function isCurrentUserRoot() { const u = getCurrentUser(); return Boolean(u && u.role === "ROOT"); }
+
+    // =========================================================================
+    // КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ
+    // =========================================================================
+    function createNotification(targetUserId, type, text, linkData = null) {
+      if (!targetUserId) return;
+      const now = new Date();
+      NOTIFICATIONS.unshift({
+        id: "ntf-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        targetUserId, type, text, linkData, read: false,
+        createdAt: now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 5)
+      });
+      persistNotifications();
+    }
+
+    function getMyNotifications() {
+      const u = getCurrentUser();
+      return u ? NOTIFICATIONS.filter(n => n.targetUserId === u.id) : [];
+    }
+
+    function updateNotifBellUI() {
+      const u = getCurrentUser();
+      const bellBtn = document.getElementById("notifBellBtn");
+      const redDot = document.getElementById("notifRedDot");
+      if (!u || !bellBtn || !redDot) return;
+      const hasUnread = getMyNotifications().some(n => !n.read);
+      redDot.classList.toggle("hidden", !hasUnread);
+      bellBtn.className = hasUnread
+        ? "w-10 h-10 bg-cp-panel border border-cp-cyan text-white flex items-center justify-center transition-all relative shadow-[0_0_10px_rgba(0,240,255,0.2)]"
+        : "w-10 h-10 bg-cp-panel border border-gray-700 hover:border-cp-cyan flex items-center justify-center transition-all relative text-gray-500 hover:text-gray-300";
+    }
+
+    function toggleNotifDropdown(e) {
+      e.stopPropagation();
+      closeUserDropdown();
+      const menu = document.getElementById("notifDropdownMenu");
+      if (menu.classList.contains("hidden")) {
+        renderNotifDropdownList();
+        menu.classList.remove("hidden");
+        const u = getCurrentUser();
+        if (u) {
+          let changed = false;
+          NOTIFICATIONS.forEach(n => { if (n.targetUserId === u.id && !n.read) { n.read = true; changed = true; } });
+          if (changed) persistNotifications();
+        }
+      } else menu.classList.add("hidden");
+    }
+
+    function closeNotifDropdown() { const m = document.getElementById("notifDropdownMenu"); if (m) m.classList.add("hidden"); }
+    function clearAllMyNotifications() {
+      const u = getCurrentUser();
+      if (!u) return;
+      NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== u.id);
+      persistNotifications();
+      renderNotifDropdownList();
+    }
+
+    function renderNotifDropdownList() {
+      const listEl = document.getElementById("notifItemsList");
+      const myNotifs = getMyNotifications();
+      if (myNotifs.length === 0) {
+        listEl.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">Уведомлений пока нет</div>`;
+        return;
+      }
+      listEl.innerHTML = myNotifs.map(n => {
+        const textCls = !n.read ? "text-white font-bold bg-cp-card/90" : "text-gray-500 font-normal bg-cp-bg/60";
+        const badgeNew = !n.read ? `<span class="inline-block w-2 h-2 bg-cp-red rounded-full mr-1.5 align-middle"></span>` : "";
+        return `
+          <div ${n.linkData ? `onclick="openNotificationTarget('${n.id}')"` : ""} class="p-3.5 text-xs transition-colors ${textCls} ${n.linkData ? 'cursor-pointer hover:bg-cp-cyan/10' : ''}">
+            <div class="flex items-start gap-2.5">
+              <span class="text-sm shrink-0">${n.type === "rank" ? "🛡️" : "💬"}</span>
+              <div class="flex-1 leading-relaxed">
+                <div>${badgeNew}${n.text}</div>
+                <div class="text-[10px] text-gray-600 mt-1">${n.createdAt}</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function openNotificationTarget(notifId) {
+      const n = NOTIFICATIONS.find(x => x.id === notifId);
+      closeNotifDropdown();
+      if (!n || !n.linkData) return;
+      const { sectionKey, itemId, commentId } = n.linkData;
+      if (sectionKey === "rules") { selectedRuleId = itemId; switchMainView("rules"); }
+      else { selectedItemId = itemId; switchMainView("catalog", sectionKey); }
+      if (commentId) setTimeout(() => scrollToAndHighlightComment(commentId), 120);
+    }
+
+    // =========================================================================
+    // ПРОВЕРКА ФАЙЛОВ «СЕТЕВОЙ ДОЗОР БДИТ!»
+    // =========================================================================
+    function showNetwatchAlert(msg) { document.getElementById("netwatchErrorText").innerHTML = msg; document.getElementById("netwatchModal").classList.remove("hidden"); }
+    function closeNetwatchModal() { document.getElementById("netwatchModal").classList.add("hidden"); }
+
+    function validateUploadedFile(file) {
+      if (!file) return false;
+      const u = getCurrentUser();
+      const role = u ? u.role : "USER";
+      if (role === "ROOT") return true;
+      const fileName = (file.name || "").toLowerCase();
+      const mime = (file.type || "").toLowerCase();
+      const size = file.size || 0;
+      const isJpgPng = mime === "image/jpeg" || mime === "image/png" || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png");
+      const isGif = mime === "image/gif" || fileName.endsWith(".gif");
+
+      if (role === "ADMIN") {
+        if (!isJpgPng && !isGif) { showNetwatchAlert(`Ошибка загрузки файла <b>«${file.name}»</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG, PNG и GIF весом до 50мб</b>.`); return false; }
+        if (size > 50 * 1024 * 1024) { showNetwatchAlert(`Превышен допустимый размер файла <b>«${file.name}» (${(size/1048576).toFixed(1)} МБ)</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG, PNG и GIF весом до 50мб</b>.`); return false; }
+        return true;
+      } else {
+        if (!isJpgPng) { showNetwatchAlert(`Ошибка загрузки файла <b>«${file.name}»</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`); return false; }
+        if (size > 10 * 1024 * 1024) { showNetwatchAlert(`Превышен допустимый размер файла <b>«${file.name}» (${(size/1048576).toFixed(1)} МБ)</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`); return false; }
+        return true;
+      }
+    }
+
+    function validateImageUrlForRole(urlStr) {
+      if (!urlStr) return true;
+      const u = getCurrentUser();
+      const role = u ? u.role : "USER";
+      if (role === "ROOT") return true;
+      if (role === "USER" && urlStr.split("?")[0].toLowerCase().endsWith(".gif")) {
+        showNetwatchAlert(`Сетевой Дозор заблокировал прямую ссылку на GIF.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`);
+        return false;
+      }
+      return true;
+    }
+
+    // =========================================================================
+    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ
+    // =========================================================================
+    function countUserTotalComments(userId) {
+      let total = 0;
+      Object.values(COMMENTS).forEach(arr => { if (Array.isArray(arr)) total += arr.filter(c => c.userId === userId).length; });
+      return total;
+    }
+
+    function openPublicProfileModal(userId) {
+      const target = USERS.find(u => u.id === userId);
+      if (!target) return;
+      document.getElementById("pubProfAvatar").innerHTML = target.avatar ? `<img src="${target.avatar}" class="w-full h-full object-cover">` : (target.displayName || target.username).slice(0, 2).toUpperCase();
+      const badge = document.getElementById("pubProfBadge");
+      badge.className = target.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-red text-white" : target.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-gray-800 text-cp-yellow border border-cp-yellow/40";
+      badge.textContent = target.role === "ROOT" ? "👑 Главный Админ (ROOT)" : target.role === "ADMIN" ? "🛡️ Администратор" : "👤 Эджраннер (Игрок)";
+      document.getElementById("pubProfName").textContent = target.displayName || target.username;
+      document.getElementById("pubProfLogin").textContent = "@" + target.username;
+      document.getElementById("pubProfRole").textContent = target.favRole || "Соло";
+      document.getElementById("pubProfDate").textContent = target.createdAt || "2026";
+      document.getElementById("pubProfCommentsCnt").textContent = countUserTotalComments(target.id);
+      document.getElementById("pubProfBio").textContent = (target.bio && target.bio.trim()) ? target.bio : "Пользователь пока не заполнил публичное описание профиля.";
+      document.getElementById("publicProfileModal").classList.remove("hidden");
+    }
+    function openPublicProfileByCurrent() { const u = getCurrentUser(); if (u) openPublicProfileModal(u.id); }
+    function closePublicProfileModal() { document.getElementById("publicProfileModal").classList.add("hidden"); }
+
+    function scrollToAndHighlightComment(commentId) {
+      const el = document.getElementById(`comment-box-${commentId}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.remove("comment-highlight");
+      void el.offsetWidth;
+      el.classList.add("comment-highlight");
+    }
+
+    function handleCommentKeydown(event, itemId) {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        submitNewComment(null, itemId);
+      }
+    }
+
+    function renderCommentsSectionHTML(itemId) {
+      const list = COMMENTS[itemId] || [];
+      const curUser = getCurrentUser();
+      const isAdmin = isCurrentUserAdmin();
+
+      const itemsHtml = list.length === 0
+        ? `<div class="text-xs text-gray-500 py-4 text-center bg-black/30 border border-gray-800/80">Под этой карточкой пока нет комментариев. Будьте первым!</div>`
+        : list.map(c => {
+            const author = USERS.find(u => u.id === c.userId) || { id: c.userId, displayName: c.fallbackName || "Раннер", role: "USER", avatar: "" };
+            const isOwn = Boolean(curUser && curUser.id === c.userId);
+            const canDel = isOwn || isAdmin;
+            const roleBadge = author.role === "ROOT" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red text-white font-bold uppercase">ROOT</span>` : author.role === "ADMIN" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-cyan text-black font-bold uppercase">ADM</span>` : "";
+            const avHtml = author.avatar ? `<img src="${author.avatar}" onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 object-cover border border-cp-cyan cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 bg-cp-panel border border-gray-700 hover:border-cp-yellow text-cp-yellow flex items-center justify-center font-display font-bold text-xs cursor-pointer shrink-0">${(author.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
+
+            let replyBannerHtml = "";
+            if (c.replyToName) {
+              const origComm = list.find(x => x.id === c.replyToId);
+              const quoteText = origComm ? truncateQuote(origComm.text, 100) : (c.replyToSnippet || "Сообщение удалено");
+              replyBannerHtml = `
+                <div ${c.replyToId ? `onclick="scrollToAndHighlightComment('${c.replyToId}')"` : ""} title="Нажмите, чтобы перейти к оригинальному комментарию"
+                  class="flex items-center gap-2 text-[11px] bg-cp-cyan/10 hover:bg-cp-cyan/20 border-l-2 border-cp-cyan px-2.5 py-1 cursor-pointer transition-colors overflow-hidden">
+                  <span class="text-cp-cyan font-bold shrink-0">↩ Ответ пользователю ${c.replyToName}:</span>
+                  <span class="text-gray-400 italic truncate">«${quoteText}»</span>
+                </div>
+              `;
+            }
+
+            return `
+              <div id="comment-box-${c.id}" class="bg-cp-bg border border-gray-800 p-3 space-y-2 transition-all">
+                ${replyBannerHtml}
+                <div class="flex items-start justify-between gap-2">
+                  <div class="flex items-center gap-2.5">
+                    ${avHtml}
+                    <div>
+                      <div class="flex items-center gap-1.5">
+                        <button type="button" onclick="openPublicProfileModal('${author.id}')" class="text-xs font-bold text-white hover:text-cp-yellow hover:underline">${author.displayName}</button>
+                        ${roleBadge}
+                      </div>
+                      <div class="text-[10px] text-gray-500">${c.createdAt}${c.edited ? ' (изм.)' : ''}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    ${curUser ? `<button type="button" onclick="startReplyToComment('${itemId}', '${c.id}')" class="px-2 py-0.5 bg-gray-800 hover:bg-cp-cyan hover:text-black text-gray-300 text-[10px] font-bold">↩ Ответить</button>` : ""}
+                    ${isOwn ? `<button type="button" onclick="startEditComment('${itemId}', '${c.id}')" class="px-2 py-0.5 bg-gray-800 hover:bg-cp-yellow hover:text-black text-gray-300 text-[10px] font-bold">✏️ Изм.</button>` : ""}
+                    ${canDel ? `<button type="button" onclick="deleteComment('${itemId}', '${c.id}')" class="px-2 py-0.5 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white text-[10px] font-bold">🗑️</button>` : ""}
+                  </div>
+                </div>
+                ${activeEditCommentId === c.id ? `
+                  <div class="space-y-2 pt-1">
+                    <textarea id="edit-comm-textarea-${c.id}" rows="2" class="w-full bg-cp-panel border border-cp-yellow p-2 text-xs text-white outline-none">${c.text}</textarea>
+                    <div class="flex gap-2">
+                      <button type="button" onclick="saveEditedComment('${itemId}', '${c.id}')" class="px-3 py-1 bg-cp-green text-black font-bold text-[11px] uppercase">Сохранить</button>
+                      <button type="button" onclick="cancelEditComment()" class="px-3 py-1 bg-gray-800 text-gray-300 text-[11px] uppercase">Отмена</button>
+                    </div>
+                  </div>
+                ` : `<div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line pl-10">${c.text}</div>`}
+              </div>
+            `;
+          }).join("");
+
+      const replyBanner = (activeReplyToComment && activeReplyToComment.itemId === itemId)
+        ? `<div class="flex items-center justify-between gap-2 bg-cp-cyan/15 border border-cp-cyan/50 px-3 py-1.5 text-xs mb-2">
+             <div class="flex items-center gap-2 overflow-hidden">
+               <span class="text-cp-cyan font-bold shrink-0">↩ Ответ пользователю ${activeReplyToComment.authorName}:</span>
+               <span class="text-gray-300 italic truncate">«${activeReplyToComment.snippet}»</span>
+             </div>
+             <button type="button" onclick="cancelReplyToComment()" class="text-white hover:text-cp-red font-bold shrink-0">✕</button>
+           </div>` : "";
+
+      const formHtml = curUser
+        ? `<form onsubmit="submitNewComment(event, '${itemId}')" class="mt-3 pt-3 border-t border-gray-800">
+             ${replyBanner}
+             <textarea id="new-comment-input-${itemId}" onkeydown="handleCommentKeydown(event, '${itemId}')" required rows="2" placeholder="Напишите комментарий (Enter — отправить, Shift+Enter — новая строка)..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-2.5 text-xs text-white outline-none"></textarea>
+             <div class="flex items-center justify-between mt-2">
+               <span class="text-[10px] text-gray-500"><b>Enter</b> — отправить • <b>Shift + Enter</b> — перенос строки</span>
+               <button type="submit" class="px-4 py-1.5 bg-cp-yellow hover:bg-yellow-300 text-black font-bold text-xs uppercase">💬 Отправить</button>
+             </div>
+           </form>`
+        : `<div class="mt-3 pt-3 border-t border-gray-800 flex items-center justify-between bg-black/40 p-3 text-xs">
+             <span class="text-gray-400">Оставлять комментарии могут только авторизованные пользователи.</span>
+             <button type="button" onclick="switchMainView('profile')" class="px-3 py-1.5 bg-cp-yellow text-black font-bold text-[11px] uppercase shrink-0">🔑 Войти</button>
+           </div>`;
+
+      return `<div class="mt-6 pt-5 border-t-2 border-gray-800">
+                <h4 class="font-display text-xs font-bold uppercase text-cp-cyan tracking-wider mb-3">💬 Комментарии (${list.length})</h4>
+                <div class="space-y-2.5 max-h-96 overflow-y-auto pr-1">${itemsHtml}</div>
+                ${formHtml}
+              </div>`;
+    }
+
+    function refreshCurrentCardOrRuleView() {
+      if (activeMainView === "rules") renderRulesSidebar();
+      else if (activeMainView === "catalog") renderCatalog();
+    }
+
+    function submitNewComment(e, itemId) {
+      if (e) e.preventDefault();
+      const u = getCurrentUser();
+      const inp = document.getElementById(`new-comment-input-${itemId}`);
+      if (!u || !inp || !inp.value.trim()) return;
+      if (!Array.isArray(COMMENTS[itemId])) COMMENTS[itemId] = [];
+
+      const now = new Date();
+      const newCommId = "cm-" + Date.now();
+      const isReplying = Boolean(activeReplyToComment && activeReplyToComment.itemId === itemId);
+
+      COMMENTS[itemId].push({
+        id: newCommId, userId: u.id, fallbackName: u.displayName, text: inp.value.trim(),
+        createdAt: now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 5),
+        replyToId: isReplying ? activeReplyToComment.commentId : null,
+        replyToName: isReplying ? activeReplyToComment.authorName : null,
+        replyToSnippet: isReplying ? activeReplyToComment.snippet : null
+      });
+
+      if (isReplying && activeReplyToComment.targetUserId && activeReplyToComment.targetUserId !== u.id) {
+        const foundObj = findItemAcrossAllSections(itemId);
+        const cardTitle = foundObj ? (foundObj.item.name || foundObj.item.title) : "карточке";
+        const secKey = foundObj ? foundObj.section : activeCatalogTab;
+        createNotification(
+          activeReplyToComment.targetUserId, "reply",
+          `Пользователь <b>${u.displayName}</b> ответил на ваш комментарий к «<b>${cardTitle}</b>»: «${truncateQuote(inp.value.trim(), 60)}»`,
+          { sectionKey: secKey, itemId, commentId: newCommId }
+        );
+      }
+
+      activeReplyToComment = null;
+      persistComments();
+      refreshCurrentCardOrRuleView();
+    }
+
+    function startReplyToComment(itemId, commentId) {
+      const orig = (COMMENTS[itemId] || []).find(c => c.id === commentId);
+      if (!orig) return;
+      const author = USERS.find(u => u.id === orig.userId);
+      activeReplyToComment = {
+        itemId, commentId, targetUserId: orig.userId,
+        authorName: author ? author.displayName : (orig.fallbackName || "Раннер"),
+        snippet: truncateQuote(orig.text, 100)
+      };
+      refreshCurrentCardOrRuleView();
+      setTimeout(() => { const inp = document.getElementById(`new-comment-input-${itemId}`); if (inp) inp.focus(); }, 50);
+    }
+    function cancelReplyToComment() { activeReplyToComment = null; refreshCurrentCardOrRuleView(); }
+    function startEditComment(itemId, commentId) { activeEditCommentId = commentId; refreshCurrentCardOrRuleView(); }
+    function cancelEditComment() { activeEditCommentId = null; refreshCurrentCardOrRuleView(); }
+    function saveEditedComment(itemId, commentId) {
+      const u = getCurrentUser();
+      const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
+      const area = document.getElementById(`edit-comm-textarea-${commentId}`);
+      if (!u || !target || target.userId !== u.id || !area || !area.value.trim()) return;
+      target.text = area.value.trim(); target.edited = true; activeEditCommentId = null;
+      persistComments(); refreshCurrentCardOrRuleView();
+    }
+    function deleteComment(itemId, commentId) {
+      const u = getCurrentUser();
+      const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
+      if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
+      if (!confirm("Удалить этот комментарий?")) return;
+      COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
+      persistComments(); refreshCurrentCardOrRuleView();
+    }
+
+    // =========================================================================
+    // ШАПКА, НАВИГАЦИЯ И ФИЛЬТРЫ
+    // =========================================================================
+    function updateAuthHeaderUI() {
+      const u = getCurrentUser();
+      const guestBtn = document.getElementById("guestLoginSquareBtn");
+      const loggedWrap = document.getElementById("loggedAvatarWrapper");
+      const avatarContent = document.getElementById("headerAvatarContent");
+      const roleDot = document.getElementById("headerRoleDot");
+      const dropName = document.getElementById("dropdownUserName");
+      const dropRole = document.getElementById("dropdownUserRole");
+      const dropAdminBtn = document.getElementById("dropdownAdminBtn");
+      const addRuleBtn = document.getElementById("addRuleTopBtn");
+      const cntUsersEl = document.getElementById("cnt-users");
+      if (cntUsersEl) cntUsersEl.textContent = USERS.length;
+
+      if (!u) {
+        guestBtn.classList.remove("hidden");
+        loggedWrap.classList.add("hidden");
+        closeUserDropdown(); closeNotifDropdown();
+        if (addRuleBtn) addRuleBtn.classList.add("hidden");
+      } else {
+        guestBtn.classList.add("hidden");
+        loggedWrap.classList.remove("hidden");
+        avatarContent.innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || u.username).slice(0, 2).toUpperCase();
+        dropName.textContent = u.displayName || u.username;
+        roleDot.className = u.role === "ROOT" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-red border border-black" : u.role === "ADMIN" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-cyan border border-black" : "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-green border border-black";
+        dropRole.textContent = u.role === "ROOT" ? "👑 Главный Админ (ROOT)" : u.role === "ADMIN" ? "🛡️ Администратор (ADMIN)" : `👤 Игрок (${u.favRole || 'Соло'})`;
+        const isAdm = isCurrentUserAdmin();
+        dropAdminBtn.classList.toggle("hidden", !isAdm);
+        if (addRuleBtn) addRuleBtn.classList.toggle("hidden", !isAdm);
+        updateNotifBellUI();
+      }
+    }
+
+    function toggleUserDropdown(e) { e.stopPropagation(); closeNotifDropdown(); document.getElementById("userDropdownMenu").classList.toggle("hidden"); }
+    function closeUserDropdown() { const m = document.getElementById("userDropdownMenu"); if (m) m.classList.add("hidden"); }
+    function openViewFromDropdown(v) { closeUserDropdown(); switchMainView(v); }
+    function logoutFromDropdown() { closeUserDropdown(); logoutCurrentUser(); }
+
+    document.addEventListener("click", e => {
+      const wrap = document.getElementById("loggedAvatarWrapper");
+      if (wrap && !wrap.contains(e.target)) { closeUserDropdown(); closeNotifDropdown(); }
+    });
+
+    function updateCounts() {
+      Object.keys(SECTION_LABELS).forEach(k => {
+        const el = document.getElementById("cnt-" + k);
+        if (el) el.textContent = (DB[k] || []).length;
+      });
+      updateAuthHeaderUI();
+    }
+
+    function getAllCategoriesForSection(secKey) {
+      const fromList = CATEGORIES[secKey] || [];
+      const prop = secKey === "rules" ? "subsection" : "category";
+      const fromItems = (DB[secKey] || []).map(i => i[prop]).filter(Boolean);
+      return [...new Set([...fromList, ...fromItems])];
+    }
+
+    function switchMainView(view, catalogTab = null) {
+      if (view === "admin" && !isCurrentUserAdmin()) view = "profile";
+      activeMainView = view;
+      if (catalogTab) activeCatalogTab = catalogTab;
+
+      ["catalog", "rules", "profile", "admin"].forEach(v => {
+        document.getElementById("view-" + v).classList.toggle("hidden", view !== v);
+      });
+
+      const targetKey = view === "catalog" ? activeCatalogTab : view;
+      document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
+        const isCur = btn.getAttribute("data-view") === targetKey;
+        btn.className = isCur
+          ? "nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border transition-all bg-cp-yellow text-black border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.3)]"
+          : "nav-btn px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan";
+      });
+
+      if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
+      else if (view === "rules") renderRulesView();
+      else if (view === "profile") renderProfileView();
+      else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
+    }
+
+    function switchAdminSubtab(subtab) {
+      activeAdminSubtab = subtab;
+      ["builder", "categories", "users", "backup"].forEach(s => {
+        document.getElementById("admin-sub-" + s).classList.toggle("hidden", subtab !== s);
+      });
+      document.querySelectorAll("#adminSubNav .admin-sub-btn").forEach(btn => {
+        const isCur = btn.getAttribute("data-subtab") === subtab;
+        btn.className = isCur
+          ? "admin-sub-btn px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
+          : "admin-sub-btn px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
+      });
+      if (subtab === "builder" && !editingItemId) setBuilderType(activeBuilderType);
+      else if (subtab === "categories") renderCategoryManager();
+      else if (subtab === "users") renderAdminUsersManager();
+      else if (subtab === "backup") renderAdminBackupStats();
+    }
+
+    function setupCatalogFilters() {
+      const subSelect = document.getElementById("subFilter");
+      const extraSelect = document.getElementById("extraFilter");
+      const relBox = document.getElementById("reliabilityFilterBox");
+      const subLabel = document.getElementById("subFilterLabel");
+      const extraLabel = document.getElementById("extraFilterLabel");
+      const legend = document.getElementById("abbrevLegend");
+      const items = DB[activeCatalogTab] || [];
+      const categories = getAllCategoriesForSection(activeCatalogTab);
+
+      subLabel.textContent = activeCatalogTab === "vehicles" ? "Тип транспорта" : activeCatalogTab === "characters" ? "Роль персонажа" : "Категория / Раздел";
+      subSelect.innerHTML = `<option value="ALL">Все (${items.length})</option>` + categories.map(c => `<option value="${c}">${c}</option>`).join("");
+      relBox.classList.toggle("hidden", activeCatalogTab !== "weapons");
+
+      if (activeCatalogTab === "roles") {
+        extraLabel.textContent = "Зарплата";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_SALARY_ASC">🔼 По возрастанию (макс. зарплата)</option><option value="SORT_SALARY_DESC">🔽 По убыванию (макс. зарплата)</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">Особая способность</b> = Уникальный навык роли</span><span><b class="text-cp-cyan">40 Очков</b> = Начальный пул на 10 профессиональных навыков</span>`;
+      } else if (activeCatalogTab === "weapons") {
+        extraLabel.textContent = "Скрываемость";
+        extraSelect.innerHTML = `<option value="ALL">Любая скрываемость</option><option value="Кар">Кар — Карман</option><option value="Кур">Кур — Куртка</option><option value="Плащ">Плащ — Длинный плащ</option><option value="Нет">Нет — Нельзя скрыть</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">ТО</b> = Точность</span><span><b class="text-cp-cyan">СКР</b> = Кар/Кур/Плащ/Нет</span><span><b class="text-cp-cyan">ДОС</b> = Отл/Обы/Мал/Ред</span><span><b class="text-cp-cyan">МАГ</b> = Магазин</span><span><b class="text-cp-cyan">СКО</b> = Скоростр.</span><span><b class="text-cp-cyan">НАД</b> = НН/ОБ/ОН/ОТ</span>`;
+      } else if (activeCatalogTab === "armor") {
+        extraLabel.textContent = "Бронированность";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки ОС</option><option value="SORT_OS_ASC">🔼 По возрастанию ОС</option><option value="SORT_OS_DESC">🔽 По убыванию ОС</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">ОС</b> = Останавливающая способность (SP)</span><span><b class="text-cp-cyan">ЗУ</b> = Значение утяжеления (EV)</span>`;
+      } else if (activeCatalogTab === "gear" || activeCatalogTab === "cyberware" || activeCatalogTab === "services") {
+        extraLabel.textContent = "Цена";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки цен</option><option value="SORT_PRICE_ASC">🔼 Цена: по возрастанию</option><option value="SORT_PRICE_DESC">🔽 Цена: по убыванию</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">eb</b> = Евробаксы</span><span><b class="text-cp-cyan">ПЧ</b> = Потеря Человечности</span><span><b class="text-cp-cyan">Хирургия:</b> Н, М, С, КР</span>`;
+      } else if (activeCatalogTab === "netrunning") {
+        extraLabel.textContent = "Тип";
+        extraSelect.innerHTML = `<option value="ALL">Программы и Кибердеки</option><option value="ONLY_PROGRAMS">💾 Только Программы</option><option value="ONLY_DECKS">💻 Только Кибердеки</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">ЕП (MU)</b> = Единицы Памяти</span><span><b class="text-cp-cyan">СИЛ</b> = Сила программы / Кодовых врат</span><span><b class="text-cp-cyan">Стена данных</b> = Защита деки</span>`;
+      } else if (activeCatalogTab === "vehicles") {
+        extraLabel.textContent = "Сортировка по типу / ОСТ";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_TYPE_ASC">🔤 По типу транспорта (А → Я)</option><option value="SORT_TYPE_DESC">🔤 По типу транспорта (Я → А)</option><option value="SORT_SDP_DESC">🛡️ Сначала самые прочные (по ОСТ)</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">УСК/ТОРМ</b> = Ускорение и Торможение</span><span><b class="text-cp-cyan">ОСТ</b> = Очки Структуры (ХП)</span><span><b class="text-cp-cyan">ОС (Броня)</b> = Броня равна ОС / 10 (округл. вниз)</span>`;
+      } else if (activeCatalogTab === "characters") {
+        extraLabel.textContent = "Сортировка по ролям";
+        extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_ROLE_ASC">🎭 По Ролям (А → Я)</option><option value="SORT_ROLE_DESC">🎭 По Ролям (Я → А)</option><option value="SORT_REP_DESC">⭐ Сначала с высшей Репутацией</option>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">СТАТЫ</b> = ИНТ, КРУТ, ПЕР, РЕФ, ПРВЛ, ТЕЛО, ТЕХ, УДАЧА, ЭМП</span><span><b class="text-cp-cyan">Репутация</b> = Известность на улицах (0–10)</span>`;
+      }
+    }
+
+    function clearSearch() { document.getElementById("searchInput").value = ""; renderCatalog(); }
+    function resetFilters() {
+      document.getElementById("searchInput").value = "";
+      document.getElementById("subFilter").value = "ALL";
+      document.getElementById("extraFilter").value = "ALL";
+      document.getElementById("relFilter").value = "ALL";
+      document.getElementById("bookFilter").value = "ALL";
+      renderCatalog();
+    }
+
+    function getReliabilityRank(nadStr) {
+      if (!nadStr) return 0;
+      const s = nadStr.toUpperCase();
+      return s.includes("ОТ") ? 4 : s.includes("ОН") ? 3 : (s.includes("ОБ") || s.includes("СТ")) ? 2 : s.includes("НН") ? 1 : 0;
+    }
+
+    // =========================================================================
+    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК (ОБЕ ФУНКЦИИ ВМЕСТЕ!)
+    // =========================================================================
+    function renderCatalog() {
+      const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
+      const sub = document.getElementById("subFilter")?.value || "ALL";
+      const extra = document.getElementById("extraFilter")?.value || "ALL";
+      const rel = document.getElementById("relFilter")?.value || "ALL";
+      const book = document.getElementById("bookFilter")?.value || "ALL";
+
+      let filtered = (DB[activeCatalogTab] || []).filter(item => {
+        const textOk = !q || Object.values(item).some(val => String(val).toLowerCase().includes(q));
+        const subOk = sub === "ALL" || item.category === sub;
+        const bookOk = book === "ALL" ? true : book === "FAV" ? isItemFavorited(item.id) : book === "USER" ? Boolean(item.isUser) : (item.book && item.book.includes(book));
+        let extraOk = true;
+        if (extra !== "ALL" && !extra.startsWith("SORT_")) {
+          if (activeCatalogTab === "weapons") extraOk = item.skr && item.skr.includes(extra);
+          else if (activeCatalogTab === "netrunning") {
+            const isDeck = item.itemKind === "deck" || item.category === "Кибердеки";
+            extraOk = extra === "ONLY_DECKS" ? isDeck : !isDeck;
+          }
+        }
+        let relOk = true;
+        if (activeCatalogTab === "weapons" && rel.startsWith("ONLY_")) {
+          relOk = item.nad && item.nad.toUpperCase().includes(rel.replace("ONLY_", ""));
+        }
+        return textOk && subOk && bookOk && extraOk && relOk;
+      });
+
+      if (activeCatalogTab === "weapons" && (rel === "SORT_DESC" || rel === "SORT_ASC")) {
+        filtered = [...filtered].sort((a, b) => rel === "SORT_DESC" ? (getReliabilityRank(b.nad) - getReliabilityRank(a.nad)) : (getReliabilityRank(a.nad) - getReliabilityRank(b.nad)));
+      } else if (activeCatalogTab === "roles") {
+        if (extra === "SORT_SALARY_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.salary) - extractMaxNumericValue(b.salary));
+        else if (extra === "SORT_SALARY_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.salary) - extractMaxNumericValue(a.salary));
+      } else if (activeCatalogTab === "armor") {
+        if (extra === "SORT_OS_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.os) - extractMaxNumericValue(b.os));
+        else if (extra === "SORT_OS_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.os) - extractMaxNumericValue(a.os));
+      } else if (activeCatalogTab === "gear" || activeCatalogTab === "cyberware" || activeCatalogTab === "services") {
+        if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+      } else if (activeCatalogTab === "vehicles") {
+        if (extra === "SORT_TYPE_ASC") filtered = [...filtered].sort((a, b) => (a.category || "").localeCompare(b.category || "", "ru"));
+        else if (extra === "SORT_TYPE_DESC") filtered = [...filtered].sort((a, b) => (b.category || "").localeCompare(a.category || "", "ru"));
+        else if (extra === "SORT_SDP_DESC") filtered = [...filtered].sort((a, b) => (parseInt(b.sdp) || 0) - (parseInt(a.sdp) || 0));
+      } else if (activeCatalogTab === "characters") {
+        if (extra === "SORT_ROLE_ASC") filtered = [...filtered].sort((a, b) => (a.category || "").localeCompare(b.category || "", "ru"));
+        else if (extra === "SORT_ROLE_DESC") filtered = [...filtered].sort((a, b) => (b.category || "").localeCompare(a.category || "", "ru"));
+        else if (extra === "SORT_REP_DESC") filtered = [...filtered].sort((a, b) => (parseInt(b.reputation) || 0) - (parseInt(a.reputation) || 0));
+      }
+
+      document.getElementById("foundCount").textContent = filtered.length;
+      const container = document.getElementById("catalogList");
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="bg-cp-card border border-gray-800 p-8 text-center text-gray-400 text-xs">По вашему запросу ничего не найдено. Сбросьте фильтры!</div>`;
+        document.getElementById("detailCard").innerHTML = `<div class="text-xs text-gray-500">Выберите объект в списке слева...</div>`;
+        return;
+      }
+
+      if (!selectedItemId || !filtered.some(i => i.id === selectedItemId)) selectedItemId = filtered[0].id;
+
+      container.innerHTML = filtered.map(item => {
+        const isSel = item.id === selectedItemId;
+        const borderCls = isSel ? "cp-border-active bg-cp-card" : "border-gray-800 bg-cp-card/70 hover:border-gray-600";
+        const favStar = isItemFavorited(item.id) ? `<span class="text-cp-yellow text-xs">★</span>` : "";
+        const userBadge = item.isUser ? `<span class="text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1 font-bold">ДОБАВЛЕНО</span>` : "";
+        const imgBadge = item.image ? `<span class="text-[10px] text-cp-cyan border border-cp-cyan/40 px-1">🖼️</span>` : "";
+        const commCnt = (COMMENTS[item.id] || []).length;
+        const commBadge = commCnt > 0 ? `<span class="text-[10px] text-gray-400">💬 ${commCnt}</span>` : "";
+
+        let subline = "";
+        let rightTop = "";
+        let rightBottom = dash(item.cost || item.salary);
+
+        if (activeCatalogTab === "weapons") {
+          subline = `ТО: <b class="text-white">${dash(item.to)}</b> • СКР: <b class="text-cp-cyan">${dash(item.skr)}</b> • ДОС: <b>${dash(item.dos)}</b> • МАГ: <b>${dash(item.mag)}</b> • СКО: <b>${dash(item.sko)}</b> • НАД: <b class="text-cp-green">${dash(item.nad)}</b> • ДИС: <b class="text-cp-cyan">${dash(item.range)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-yellow/15 border border-cp-yellow/50 text-cp-yellow font-bold text-xs">${dash(item.damage)} (${dash(item.ammo)})</span>`;
+        } else if (activeCatalogTab === "armor") {
+          subline = `Зона защиты: <b class="text-gray-200">${dash(item.covers)}</b> • Утяжеление (ЗУ): <b class="text-cp-yellow">${dash(item.zu)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-cyan/15 border border-cp-cyan/50 text-cp-cyan font-bold text-xs">ОС: ${dash(item.os)}</span>`;
+        } else if (activeCatalogTab === "gear") {
+          subline = `Вес: <b class="text-gray-200">${dash(item.weight)}</b> • Эффект: <b class="text-cp-cyan">${dash(item.effect)}</b>`;
+        } else if (activeCatalogTab === "cyberware") {
+          subline = `Хирургия: <b class="text-cp-yellow">${dash(item.surg)}</b> • Оригинал: ${dash(item.origName)}`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">ПЧ: ${dash(item.pch)}</span>`;
+        } else if (activeCatalogTab === "netrunning") {
+          const isDeck = item.itemKind === "deck" || item.category === "Кибердеки";
+          if (isDeck) {
+            subline = `ЦПУ: <b>${dash(item.cpu)}</b> • Стена данных: <b class="text-cp-cyan">${dash(item.dataWall)}</b> • Врата: <b class="text-cp-yellow">${dash(item.codeGate)}</b> • Скорость: <b class="text-cp-green">${dash(item.speed)}</b> • Память: <b>${dash(item.memory)}</b>`;
+          } else {
+            subline = `Оригинал: ${dash(item.origName)}`;
+            rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">СИЛ: ${dash(item.strength)}</span> <span class="px-2 py-0.5 bg-cp-cyan/15 border border-cp-cyan/50 text-cp-cyan font-bold text-xs">ЕП: ${dash(item.mu)}</span>`;
+          }
+        } else if (activeCatalogTab === "vehicles") {
+          subline = `Скор: <b class="text-cp-yellow">${dash(item.topSpeed)}</b> • УСК/ТОРМ: <b>${dash(item.accDec)}</b> • Экипаж/Пасс: <b>${dash(item.crew)}/${dash(item.passengers)}</b> • Манёвр: <b class="text-cp-green">${dash(item.maneuver)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">ОСТ: ${dash(item.sdp)}</span> <span class="px-2 py-0.5 bg-cp-cyan/15 border border-cp-cyan/50 text-cp-cyan font-bold text-xs">ОС: ${formatVehicleArmorOS(item.os)}</span>`;
+        } else if (activeCatalogTab === "services") {
+          subline = `Расчётная единица: <b class="text-gray-200">${dash(item.unit)}</b>`;
+        } else if (activeCatalogTab === "roles") {
+          subline = `Особая способность: <b class="text-cp-cyan">${dash(item.ability)}</b> (${dash(item.stat)})`;
+        } else if (activeCatalogTab === "characters") {
+          subline = `ИНТ <b>${dash(item.stat_int)}</b> • РЕФ <b>${dash(item.stat_ref)}</b> • ТЕХ <b>${dash(item.stat_tech)}</b> • КРУТ <b>${dash(item.stat_cool)}</b> • ТЕЛО <b>${dash(item.stat_body)}</b> • ЭМП <b>${dash(item.stat_emp)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-yellow/20 border border-cp-yellow/50 text-cp-yellow font-bold text-xs">РЕП: ${dash(item.reputation)}</span>`;
+          rightBottom = `Роль: ${dash(item.category)}`;
+        }
+
+        return `
+          <div onclick="selectCatalogItem('${item.id}')" class="border ${borderCls} p-3.5 cursor-pointer transition-all flex items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-cyan/15 text-cp-cyan border border-cp-cyan/40">${dash(item.typeCode || item.category)}</span>
+                <span class="font-bold text-sm text-white">${dash(item.name)}</span>
+                ${favStar} ${userBadge} ${imgBadge} ${commBadge}
+                <span class="text-[11px] text-gray-500">[${dash(item.book)}]</span>
+              </div>
+              <div class="text-xs text-gray-400 mt-1">${subline}</div>
+            </div>
+            <div class="flex flex-col items-end justify-between shrink-0 gap-1">
+              <div class="flex gap-1">${rightTop}</div>
+              <span class="text-xs font-bold text-cp-green">${rightBottom}</span>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      renderDetailCard(filtered.find(i => i.id === selectedItemId) || filtered[0]);
+    }
+
+    function selectCatalogItem(id) {
+      selectedItemId = id;
+      activeReplyToComment = null;
+      activeEditCommentId = null;
+      renderCatalog();
+    }
+
+    function renderCardActionButtons(sectionKey, itemId) {
+      const fav = isItemFavorited(itemId);
+      const favBtn = `<button type="button" onclick="toggleFavoriteItem('${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${fav ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow'}">${fav ? '★ В избранном' : '☆ В избранное'}</button>`;
+      if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${favBtn}</div>`;
+      return `<div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">${favBtn}<button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button><button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button></div>`;
+    }
+
+    function renderDetailCard(item) {
+      const box = document.getElementById("detailCard");
+      if (!item) return;
+
+      const isDeck = activeCatalogTab === "netrunning" && (item.itemKind === "deck" || item.category === "Кибердеки");
+      const schemaKey = activeCatalogTab === "netrunning" ? (isDeck ? "net_deck" : "net_program") : activeCatalogTab;
+      const fields = (SCHEMAS[schemaKey] || []).filter(f => f.stat);
+
+      const gridCols = activeCatalogTab === "weapons" ? "grid-cols-4" : "grid-cols-3";
+      const statsHtml = fields.map(f => {
+        const spanCls = f.span ? `col-span-${f.span}` : "";
+        const colorCls = f.c || "text-white";
+        const valDisplay = (activeCatalogTab === "vehicles" && f.k === "os") ? formatVehicleArmorOS(item.os) : dash(item[f.k]);
+        return `<div class="bg-cp-bg border border-gray-800 p-2.5 ${spanCls}"><div class="text-[10px] text-gray-400">${f.stat}</div><div class="text-sm font-bold ${colorCls} mt-0.5">${valDisplay}</div></div>`;
+      }).join("");
+
+      let extraSpecialHtml = "";
+      if (isDeck) {
+        const activeTypes = Array.isArray(item.deckTypes) ? item.deckTypes : [];
+        const activeOpts = Array.isArray(item.deckOptions) ? item.deckOptions : [];
+        const chipsCnt = (item.extraChipsCount && item.extraChipsCount !== "—" && item.extraChipsCount !== "0") ? ` (${item.extraChipsCount} шт.)` : "";
+        extraSpecialHtml = `
+          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-3">
+            <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">Типы кибердеки:</div>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              ${DECK_TYPE_LIST.map(t => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeTypes.includes(t) ? 'border-cp-yellow bg-cp-yellow/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeTypes.includes(t) ? '☑' : '☐'}</span><span>${t}</span></div>`).join("")}
+            </div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
+            <div class="text-[11px] font-bold uppercase text-cp-cyan mb-2">Установленные опции деки:</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              ${DECK_OPTION_LIST.map(o => `<div class="flex items-center gap-2 px-2.5 py-1.5 border ${activeOpts.includes(o) ? 'border-cp-cyan bg-cp-cyan/10 text-white font-bold' : 'border-gray-800 bg-black/40 text-gray-500'}"><span>${activeOpts.includes(o) ? '☑' : '☐'}</span><span>${o}${o === "Доп чипы" && activeOpts.includes(o) ? chipsCnt : ""}</span></div>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (activeCatalogTab === "vehicles") {
+        if (item.specialEquipment && String(item.specialEquipment).trim() !== "" && item.specialEquipment !== "—") {
+          extraSpecialHtml = `
+            <div class="bg-cp-bg border border-cp-cyan/50 p-3.5 mb-4">
+              <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1.5">🔧 Особое снаряжение и вооружение:</div>
+              <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.specialEquipment}</div>
+            </div>
+          `;
+        }
+      } else if (activeCatalogTab === "roles") {
+        const skillsArr = Array.isArray(item.skills) && item.skills.length > 0 ? item.skills : ["—"];
+        extraSpecialHtml = `
+          <div class="bg-cp-bg border border-gray-800 p-3.5 mt-4">
+            <div class="text-xs font-bold uppercase text-cp-cyan mb-2">Профессиональные навыки роли:</div>
+            <div class="grid grid-cols-2 gap-1.5 text-xs">
+              ${skillsArr.map((sk, i) => `<div class="bg-black/40 border border-gray-800 px-2.5 py-1.5 flex items-center gap-2"><span class="text-cp-yellow font-bold">${i + 1}.</span><span class="text-gray-200">${dash(sk)}</span></div>`).join("")}
+            </div>
+          </div>
+        `;
+      } else if (activeCatalogTab === "characters") {
+        const charBlocks = [
+          { label: "🎯 Навыки", val: item.charSkills, border: "border-cp-cyan" },
+          { label: "🦾 Кибероснащение", val: item.charCyberware, border: "border-purple-500" },
+          { label: "🛡️ Броня", val: item.charArmor, border: "border-cp-yellow" },
+          { label: "🔫 Вооружение", val: item.charWeapons, border: "border-cp-red" },
+          { label: "🎒 Снаряжение", val: item.charGear, border: "border-cp-green" }
+        ].filter(b => b.val && String(b.val).trim() !== "" && b.val !== "—");
+
+        extraSpecialHtml = `
+          <div class="bg-cp-bg border border-gray-800 p-3.5 mb-4">
+            <div class="text-[11px] font-bold uppercase text-cp-yellow mb-2">📊 СТАТЫ (Основные характеристики):</div>
+            <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5 text-center">
+              ${CHARACTER_STAT_KEYS.map(st => `
+                <div class="bg-black/60 border border-gray-800 p-2">
+                  <div class="text-[9px] text-gray-400 font-bold">${st.l}</div>
+                  <div class="text-sm font-display font-black text-cp-cyan mt-0.5">${dash(item[st.k])}</div>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+          <div class="space-y-3 mb-4">
+            ${charBlocks.map(b => `
+              <div class="bg-cp-bg border-l-2 ${b.border} p-3">
+                <div class="text-[11px] font-bold uppercase text-gray-300 mb-1">${b.label}:</div>
+                <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${b.val}</div>
+              </div>
+            `).join("")}
+          </div>
+        `;
+      }
+
+      box.innerHTML = `
+        <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
+          <div>
+            <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)}</div>
+            <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
+            <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
+          </div>
+          ${renderCardActionButtons(activeCatalogTab, item.id)}
+        </div>
+        <div class="grid ${gridCols} gap-2.5 text-center mb-4">${statsHtml}</div>
+        ${(isDeck || activeCatalogTab === "vehicles" || activeCatalogTab === "characters") ? extraSpecialHtml : ""}
+        ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${item.desc}</div>` : ""}
+        ${(!isDeck && activeCatalogTab !== "vehicles" && activeCatalogTab !== "characters") ? extraSpecialHtml : ""}
+        ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
+        ${renderCommentsSectionHTML(item.id)}
+      `;
+    }
+
+    // =========================================================================
+    // КОНСТРУКТОР, ПРОФИЛЬ, КАТЕГОРИИ И АДМИНКА
+    // =========================================================================
+    function deleteItem(sectionKey, itemId) {
+      if (!isCurrentUserAdmin()) return;
+      const target = (DB[sectionKey] || []).find(i => i.id === itemId);
+      if (!confirm(`Удалить «${target ? (target.name || target.title) : itemId}»?`)) return;
+      DB[sectionKey] = (DB[sectionKey] || []).filter(i => i.id !== itemId);
+      persistDatabase(); updateCounts();
+      if (sectionKey === "rules") { selectedRuleId = DB.rules[0]?.id || null; renderRulesView(); }
+      else { selectedItemId = DB[sectionKey][0]?.id || null; renderCatalog(); }
+    }
+
+    function startEditItem(sectionKey, itemId) {
+      if (!isCurrentUserAdmin()) return;
+      const item = (DB[sectionKey] || []).find(i => i.id === itemId);
+      if (!item) return;
+      editingItemId = itemId;
+      activeBuilderType = sectionKey;
+      if (sectionKey === "netrunning") activeNetBuilderKind = (item.itemKind === "deck" || item.category === "Кибердеки") ? "deck" : "program";
+      switchMainView("admin"); switchAdminSubtab("builder"); setBuilderType(sectionKey, item);
+    }
+
+    function cancelEditMode() { editingItemId = null; clearBuilderImage(); setBuilderType(activeBuilderType); }
+    function switchNetBuilderKind(kind) { activeNetBuilderKind = kind; setBuilderType("netrunning", editingItemId ? (DB.netrunning || []).find(i => i.id === editingItemId) : null); }
+
+    function setBuilderType(type, itemToEdit = null) {
+      activeBuilderType = type;
+      if (!itemToEdit) { editingItemId = null; clearBuilderImage(); }
+      else {
+        currentBuilderImageData = itemToEdit.image || "";
+        document.getElementById("builderImageUrl").value = (itemToEdit.image && !itemToEdit.image.startsWith("data:")) ? itemToEdit.image : "";
+        updateBuilderImagePreview();
+      }
+
+      const isEdit = Boolean(editingItemId && itemToEdit);
+      document.getElementById("builderHeaderTitle").textContent = isEdit ? `✏️ Редактирование: ${itemToEdit.name || itemToEdit.title}` : `➕ Создание новой карточки`;
+      document.getElementById("editModeBadge").classList.toggle("hidden", !isEdit);
+      document.getElementById("cancelEditBtn").classList.toggle("hidden", !isEdit);
+      document.getElementById("builderSubmitBtn").textContent = isEdit ? "💾 Сохранить изменения в карточке" : "➕ Добавить запись в справочник";
+
+      document.querySelectorAll("#builderTypeButtons .btype-btn").forEach(btn => {
+        const isCur = btn.getAttribute("data-btype") === type;
+        btn.className = isCur ? "btype-btn px-3 py-2 text-xs font-bold border border-cp-yellow bg-cp-yellow text-black" : "btype-btn px-3 py-2 text-xs font-bold border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
+      });
+
+      const container = document.getElementById("builderFieldsContainer");
+      const v = itemToEdit || {};
+      const cats = getAllCategoriesForSection(type);
+      const datalistHtml = `<datalist id="dl-builder-cat">${cats.map(c => `<option value="${c}">`).join("")}</datalist>`;
+
+      if (type === "rules") {
+        container.innerHTML = `
+          ${datalistHtml}
+          <div class="grid grid-cols-2 gap-3.5">
+            <div><label class="text-[11px] text-gray-400">Заголовок игровой механики</label><input name="title" value="${v.title || ''}" placeholder="Стрельба с двух рук" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+            <div><label class="text-[11px] text-cp-cyan font-bold">Подраздел механик</label><input name="subsection" list="dl-builder-cat" value="${v.subsection || ''}" placeholder="Бой и Оружие (ПВПВ)" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+            <div><label class="text-[11px] text-gray-400">Краткая суть</label><input name="summary" value="${v.summary || ''}" placeholder="Штрафы при стрельбе..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+            <div><label class="text-[11px] text-gray-400">Книга-источник</label><input name="book" value="${v.book || ''}" placeholder="CP20 / Homebrew" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+          </div>
+          <div><label class="text-[11px] text-gray-400">Текст игровой механики (необязательно)</label><textarea name="content" rows="5" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.content || ''}</textarea></div>
+        `;
+        return;
+      }
+
+      const isDeck = type === "netrunning" && activeNetBuilderKind === "deck";
+      const schemaKey = type === "netrunning" ? (isDeck ? "net_deck" : "net_program") : type;
+      const fields = SCHEMAS[schemaKey] || [];
+
+      const netSwitchHtml = type === "netrunning" ? `
+        <div class="flex items-center gap-2 border-b border-gray-800 pb-3 mb-2">
+          <span class="text-xs text-gray-400 font-bold uppercase mr-2">Тип объекта:</span>
+          <button type="button" onclick="switchNetBuilderKind('program')" class="px-3 py-1.5 text-xs font-bold border ${!isDeck ? 'bg-cp-cyan text-black border-cp-cyan' : 'bg-cp-panel text-gray-300 border-gray-700'}">💾 Программа</button>
+          <button type="button" onclick="switchNetBuilderKind('deck')" class="px-3 py-1.5 text-xs font-bold border ${isDeck ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-panel text-gray-300 border-gray-700'}">💻 Кибердека</button>
+        </div>
+        <input type="hidden" name="itemKind" value="${isDeck ? 'deck' : 'program'}">
+      ` : "";
+
+      const inputsHtml = fields.map(f => {
+        let val = v[f.k] || "";
+        if (f.k === "skills" && Array.isArray(val)) val = val.join(", ");
+        return `<div><label class="text-[11px] ${f.isCat ? 'text-cp-cyan font-bold' : 'text-gray-400'}">${f.l}</label><input name="${f.k}" ${f.isCat ? 'list="dl-builder-cat"' : ''} value="${val}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
+      }).join("");
+
+      const selTypes = Array.isArray(v.deckTypes) ? v.deckTypes : [];
+      const selOpts = Array.isArray(v.deckOptions) ? v.deckOptions : [];
+      const deckChecksHtml = isDeck ? `
+        <input type="hidden" name="category" value="Кибердеки">
+        <div class="bg-cp-panel border border-gray-700 p-3">
+          <div class="text-[11px] font-bold text-cp-yellow uppercase mb-2">Типы деки:</div>
+          <div class="grid grid-cols-3 gap-2 text-xs">${DECK_TYPE_LIST.map(t => `<label class="flex items-center gap-2 cursor-pointer bg-cp-bg border border-gray-800 px-2.5 py-1.5"><input type="checkbox" name="deckTypeCheck" value="${t}" ${selTypes.includes(t) ? 'checked' : ''} class="accent-yellow-400"><span>${t}</span></label>`).join("")}</div>
+        </div>
+        <div class="bg-cp-panel border border-gray-700 p-3">
+          <div class="text-[11px] font-bold text-cp-cyan uppercase mb-2">Опции деки:</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-2.5">${DECK_OPTION_LIST.map(o => `<label class="flex items-center gap-2 cursor-pointer bg-cp-bg border border-gray-800 px-2.5 py-1.5"><input type="checkbox" name="deckOptionCheck" value="${o}" ${selOpts.includes(o) ? 'checked' : ''} class="accent-cyan-400"><span>${o}</span></label>`).join("")}</div>
+          <div class="flex items-center gap-3 pt-2 border-t border-gray-800"><label class="text-[11px] text-gray-400">Количество Доп чипов:</label><input name="extraChipsCount" value="${v.extraChipsCount || ''}" placeholder="10" class="w-32 bg-cp-bg border border-gray-700 px-2.5 py-1 text-xs text-white"></div>
+        </div>
+      ` : "";
+
+      const vehicleExtraHtml = type === "vehicles" ? `<div><label class="text-[11px] text-cp-cyan font-bold">🔧 Особое снаряжение (игромеханические особенности, рации, установленное оружие)</label><textarea name="specialEquipment" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.specialEquipment || ''}</textarea></div>` : "";
+
+      const characterExtraHtml = type === "characters" ? `
+        <div class="bg-cp-panel border border-gray-700 p-3.5 space-y-2">
+          <div class="text-[11px] font-bold text-cp-yellow uppercase">📊 СТАТЫ (Основные характеристики КП2020):</div>
+          <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">
+            ${CHARACTER_STAT_KEYS.map(st => `<div><label class="block text-[10px] text-cp-cyan font-bold text-center mb-1">${st.l}</label><input name="${st.k}" value="${v[st.k] || ''}" placeholder="7" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-center text-white font-bold"></div>`).join("")}
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3.5">
+          <div><label class="text-[11px] text-cp-cyan font-bold">🎯 Навыки персонажа</label><textarea name="charSkills" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charSkills || ''}</textarea></div>
+          <div><label class="text-[11px] text-purple-400 font-bold">🦾 Кибероснащение</label><textarea name="charCyberware" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charCyberware || ''}</textarea></div>
+          <div><label class="text-[11px] text-cp-yellow font-bold">🛡️ Броня</label><textarea name="charArmor" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charArmor || ''}</textarea></div>
+          <div><label class="text-[11px] text-cp-red font-bold">🔫 Вооружение</label><textarea name="charWeapons" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charWeapons || ''}</textarea></div>
+        </div>
+        <div><label class="text-[11px] text-cp-green font-bold">🎒 Снаряжение</label><textarea name="charGear" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charGear || ''}</textarea></div>
+      ` : "";
+
+      container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${deckChecksHtml}${vehicleExtraHtml}${characterExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
+    }
+
+    function saveBuilderItem(e) {
+      e.preventDefault();
+      if (!isCurrentUserAdmin()) return;
+      const fd = new FormData(e.target);
+      const raw = Object.fromEntries(fd.entries());
+      const data = {};
+      const freeTextFields = ["desc", "content", "summary", "specialEquipment", "charSkills", "charCyberware", "charArmor", "charWeapons", "charGear"];
+      Object.keys(raw).forEach(k => {
+        if (k === "deckTypeCheck" || k === "deckOptionCheck") return;
+        const val = String(raw[k] || "").trim();
+        data[k] = freeTextFields.includes(k) ? val : (val === "" ? "—" : val);
+      });
+
+      data.id = editingItemId || ("user-" + Date.now());
+      data.origName = data.origName && data.origName !== "—" ? data.origName : data.name;
+      data.isUser = true;
+      if (currentBuilderImageData) data.image = currentBuilderImageData;
+
+      if (activeBuilderType === "netrunning" && data.itemKind === "deck") {
+        data.category = "Кибердеки";
+        data.deckTypes = fd.getAll("deckTypeCheck");
+        data.deckOptions = fd.getAll("deckOptionCheck");
+      }
+      if (activeBuilderType === "roles") {
+        const rawSk = String(raw.skills || "").trim();
+        data.skills = rawSk ? rawSk.split(",").map(s => s.trim()).filter(Boolean) : ["—"];
+      }
+
+      const catField = activeBuilderType === "rules" ? data.subsection : data.category;
+      if (catField && catField !== "—" && !CATEGORIES[activeBuilderType].includes(catField)) CATEGORIES[activeBuilderType].push(catField);
+
+      if (editingItemId) {
+        const idx = DB[activeBuilderType].findIndex(i => i.id === editingItemId);
+        if (idx !== -1) DB[activeBuilderType][idx] = data;
+        else DB[activeBuilderType].unshift(data);
+      } else DB[activeBuilderType].unshift(data);
+
+      persistDatabase();
+      document.getElementById("builderJsonPreview").textContent = JSON.stringify({ ...data, image: data.image ? "[Изображение прикреплено]" : undefined }, null, 2);
+
+      const savedId = data.id;
+      editingItemId = null;
+      updateCounts(); e.target.reset(); clearBuilderImage();
+
+      if (activeBuilderType === "rules") { selectedRuleId = savedId; switchMainView("rules"); }
+      else { selectedItemId = savedId; switchMainView("catalog", activeBuilderType); }
+    }
+
+    function renderRulesView() {
+      const subsections = ["ALL", ...getAllCategoriesForSection("rules")];
+      document.getElementById("ruleSubsections").innerHTML = subsections.map(s => `<button type="button" onclick="selectRuleSubsection('${s}')" class="px-2.5 py-1 text-xs font-bold border transition-all ${s === activeRuleSubsection ? 'bg-cp-cyan text-black border-cp-cyan' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-cyan'}">${s === "ALL" ? "Все подразделы" : s}</button>`).join("");
+      renderRulesSidebar();
+    }
+    function selectRuleSubsection(sub) { activeRuleSubsection = sub; renderRulesView(); }
+    function openRuleArticle(id) { selectedRuleId = id; renderRulesSidebar(); }
+    function openRuleCreatorModal() { if (!isCurrentUserAdmin()) return; editingItemId = null; activeBuilderType = "rules"; switchMainView("admin"); switchAdminSubtab("builder"); setBuilderType("rules"); }
+
+    function renderRulesSidebar() {
+      const q = (document.getElementById("ruleSearchInput")?.value || "").trim().toLowerCase();
+      const filtered = (DB.rules || []).filter(r => (activeRuleSubsection === "ALL" || r.subsection === activeRuleSubsection) && (!q || Object.values(r).some(v => String(v).toLowerCase().includes(q))));
+      const listEl = document.getElementById("ruleArticlesList");
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<div class="text-xs text-gray-500 py-4 text-center">Механики не найдены.</div>`;
+        document.getElementById("ruleContentArea").innerHTML = `<div class="text-xs text-gray-500">Выберите механику...</div>`;
+        return;
+      }
+      if (!selectedRuleId || !filtered.some(r => r.id === selectedRuleId)) selectedRuleId = filtered[0].id;
+      listEl.innerHTML = filtered.map(r => `
+        <div onclick="openRuleArticle('${r.id}')" class="p-3 border cursor-pointer transition-all ${r.id === selectedRuleId ? 'border-cp-yellow bg-cp-card' : 'border-gray-800 bg-cp-bg hover:border-gray-600'}">
+          <div class="flex items-center justify-between text-[10px] text-cp-cyan font-bold uppercase"><span>${dash(r.subsection)}</span><span>${isItemFavorited(r.id) ? '★ ' : ''}[${dash(r.book)}]</span></div>
+          <div class="text-xs font-bold text-white mt-1">${dash(r.title)}</div>
+          ${r.summary ? `<div class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">${r.summary}</div>` : ""}
+        </div>
+      `).join("");
+
+      const rule = filtered.find(r => r.id === selectedRuleId) || filtered[0];
+      document.getElementById("ruleContentArea").innerHTML = `
+        <div class="border-b border-gray-800 pb-4 mb-5 flex items-start justify-between gap-3">
+          <div><div class="text-xs font-bold text-cp-cyan uppercase">${dash(rule.subsection)} // Источник: ${dash(rule.book)}</div><h2 class="font-display text-2xl font-black text-white mt-1">${dash(rule.title)}</h2></div>
+          ${renderCardActionButtons('rules', rule.id)}
+        </div>
+        ${rule.summary ? `<div class="bg-cp-bg/70 border-l-2 border-cp-yellow p-3.5 text-xs text-gray-300 mb-5"><strong>Краткая суть:</strong> ${rule.summary}</div>` : ""}
+        ${rule.content ? `<div class="text-xs leading-relaxed text-gray-200 whitespace-pre-line space-y-2">${rule.content}</div>` : ""}
+        ${rule.image ? `<div class="mt-6 pt-4 border-t border-gray-800"><img src="${rule.image}" class="max-h-96 w-auto border border-gray-800"></div>` : ""}
+        ${renderCommentsSectionHTML(rule.id)}
+      `;
+    }
+
+    function handleImageUpload(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+      const reader = new FileReader();
+      reader.onload = e => { currentBuilderImageData = e.target.result; document.getElementById("builderImageUrl").value = ""; updateBuilderImagePreview(); };
+      reader.readAsDataURL(file);
+    }
+    function handleImageUrlInput(ev) {
+      const val = ev.target.value.trim();
+      if (!validateImageUrlForRole(val)) { ev.target.value = ""; currentBuilderImageData = ""; updateBuilderImagePreview(); return; }
+      currentBuilderImageData = val; document.getElementById("builderImageFile").value = ""; updateBuilderImagePreview();
+    }
+    function clearBuilderImage() {
+      currentBuilderImageData = "";
+      if (document.getElementById("builderImageFile")) document.getElementById("builderImageFile").value = "";
+      if (document.getElementById("builderImageUrl")) document.getElementById("builderImageUrl").value = "";
+      updateBuilderImagePreview();
+    }
+    function updateBuilderImagePreview() {
+      const box = document.getElementById("builderImagePreviewBox");
+      if (box) box.innerHTML = !currentBuilderImageData ? `<span class="text-xs text-gray-500">Предпросмотр картинки появится здесь...</span>` : `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Картинка проверена Сетевым Дозором</span>`;
+    }
+
+    function handleLoginSubmit(e) {
+      e.preventDefault();
+      const login = document.getElementById("loginUsername").value.trim().toLowerCase();
+      const pass = document.getElementById("loginPassword").value;
+      const errBox = document.getElementById("loginErrorMsg");
+      const found = USERS.find(u => u.username.toLowerCase() === login && u.password === pass);
+      if (!found) { errBox.textContent = "Ошибка доступа: неверный логин или пароль."; errBox.classList.remove("hidden"); return; }
+      errBox.classList.add("hidden"); currentUserId = found.id; persistUsers();
+      document.getElementById("loginPassword").value = ""; renderProfileView();
+    }
+    function quickRootLogin() { const rootUser = USERS.find(u => u.role === "ROOT") || USERS[0]; currentUserId = rootUser.id; persistUsers(); renderProfileView(); }
+    function handleRegisterSubmit(e) {
+      e.preventDefault();
+      const username = document.getElementById("regUsername").value.trim();
+      const displayName = document.getElementById("regDisplayName").value.trim();
+      const password = document.getElementById("regPassword").value;
+      const favRole = document.getElementById("regFavRole").value;
+      const bio = document.getElementById("regBio").value.trim();
+      const errBox = document.getElementById("regErrorMsg");
+      if (username.length < 3) { errBox.textContent = "Логин должен содержать минимум 3 символа."; errBox.classList.remove("hidden"); return; }
+      if (USERS.some(u => u.username.toLowerCase() === username.toLowerCase())) { errBox.textContent = "Этот логин уже занят!"; errBox.classList.remove("hidden"); return; }
+      errBox.classList.add("hidden");
+      const newUser = { id: "u-" + Date.now(), username, password, displayName: displayName || username, role: "USER", favRole, avatar: "", bio: bio || "Эджраннер Найт-Сити.", favorites: [], notes: "", createdAt: new Date().toISOString().slice(0, 10) };
+      USERS.push(newUser); currentUserId = newUser.id; persistUsers(); e.target.reset(); renderProfileView();
+    }
+    function logoutCurrentUser() { currentUserId = null; persistUsers(); switchMainView("profile"); }
+
+    function renderProfileView() {
+      const u = getCurrentUser();
+      document.getElementById("authGuestContainer").classList.toggle("hidden", Boolean(u));
+      document.getElementById("authUserDashboard").classList.toggle("hidden", !u);
+      if (!u) return;
+
+      document.getElementById("profileAvatarBox").innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u.displayName || u.username).slice(0, 2).toUpperCase();
+      const badge = document.getElementById("profileRoleBadge");
+      const accessText = document.getElementById("profileAccessText");
+      badge.className = u.role === "ROOT" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-red text-white" : u.role === "ADMIN" ? "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-cp-cyan text-black" : "inline-block text-[10px] px-2 py-0.5 font-bold uppercase mb-1 bg-gray-800 text-cp-yellow border border-cp-yellow/40";
+      badge.textContent = u.role === "ROOT" ? "👑 Главный Админ (ROOT)" : u.role === "ADMIN" ? "🛡️ Администратор" : "👤 Профиль Игрока";
+      accessText.textContent = u.role === "ROOT" ? "Без ограничений (ROOT)" : u.role === "ADMIN" ? "JPG/PNG/GIF до 50мб" : "JPG/PNG до 10мб";
+
+      document.getElementById("profileDisplayName").textContent = u.displayName;
+      document.getElementById("profileUsername").textContent = u.username;
+      document.getElementById("profileFavRole").textContent = u.favRole || "Соло";
+      document.getElementById("profileFavCount").textContent = (u.favorites || []).length;
+
+      document.getElementById("editProfDisplayName").value = u.displayName || "";
+      document.getElementById("editProfFavRole").value = u.favRole || "Соло";
+      document.getElementById("editProfPassword").value = "";
+      document.getElementById("editProfAvatarUrl").value = (u.avatar && !u.avatar.startsWith("data:")) ? u.avatar : "";
+      document.getElementById("editProfBio").value = u.bio || "";
+      document.getElementById("userPersonalNotes").value = u.notes || "";
+      renderUserFavoritesGrid();
+    }
+
+    function saveUserProfileChanges(e) {
+      e.preventDefault();
+      const u = getCurrentUser();
+      if (!u) return;
+      const newUrl = document.getElementById("editProfAvatarUrl").value.trim();
+      if (newUrl !== "" && !validateImageUrlForRole(newUrl)) return;
+      const newName = document.getElementById("editProfDisplayName").value.trim();
+      const newPass = document.getElementById("editProfPassword").value;
+      if (newName) u.displayName = newName;
+      u.favRole = document.getElementById("editProfFavRole").value;
+      if (newPass.trim() !== "") u.password = newPass.trim();
+      if (newUrl !== "") u.avatar = newUrl;
+      u.bio = document.getElementById("editProfBio").value.trim();
+      persistUsers(); renderProfileView();
+
+      const btn = document.getElementById("saveProfileBtn");
+      if (btn) {
+        btn.disabled = true; btn.textContent = "✓ СОХРАНЕНО!";
+        btn.className = "w-full py-2.5 bg-cp-green text-black font-display font-black uppercase tracking-wider cursor-not-allowed transition-all";
+        setTimeout(() => {
+          btn.disabled = false; btn.textContent = "💾 Сохранить профиль";
+          btn.className = "w-full py-2.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold uppercase tracking-wider transition-all";
+        }, 2000);
+      }
+    }
+
+    function handleProfileAvatarUpload(ev) {
+      const file = ev.target.files[0];
+      const u = getCurrentUser();
+      if (!file || !u) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+      const reader = new FileReader();
+      reader.onload = e => { u.avatar = e.target.result; persistUsers(); renderProfileView(); };
+      reader.readAsDataURL(file);
+    }
+
+    function autoSaveUserNotes() {
+      const u = getCurrentUser();
+      if (!u) return;
+      u.notes = document.getElementById("userPersonalNotes").value;
+      persistUsers();
+      document.getElementById("notesSavedIndicator").textContent = "💾 Сохранено в профиле";
+    }
+
+    function isItemFavorited(itemId) { const u = getCurrentUser(); return Boolean(u && Array.isArray(u.favorites) && u.favorites.includes(itemId)); }
+    function toggleFavoriteItem(itemId) {
+      const u = getCurrentUser();
+      if (!u) { if (confirm("Войдите в профиль, чтобы сохранять закладки. Перейти ко входу?")) switchMainView("profile"); return; }
+      if (!Array.isArray(u.favorites)) u.favorites = [];
+      u.favorites = u.favorites.includes(itemId) ? u.favorites.filter(id => id !== itemId) : [...u.favorites, itemId];
+      persistUsers();
+      if (activeMainView === "catalog") renderCatalog();
+      else if (activeMainView === "rules") renderRulesSidebar();
+      else if (activeMainView === "profile") renderProfileView();
+    }
+    function clearAllUserFavorites() { const u = getCurrentUser(); if (!u || !confirm("Очистить закладки?")) return; u.favorites = []; persistUsers(); renderProfileView(); }
+    function findItemAcrossAllSections(itemId) {
+      for (const secKey of Object.keys(DB)) {
+        const found = (DB[secKey] || []).find(i => i.id === itemId);
+        if (found) return { section: secKey, item: found };
+      }
+      return null;
+    }
+    function openFavoriteCardFromProfile(secKey, itemId) {
+      if (secKey === "rules") { selectedRuleId = itemId; switchMainView("rules"); }
+      else { selectedItemId = itemId; switchMainView("catalog", secKey); }
+    }
+    function renderUserFavoritesGrid() {
+      const u = getCurrentUser();
+      const box = document.getElementById("profileFavoritesList");
+      if (!u || !Array.isArray(u.favorites) || u.favorites.length === 0) {
+        box.innerHTML = `<div class="col-span-2 text-xs text-gray-500 py-8 text-center bg-cp-bg border border-gray-800">У вас пока нет закладок. Нажмите «☆ В избранное» на любой карточке!</div>`;
+        return;
+      }
+      const resolved = u.favorites.map(id => findItemAcrossAllSections(id)).filter(Boolean);
+      box.innerHTML = resolved.map(({ section, item }) => `
+        <div class="bg-cp-bg border border-gray-800 hover:border-cp-yellow p-3 flex items-center justify-between gap-2">
+          <div onclick="openFavoriteCardFromProfile('${section}', '${item.id}')" class="cursor-pointer flex-1">
+            <div class="text-[10px] text-cp-cyan font-bold uppercase">${SECTION_LABELS[section] || section} • ${dash(item.category || item.subsection)}</div>
+            <div class="text-xs font-bold text-white mt-0.5">${dash(item.name || item.title)}</div>
+          </div>
+          <button type="button" onclick="toggleFavoriteItem('${item.id}')" class="text-cp-yellow hover:text-cp-red text-sm px-2">★</button>
+        </div>
+      `).join("");
+    }
+
+    function renderCategoryManager() {
+      document.getElementById("catManagerSectionList").innerHTML = Object.keys(SECTION_LABELS).map(key => {
+        const active = key === activeCatManagerSection;
+        return `<button type="button" onclick="selectCatManagerSection('${key}')" class="w-full text-left px-3.5 py-2.5 text-xs font-bold border flex items-center justify-between ${active ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-panel text-gray-300 border-gray-800 hover:border-cp-cyan'}"><span>${SECTION_LABELS[key]}</span><span class="text-[11px] px-1.5 py-0.5 ${active ? 'bg-black/20 text-black' : 'bg-black/50 text-cp-cyan'}">${getAllCategoriesForSection(key).length}</span></button>`;
+      }).join("");
+      document.getElementById("catManagerActiveTitle").textContent = `Категории раздела: ${SECTION_LABELS[activeCatManagerSection]}`;
+      const prop = activeCatManagerSection === "rules" ? "subsection" : "category";
+      const allCats = getAllCategoriesForSection(activeCatManagerSection);
+      document.getElementById("catManagerItemsList").innerHTML = allCats.map((catName, idx) => {
+        const count = (DB[activeCatManagerSection] || []).filter(i => i[prop] === catName).length;
+        const safeCat = catName.replace(/'/g, "\\'");
+        return `<div class="bg-cp-panel border border-gray-800 p-3 flex items-center justify-between gap-3"><div class="flex items-center gap-3 flex-1"><span class="text-xs font-bold text-cp-cyan w-6">${idx + 1}.</span><input type="text" id="cat-input-${idx}" value="${catName}" class="flex-1 bg-cp-bg border border-gray-700 px-3 py-1.5 text-xs text-white"><span class="text-xs text-gray-400">Записей: <b class="text-white">${count}</b></span></div><div class="flex gap-2"><button type="button" onclick="renameCategoryInSection('${safeCat}', 'cat-input-${idx}')" class="px-3 py-1.5 bg-cp-cyan/20 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">💾 Переименовать</button><button type="button" onclick="deleteCategoryInSection('${safeCat}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button></div></div>`;
+      }).join("");
+    }
+    function selectCatManagerSection(k) { activeCatManagerSection = k; renderCategoryManager(); }
+    function addNewCategoryToSection() {
+      const inp = document.getElementById("newCategoryInput");
+      const val = inp.value.trim();
+      if (!val) return;
+      if (!CATEGORIES[activeCatManagerSection].includes(val)) { CATEGORIES[activeCatManagerSection].push(val); persistDatabase(); }
+      inp.value = ""; renderCategoryManager();
+    }
+    function renameCategoryInSection(oldName, inputId) {
+      const inp = document.getElementById(inputId);
+      if (!inp) return;
+      const newName = inp.value.trim() || "—";
+      const prop = activeCatManagerSection === "rules" ? "subsection" : "category";
+      CATEGORIES[activeCatManagerSection] = getAllCategoriesForSection(activeCatManagerSection).map(c => c === oldName ? newName : c);
+      (DB[activeCatManagerSection] || []).forEach(it => { if (it[prop] === oldName) it[prop] = newName; });
+      persistDatabase(); renderCategoryManager();
+    }
+    function deleteCategoryInSection(catName) {
+      if (!confirm(`Удалить категорию «${catName}»?`)) return;
+      const prop = activeCatManagerSection === "rules" ? "subsection" : "category";
+      CATEGORIES[activeCatManagerSection] = getAllCategoriesForSection(activeCatManagerSection).filter(c => c !== catName);
+      (DB[activeCatManagerSection] || []).forEach(it => { if (it[prop] === catName) it[prop] = "—"; });
+      persistDatabase(); renderCategoryManager();
+    }
+
+    function toggleAdminQuickUserModal() { document.getElementById("adminQuickUserForm").classList.toggle("hidden"); }
+    function adminCreateUserManually(e) {
+      e.preventDefault();
+      const username = document.getElementById("admNewLogin").value.trim();
+      const displayName = document.getElementById("admNewName").value.trim();
+      const password = document.getElementById("admNewPass").value.trim();
+      const avatar = document.getElementById("admNewAvatar").value.trim();
+      const role = document.getElementById("admNewRole").value;
+      if (USERS.some(u => u.username.toLowerCase() === username.toLowerCase())) { alert("Такой логин уже существует!"); return; }
+      USERS.push({ id: "u-" + Date.now(), username, password, displayName, role: isCurrentUserRoot() ? role : "USER", favRole: "Соло", avatar: avatar || "", bio: "Аккаунт создан через панель Администратора.", favorites: [], notes: "", createdAt: new Date().toISOString().slice(0, 10) });
+      persistUsers(); e.target.reset(); document.getElementById("adminQuickUserForm").classList.add("hidden"); renderAdminUsersManager();
+    }
+    function toggleUserAdminPrivilege(uid) {
+      if (!isCurrentUserRoot()) { alert("Назначать Админов может только ROOT!"); return; }
+      const t = USERS.find(u => u.id === uid);
+      if (!t || t.role === "ROOT") return;
+      t.role = t.role === "ADMIN" ? "USER" : "ADMIN";
+      const rankMsg = t.role === "ADMIN"
+        ? `Поздравляем! Главный Администратор повысил ваш ранг до <b>Администратора (ADMIN)</b>. Теперь вам доступна Админ-панель и загрузка файлов до 50мб (включая GIF).`
+        : `Ваш статус доступа был изменён Главным Администратором на <b>Игрок (USER)</b>.`;
+      createNotification(t.id, "rank", rankMsg, null);
+      persistUsers(); renderAdminUsersManager();
+    }
+    function deleteUserAccount(uid) {
+      if (!isCurrentUserRoot()) return;
+      const t = USERS.find(u => u.id === uid);
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}»?`)) return;
+      USERS = USERS.filter(u => u.id !== uid);
+      persistUsers(); renderAdminUsersManager();
+    }
+    function renderAdminUsersManager() {
+      const rootMode = isCurrentUserRoot();
+      document.getElementById("adminUsersTableContainer").innerHTML = USERS.map(u => {
+        const isRoot = u.role === "ROOT";
+        const isAdm = u.role === "ADMIN";
+        const badge = isRoot ? `<span class="px-2 py-0.5 bg-cp-red text-white text-[10px] font-bold uppercase">👑 ROOT</span>` : isAdm ? `<span class="px-2 py-0.5 bg-cp-cyan text-black text-[10px] font-bold uppercase">🛡️ ADMIN</span>` : `<span class="px-2 py-0.5 bg-gray-800 text-gray-300 border border-gray-700 text-[10px] font-bold uppercase">👤 USER</span>`;
+        const av = u.avatar ? `<img onclick="openPublicProfileModal('${u.id}')" src="${u.avatar}" class="w-12 h-12 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${u.id}')" class="w-12 h-12 bg-cp-panel border-2 border-gray-700 text-cp-yellow flex items-center justify-center font-display font-black text-base cursor-pointer shrink-0">${(u.displayName || u.username).slice(0, 2).toUpperCase()}</div>`;
+        return `<div class="bg-cp-bg border border-gray-800 p-4 flex items-center justify-between gap-4"><div class="flex items-center gap-4">${av}<div><div class="flex items-center gap-2.5"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button><span class="text-xs text-gray-400">(@${u.username})</span>${badge}</div><div class="text-xs text-gray-500 mt-1">Роль: <b class="text-gray-300">${u.favRole || '—'}</b> • Комментариев: <b class="text-cp-green">${countUserTotalComments(u.id)}</b></div></div></div><div class="flex items-center gap-2"><button type="button" onclick="openPublicProfileModal('${u.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>${!isRoot && rootMode ? `<button type="button" onclick="toggleUserAdminPrivilege('${u.id}')" class="px-3.5 py-1.5 text-xs font-bold uppercase border ${isAdm ? 'bg-orange-500/20 border-orange-500 text-orange-300' : 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan'}">${isAdm ? '⬇️ Снять Админа' : '⬆️ Назначить Админом'}</button><button type="button" onclick="deleteUserAccount('${u.id}')" class="px-3 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>` : ""}</div></div>`;
+      }).join("");
+    }
+
+    function renderAdminBackupStats() {
+      const totalItems = Object.keys(DB).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
+      const userItems = Object.keys(DB).reduce((acc, k) => acc + (DB[k]?.filter(i => i.isUser).length || 0), 0);
+      const totalCats = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + getAllCategoriesForSection(k).length, 0);
+      document.getElementById("adminStatsGrid").innerHTML = `
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего карточек</div><div class="text-2xl font-display font-black text-cp-yellow mt-1">${totalItems}</div></div>
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Создано вами</div><div class="text-2xl font-display font-black text-cp-cyan mt-1">${userItems}</div></div>
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Всего категорий</div><div class="text-2xl font-display font-black text-cp-green mt-1">${totalCats}</div></div>
+        <div class="bg-cp-bg border border-gray-800 p-4"><div class="text-xs text-gray-400">Пользователей</div><div class="text-2xl font-display font-black text-purple-400 mt-1">${USERS.length}</div></div>
+      `;
+    }
+
+    function exportUserDatabase() {
+      const blob = new Blob([JSON.stringify({ db: DB, categories: CATEGORIES, users: USERS, comments: COMMENTS, notifications: NOTIFICATIONS }, null, 2)], { type: "application/json" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "database.json"; a.click();
+    }
+
+    function exportUserDatabaseAsJS() {
+      const jsContent = "window.CP2020_EXTERNAL_DATA = " + JSON.stringify({ categories: CATEGORIES, db: DB }, null, 2) + ";";
+      const blob = new Blob([jsContent], { type: "application/javascript" });
+      const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "database.js"; a.click();
+    }
+
+    function importDatabaseFromFile(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          const parsed = JSON.parse(e.target.result);
+          if (parsed.db && parsed.categories) {
+            DB = parsed.db; CATEGORIES = parsed.categories;
+            if (Array.isArray(parsed.users)) USERS = parsed.users;
+            if (parsed.comments) COMMENTS = parsed.comments;
+            if (Array.isArray(parsed.notifications)) NOTIFICATIONS = parsed.notifications;
+          } else DB = parsed;
+          persistDatabase(); persistUsers(); persistComments(); persistNotifications(); updateCounts(); renderAdminBackupStats();
+          alert("База данных успешно загружена!");
+        } catch (err) { alert("Ошибка чтения JSON-файла!"); }
+      };
+      reader.readAsText(file);
+    }
+
+    function clearUserAdditions() {
+      if (!confirm("Сбросить кеш карточек браузера и перезагрузить чистую базу из внешнего файла database.js / database.json?")) return;
+      ["cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30", "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_full_db_v50"].forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem(STORAGE_CAT_KEY);
+      location.reload();
+    }
+
+    // Старт приложения
+    initApp();
+  </script>
+</body>
+</html>
