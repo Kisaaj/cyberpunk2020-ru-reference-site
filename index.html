@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYBERPUNK 2020 // СПРАВОЧНИК</title>
+  <title>CYBERPUNK 2020 // СПРАВОЧНИК И БАЗА ДАННЫХ (1920x1080)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
   <script src="database.js"></script>
@@ -710,7 +710,6 @@
       }
     };
 
-    // ПУБЛИЧНАЯ КАРТОЧКА ГЛАВНОГО АДМИНА (БЕЗ ЛОГИНА И БЕЗ ПАРОЛЯ В КОДЕ)
     const HARDCODED_ROOT_USER = {
       id: "u-root",
       displayName: "Kisaaj",
@@ -904,7 +903,8 @@
         const savedSession = localStorage.getItem(STORAGE_SESSION_KEY) || localStorage.getItem("cp2020_session_user_id_v51");
         if (savedSession && USERS.some(u => u.id === savedSession)) currentUserId = savedSession;
 
-        persistDatabase();
+        localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
+        localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
       } catch (e) {}
     }
 
@@ -914,6 +914,16 @@
         localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
       } catch (e) {}
     }
+
+    // Сохранение ТОЛЬКО локальной сессии (вход/выход), чтобы не дёргать облако и не сбрасывать скролл у других игроков!
+    function persistSessionOnly() {
+      try {
+        if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
+        else localStorage.removeItem(STORAGE_SESSION_KEY);
+      } catch (e) {}
+      updateAuthHeaderUI();
+    }
+
     function persistUsers() {
       try {
         localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
@@ -1060,7 +1070,7 @@
     }
 
     // =========================================================================
-    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ
+    // ПУБЛИЧНЫЕ ПРОФИЛИ И КОММЕНТАРИИ (С ЖЕЛЕЗОБЕТОННЫМ СОХРАНЕНИЕМ СКРОЛЛА)
     // =========================================================================
     function countUserTotalComments(userId) {
       let total = 0;
@@ -1191,7 +1201,7 @@
               </div>`;
     }
 
-    // Точечное обновление ТОЛЬКО блока комментариев с сохранением прокрутки (без прыжков карточки вверх!)
+    // Точечное обновление ТОЛЬКО блока комментариев с сохранением прокрутки
     function refreshCurrentCardOrRuleView(options = {}) {
       const targetId = options.itemId || (activeMainView === "rules" ? selectedRuleId : selectedItemId);
       const wrapper = targetId ? document.getElementById(`comments-wrapper-${targetId}`) : null;
@@ -1200,20 +1210,30 @@
         const cardContainer = activeMainView === "rules" ? document.getElementById("ruleContentArea") : document.getElementById("detailCard");
         const commScrollEl = document.getElementById(`comments-scroll-${targetId}`);
 
-        // Запоминаем точное положение ползунков перед обновлением
         const savedCardScroll = cardContainer ? cardContainer.scrollTop : 0;
         const savedCommScroll = commScrollEl ? commScrollEl.scrollTop : 0;
 
-        // Заменяем только блок комментариев, не трогая саму карточку
+        // Сохраняем недописанный текст, если прилетело чужое сообщение, пока пользователь печатает
+        const activeEl = document.activeElement;
+        const isTypingHere = activeEl && activeEl.id && (activeEl.id.startsWith("new-comment-input-") || activeEl.id.startsWith("edit-comm-textarea-"));
+        const savedInputId = isTypingHere ? activeEl.id : null;
+        const savedInputVal = isTypingHere ? activeEl.value : "";
+
         wrapper.outerHTML = renderCommentsSectionHTML(targetId);
 
-        // Возвращаем ползунки на место (или прокручиваем вниз к новому отправленному сообщению)
         const newCommScrollEl = document.getElementById(`comments-scroll-${targetId}`);
         if (newCommScrollEl) {
           newCommScrollEl.scrollTop = options.scrollToBottom ? newCommScrollEl.scrollHeight : savedCommScroll;
         }
         if (cardContainer) {
           cardContainer.scrollTop = savedCardScroll;
+        }
+        if (savedInputId && !options.scrollToBottom) {
+          const restoredInput = document.getElementById(savedInputId);
+          if (restoredInput) {
+            restoredInput.value = savedInputVal;
+            restoredInput.focus();
+          }
         }
         return;
       }
@@ -1254,7 +1274,6 @@
 
       activeReplyToComment = null;
       persistComments();
-      // Обновляем только блок комментариев и прокручиваем список комментариев к новому сообщению
       refreshCurrentCardOrRuleView({ itemId, scrollToBottom: true });
 
       const newInp = document.getElementById(`new-comment-input-${itemId}`);
@@ -1399,8 +1418,13 @@
       const items = DB[activeCatalogTab] || [];
       const categories = getAllCategoriesForSection(activeCatalogTab);
 
+      const prevSubVal = subSelect.value || "ALL";
+      const prevExtraVal = extraSelect.value || "ALL";
+
       subLabel.textContent = activeCatalogTab === "vehicles" ? "Тип транспорта" : activeCatalogTab === "characters" ? "Роль персонажа" : "Категория / Раздел";
       subSelect.innerHTML = `<option value="ALL">Все (${items.length})</option>` + categories.map(c => `<option value="${c}">${c}</option>`).join("");
+      if (categories.includes(prevSubVal)) subSelect.value = prevSubVal;
+
       relBox.classList.toggle("hidden", activeCatalogTab !== "weapons");
 
       if (activeCatalogTab === "roles") {
@@ -1432,6 +1456,10 @@
         extraSelect.innerHTML = `<option value="ALL">Без сортировки</option><option value="SORT_ROLE_ASC">🎭 По Ролям (А → Я)</option><option value="SORT_ROLE_DESC">🎭 По Ролям (Я → А)</option><option value="SORT_REP_DESC">⭐ Сначала с высшей Репутацией</option>`;
         legend.innerHTML = `<span><b class="text-cp-cyan">СТАТЫ</b> = ИНТ, КРУТ, ПЕР, РЕФ, ПРВЛ, ТЕЛО, ТЕХ, УДАЧА, ЭМП</span><span><b class="text-cp-cyan">Репутация</b> = Известность на улицах (0–10)</span>`;
       }
+
+      if ([...extraSelect.options].some(o => o.value === prevExtraVal)) {
+        extraSelect.value = prevExtraVal;
+      }
     }
 
     function clearSearch() { document.getElementById("searchInput").value = ""; renderCatalog(); }
@@ -1461,7 +1489,7 @@
     }
 
     // =========================================================================
-    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК
+    // РЕНДЕРЕР КАТАЛОГА И КАРТОЧЕК (С АВТОСОХРАНЕНИЕМ СКРОЛЛА ВНУТРИ КАРТОЧКИ)
     // =========================================================================
     function renderCatalog() {
       const q = (document.getElementById("searchInput")?.value || "").trim().toLowerCase();
@@ -1512,6 +1540,7 @@
 
       document.getElementById("foundCount").textContent = filtered.length;
       const container = document.getElementById("catalogList");
+      const prevListScroll = container ? container.scrollTop : 0;
 
       if (filtered.length === 0) {
         container.innerHTML = `<div class="bg-cp-card border border-gray-800 p-8 text-center text-gray-400 text-xs">По вашему запросу ничего не найдено. Сбросьте фильтры!</div>`;
@@ -1585,13 +1614,19 @@
         `;
       }).join("");
 
+      container.scrollTop = prevListScroll;
       renderDetailCard(filtered.find(i => i.id === selectedItemId) || filtered[0]);
     }
 
     function selectCatalogItem(id) {
+      const isNewSelection = selectedItemId !== id;
       selectedItemId = id;
       activeReplyToComment = null;
       activeEditCommentId = null;
+      if (isNewSelection) {
+        const box = document.getElementById("detailCard");
+        if (box) box.scrollTop = 0;
+      }
       renderCatalog();
     }
 
@@ -1620,7 +1655,14 @@
 
     function renderDetailCard(item) {
       const box = document.getElementById("detailCard");
-      if (!item) return;
+      if (!item || !box) return;
+
+      // Запоминаем положение ползунков, если перерисовывается та же самая открытая карточка
+      const isSameCard = box.getAttribute("data-rendered-id") === item.id;
+      const savedCardScroll = isSameCard ? box.scrollTop : 0;
+      const oldCommEl = document.getElementById(`comments-scroll-${item.id}`);
+      const savedCommScroll = (isSameCard && oldCommEl) ? oldCommEl.scrollTop : 0;
+      box.setAttribute("data-rendered-id", item.id);
 
       const isDeck = activeCatalogTab === "netrunning" && (item.itemKind === "deck" || item.category === "Кибердеки");
       const schemaKey = activeCatalogTab === "netrunning" ? (isDeck ? "net_deck" : "net_program") : activeCatalogTab;
@@ -1719,9 +1761,24 @@
         ${(isDeck || activeCatalogTab === "vehicles" || activeCatalogTab === "characters") ? extraSpecialHtml : ""}
         ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${item.desc}</div>` : ""}
         ${(!isDeck && activeCatalogTab !== "vehicles" && activeCatalogTab !== "characters") ? extraSpecialHtml : ""}
-        ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
+        ${item.image ? `<div class="mt-4 pt-4 border-t border-gray-800"><div class="text-[10px] uppercase text-gray-500 font-bold mb-2">Иллюстрация // ${dash(item.name)}</div><div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center"><img id="detail-img-${item.id}" src="${item.image}" alt="${dash(item.name)}" class="max-h-72 w-auto object-contain"></div></div>` : ""}
         ${renderCommentsSectionHTML(item.id)}
       `;
+
+      // Немедленно возвращаем ползунки прокрутки на прежнее место
+      if (isSameCard) {
+        const newCommEl = document.getElementById(`comments-scroll-${item.id}`);
+        if (newCommEl) newCommEl.scrollTop = savedCommScroll;
+        box.scrollTop = savedCardScroll;
+
+        const imgEl = document.getElementById(`detail-img-${item.id}`);
+        if (imgEl) {
+          imgEl.onload = () => {
+            box.scrollTop = savedCardScroll;
+            if (newCommEl) newCommEl.scrollTop = savedCommScroll;
+          };
+        }
+      }
     }
 
     // =========================================================================
@@ -1906,19 +1963,31 @@
       renderRulesSidebar();
     }
     function selectRuleSubsection(sub) { activeRuleSubsection = sub; renderRulesView(); }
-    function openRuleArticle(id) { selectedRuleId = id; renderRulesSidebar(); }
+    function openRuleArticle(id) {
+      const isNew = selectedRuleId !== id;
+      selectedRuleId = id;
+      if (isNew) {
+        const area = document.getElementById("ruleContentArea");
+        if (area) area.scrollTop = 0;
+      }
+      renderRulesSidebar();
+    }
     function openRuleCreatorModal() { if (!isCurrentUserAdmin()) return; editingItemId = null; activeBuilderType = "rules"; switchMainView("admin"); switchAdminSubtab("builder"); setBuilderType("rules"); }
 
     function renderRulesSidebar() {
       const q = (document.getElementById("ruleSearchInput")?.value || "").trim().toLowerCase();
       const filtered = (DB.rules || []).filter(r => (activeRuleSubsection === "ALL" || r.subsection === activeRuleSubsection) && (!q || Object.values(r).some(v => String(v).toLowerCase().includes(q))));
       const listEl = document.getElementById("ruleArticlesList");
+      const areaEl = document.getElementById("ruleContentArea");
+
       if (filtered.length === 0) {
         listEl.innerHTML = `<div class="text-xs text-gray-500 py-4 text-center">Механики не найдены.</div>`;
-        document.getElementById("ruleContentArea").innerHTML = `<div class="text-xs text-gray-500">Выберите механику...</div>`;
+        areaEl.innerHTML = `<div class="text-xs text-gray-500">Выберите механику...</div>`;
         return;
       }
       if (!selectedRuleId || !filtered.some(r => r.id === selectedRuleId)) selectedRuleId = filtered[0].id;
+
+      const prevListScroll = listEl.scrollTop;
       listEl.innerHTML = filtered.map(r => `
         <div onclick="openRuleArticle('${r.id}')" class="p-3 border cursor-pointer transition-all ${r.id === selectedRuleId ? 'border-cp-yellow bg-cp-card' : 'border-gray-800 bg-cp-bg hover:border-gray-600'}">
           <div class="flex items-center justify-between text-[10px] text-cp-cyan font-bold uppercase">
@@ -1929,10 +1998,17 @@
           ${r.summary ? `<div class="text-[11px] text-gray-400 mt-0.5 line-clamp-2">${r.summary}</div>` : ""}
         </div>
       `).join("");
+      listEl.scrollTop = prevListScroll;
 
       const rule = filtered.find(r => r.id === selectedRuleId) || filtered[0];
+      const isSameRule = areaEl.getAttribute("data-rendered-id") === rule.id;
+      const savedRuleScroll = isSameRule ? areaEl.scrollTop : 0;
+      const oldCommEl = document.getElementById(`comments-scroll-${rule.id}`);
+      const savedCommScroll = (isSameRule && oldCommEl) ? oldCommEl.scrollTop : 0;
+      areaEl.setAttribute("data-rendered-id", rule.id);
+
       const addedBadge = rule.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold">ДОБАВЛЕНО</span>` : "";
-      document.getElementById("ruleContentArea").innerHTML = `
+      areaEl.innerHTML = `
         <div class="border-b border-gray-800 pb-4 mb-5 flex items-start justify-between gap-3">
           <div><div class="text-xs font-bold text-cp-cyan uppercase">${dash(rule.subsection)} // Источник: ${dash(rule.book)} ${addedBadge}</div><h2 class="font-display text-2xl font-black text-white mt-1">${dash(rule.title)}</h2></div>
           ${renderCardActionButtons('rules', rule.id)}
@@ -1942,6 +2018,12 @@
         ${rule.image ? `<div class="mt-6 pt-4 border-t border-gray-800"><img src="${rule.image}" class="max-h-96 w-auto border border-gray-800"></div>` : ""}
         ${renderCommentsSectionHTML(rule.id)}
       `;
+
+      if (isSameRule) {
+        const newCommEl = document.getElementById(`comments-scroll-${rule.id}`);
+        if (newCommEl) newCommEl.scrollTop = savedCommScroll;
+        areaEl.scrollTop = savedRuleScroll;
+      }
     }
 
     function handleImageUpload(ev) {
@@ -2006,7 +2088,8 @@
 
         errBox.classList.add("hidden");
         currentUserId = found.id;
-        persistUsers();
+        // Сохраняем вход ТОЛЬКО локально в сессию, не вызывая перезагрузку экрана у остальных пользователей!
+        persistSessionOnly();
         document.getElementById("loginUsername").value = "";
         document.getElementById("loginPassword").value = "";
         renderProfileView();
@@ -2073,7 +2156,11 @@
       }
     }
 
-    function logoutCurrentUser() { currentUserId = null; persistUsers(); switchMainView("profile"); }
+    function logoutCurrentUser() {
+      currentUserId = null;
+      persistSessionOnly();
+      switchMainView("profile");
+    }
 
     function renderProfileView() {
       const u = getCurrentUser();
@@ -2331,12 +2418,11 @@
       location.reload();
     }
 
-    // Старт приложения
     initApp();
   </script>
 
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ БЕЗ ЛАГОВ И ОТКАТОВ (SUPABASE REALTIME)    -->
+  <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ БЕЗ СБРОСА ПРОКРУТКИ (SUPABASE REALTIME)   -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -2347,13 +2433,12 @@
     let liveChannel = null;
     let isApplyingRemoteUpdate = false;
     let isPushingToCloud = false;
+    let lastLocalPushTimestamp = 0;
     let pendingSectionsToPush = new Set();
     let pushDebounceTimer = null;
 
-    // Уникальный ID текущей вкладки, чтобы не перезаписывать самого себя своими же пакетами
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
-    // --- Серверные функции проверки и шифрования паролей/логинов ---
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -2421,14 +2506,13 @@
       }
     }
 
-    // Очередь отправки: склеивает двойные вызовы (например, комментарий + уведомление) в один быстрый запрос
     function scheduleCloudPush(sectionName) {
       if (!sbClient || isApplyingRemoteUpdate) return;
       pendingSectionsToPush.add(sectionName);
+      lastLocalPushTimestamp = Date.now();
 
-      // 1. Мгновенно (за 0 мс) отправляем изменившийся кусок напрямую в другие вкладки/окна по WebSocket Broadcast
       if (liveChannel) {
-        const deltaPayload = { sender: CLIENT_TAB_ID };
+        const deltaPayload = { sender: CLIENT_TAB_ID, section: sectionName };
         if (sectionName === "db") { deltaPayload.db = DB; deltaPayload.categories = CATEGORIES; }
         if (sectionName === "users") { sanitizeUsersAndEnforceRoot(); deltaPayload.users = USERS; }
         if (sectionName === "comments") { deltaPayload.comments = COMMENTS; }
@@ -2441,7 +2525,6 @@
         });
       }
 
-      // 2. Сохраняем в БД Supabase с микро-задержкой 120 мс, чтобы не было гонки запросов
       if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
       pushDebounceTimer = setTimeout(flushPendingToCloud, 120);
     }
@@ -2449,6 +2532,7 @@
     async function flushPendingToCloud() {
       if (!sbClient || pendingSectionsToPush.size === 0 || isPushingToCloud) return;
       isPushingToCloud = true;
+      lastLocalPushTimestamp = Date.now();
 
       const sections = Array.from(pendingSectionsToPush);
       pendingSectionsToPush.clear();
@@ -2457,7 +2541,6 @@
         sanitizeUsersAndEnforceRoot();
         setCloudStatusBadge("🔄 Синхронизация...", "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/40");
 
-        // Формируем лёгкий пакет ТОЛЬКО из тех разделов, которые реально изменились
         const updateObj = { updated_at: new Date().toISOString() };
         if (sections.includes("all") || sections.includes("db")) {
           updateObj.db = DB;
@@ -2479,54 +2562,96 @@
           .eq("id", "main_state");
 
         if (error) throw error;
+        lastLocalPushTimestamp = Date.now();
         setCloudStatusBadge("🟢 В сети", "bg-cp-green/15 text-cp-green border-cp-green/40");
       } catch (err) {
         console.error("Ошибка сохранения в облако:", err);
         setCloudStatusBadge("🔴 Ошибка сети", "bg-cp-red/20 text-cp-red border-cp-red/50");
       } finally {
         isPushingToCloud = false;
-        // Если пока сохраняли, пользователь кликнул что-то ещё — досылаем остаток
         if (pendingSectionsToPush.size > 0) {
           setTimeout(flushPendingToCloud, 80);
         }
       }
     }
 
-    // Применение данных, прилетевших от других игроков (без затирания твоих собственных нажатий!)
-    function applyCloudStateToUI(incoming) {
+    function applyCloudStateToUI(incoming, isFullPostgresRow = false) {
       if (!incoming || isPushingToCloud) return;
+
+      // Игнорируем собственное эхо от postgres_changes в течение 2 секунд после нашей же отправки
+      if (isFullPostgresRow && (Date.now() - lastLocalPushTimestamp < 2000)) {
+        return;
+      }
+
       isApplyingRemoteUpdate = true;
       try {
+        // Проверяем, что реально изменилось по сравнению с текущей памятью, чтобы не дёргать экран зря
+        let dbChanged = false;
+        let usersChanged = false;
+        let commentsChanged = false;
+        let notifsChanged = false;
+
         if (incoming.db && Object.keys(incoming.db).length > 0 && !pendingSectionsToPush.has("db")) {
-          DB = incoming.db;
-          localStorage.setItem(STORAGE_DB_KEY, JSON.stringify(DB));
+          const newDbStr = JSON.stringify(incoming.db);
+          if (newDbStr !== JSON.stringify(DB)) {
+            DB = incoming.db;
+            localStorage.setItem(STORAGE_DB_KEY, newDbStr);
+            dbChanged = true;
+          }
         }
         if (incoming.categories && Object.keys(incoming.categories).length > 0 && !pendingSectionsToPush.has("db")) {
-          CATEGORIES = incoming.categories;
-          localStorage.setItem(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+          const newCatStr = JSON.stringify(incoming.categories);
+          if (newCatStr !== JSON.stringify(CATEGORIES)) {
+            CATEGORIES = incoming.categories;
+            localStorage.setItem(STORAGE_CAT_KEY, newCatStr);
+            dbChanged = true;
+          }
         }
         if (Array.isArray(incoming.users) && incoming.users.length > 0 && !pendingSectionsToPush.has("users")) {
-          USERS = incoming.users;
-          sanitizeUsersAndEnforceRoot();
-          localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
+          const newUsersStr = JSON.stringify(incoming.users);
+          if (newUsersStr !== JSON.stringify(USERS)) {
+            USERS = incoming.users;
+            sanitizeUsersAndEnforceRoot();
+            localStorage.setItem(STORAGE_USERS_KEY, JSON.stringify(USERS));
+            usersChanged = true;
+          }
         }
         if (incoming.comments && typeof incoming.comments === "object" && !pendingSectionsToPush.has("comments")) {
-          COMMENTS = incoming.comments;
-          localStorage.setItem(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+          const newCommStr = JSON.stringify(incoming.comments);
+          if (newCommStr !== JSON.stringify(COMMENTS)) {
+            COMMENTS = incoming.comments;
+            localStorage.setItem(STORAGE_COMMENTS_KEY, newCommStr);
+            commentsChanged = true;
+          }
         }
         if (Array.isArray(incoming.notifications) && !pendingSectionsToPush.has("notifications")) {
-          NOTIFICATIONS = incoming.notifications;
-          localStorage.setItem(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
+          const newNotifStr = JSON.stringify(incoming.notifications);
+          if (newNotifStr !== JSON.stringify(NOTIFICATIONS)) {
+            NOTIFICATIONS = incoming.notifications;
+            localStorage.setItem(STORAGE_NOTIF_KEY, newNotifStr);
+            notifsChanged = true;
+          }
         }
 
-        // Обновляем шапку и колокольчик
+        // Если вообще ничего не поменялось — выходим и не трогаем DOM!
+        if (!dbChanged && !usersChanged && !commentsChanged && !notifsChanged) {
+          return;
+        }
+
         updateCounts();
 
-        // Сохраняем текст и позицию курсора, если пользователь прямо сейчас что-то печатает
         const activeEl = document.activeElement;
         const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
         const savedId = isTyping ? activeEl.id : null;
         const savedVal = isTyping ? activeEl.value : "";
+
+        // Если изменились только комментарии, уведомления или пользователи (а карточки предметов не менялись) — обновляем ТОЛЬКО блок комментариев, не перерисовывая карточку!
+        if (!dbChanged && (activeMainView === "catalog" || activeMainView === "rules")) {
+          if (commentsChanged || usersChanged) {
+            refreshCurrentCardOrRuleView();
+          }
+          return;
+        }
 
         if (activeMainView === "catalog") {
           setupCatalogFilters();
@@ -2553,7 +2678,6 @@
       }
     }
 
-    // Перехватываем сохранения по отдельным отсекам
     const origPersistDB = persistDatabase;
     persistDatabase = function() {
       origPersistDB();
@@ -2578,7 +2702,6 @@
       scheduleCloudPush("notifications");
     };
 
-    // Слушаем локальные соседние вкладки одного окна браузера (мгновенно)
     window.addEventListener("storage", (ev) => {
       if (isPushingToCloud) return;
       try {
@@ -2603,7 +2726,7 @@
         if (error) throw error;
 
         if (data && data.db && Object.keys(data.db).length > 0) {
-          applyCloudStateToUI(data);
+          applyCloudStateToUI(data, false);
         } else {
           sanitizeUsersAndEnforceRoot();
           await sbClient.from("cp2020_state").upsert({
@@ -2617,7 +2740,6 @@
           });
         }
 
-        // Подключаем двухконтурный канал реального времени (Broadcast + Postgres Changes)
         liveChannel = sbClient.channel("cp2020-realtime-v2", {
           config: { broadcast: { self: false } }
         });
@@ -2625,7 +2747,7 @@
         liveChannel
           .on("broadcast", { event: "fast_delta" }, (msg) => {
             if (msg.payload && msg.payload.sender !== CLIENT_TAB_ID) {
-              applyCloudStateToUI(msg.payload);
+              applyCloudStateToUI(msg.payload, false);
             }
           })
           .on(
@@ -2633,7 +2755,7 @@
             { event: "UPDATE", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
             (payload) => {
               if (payload.new && !isPushingToCloud) {
-                applyCloudStateToUI(payload.new);
+                applyCloudStateToUI(payload.new, true);
               }
             }
           )
