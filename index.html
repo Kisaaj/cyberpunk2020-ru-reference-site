@@ -1264,20 +1264,14 @@
         }
 
         // ЖЕЛЕЗОБЕТОННОЕ ВОССТАНОВЛЕНИЕ СЕССИИ ПРИ F5:
-        // Проверяем все возможные ключи сессии в localStorage
+        // БЕЗОПАСНОЕ ВОССТАНОВЛЕНИЕ СЕССИИ ПРИ F5:
         const savedSession = localStorage.getItem(STORAGE_SESSION_KEY) || localStorage.getItem("cp2020_session_user_id_v51");
         if (savedSession && USERS.some(u => u.id === savedSession)) {
           currentUserId = savedSession;
         } else {
-          // Фолбэк: если точный ID сессии не найден, но в базе есть аккаунт Kisaaj (ROOT) — автоматически подцепляем его, чтобы админ не вылетал
-          const rootUser = USERS.find(u => u.role === "ROOT" || u.id === "u-root");
-          if (rootUser) {
-            currentUserId = rootUser.id;
-            persistSessionOnly();
-          }
+          // Если сессии в браузере нет — оставляем пользователя гостем (никаких автоматических входов в админку для чужих людей!)
+          currentUserId = null;
         }
-      } catch (e) {}
-    }
 
     function persistDatabase() {
       safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
