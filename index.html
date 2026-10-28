@@ -655,7 +655,7 @@
       <div class="space-y-2.5" id="adminUsersTableContainer"></div>
     </section>
 
-    <!-- ПОДВКЛАДКА 4.4: ЛОГИ (БАНЫ, КОММЕНТАРИИ И ИЗМЕНЕНИЯ КАРТОЧЕК) -->
+    <!-- ПОДВКЛАДКА 4.4: ЛОГИ -->
     <section id="admin-sub-logs" class="hidden bg-cp-panel cp-border p-6 space-y-5">
       <div class="border-b border-gray-800 pb-4 flex items-center justify-between gap-4">
         <div>
@@ -675,17 +675,12 @@
         </div>
       </div>
 
-      <!-- Список забаненных -->
       <div id="adminLogsBansBox" class="space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
-
-      <!-- Список всех комментариев сайта -->
       <div id="adminLogsCommentsBox" class="hidden space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
-
-      <!-- Список изменений карточек -->
       <div id="adminLogsChangesBox" class="hidden space-y-2.5 max-h-[65vh] overflow-y-auto pr-1"></div>
     </section>
 
-    <!-- ПОДВКЛАДКА 4.5: БАЗА ДАННЫХ (КНОПКИ ТОЛЬКО ДЛЯ ROOT) -->
+    <!-- ПОДВКЛАДКА 4.5: БАЗА ДАННЫХ -->
     <section id="admin-sub-backup" class="hidden bg-cp-panel cp-border p-6 space-y-6">
       <h4 class="font-display text-base font-bold text-cp-yellow uppercase border-b border-gray-800 pb-3">💾 Статистика и управление базой данных (JSON / JS)</h4>
       <div class="grid grid-cols-4 gap-4 text-center" id="adminStatsGrid"></div>
@@ -704,6 +699,7 @@
       </div>
     </section>
   </main>
+
   <script>
     // =========================================================================
     // СХЕМЫ ДАННЫХ И КОНСТАНТЫ
@@ -886,8 +882,8 @@
     let activeReplyToComment = null;
     let activeEditCommentId = null;
     let currentlyViewedPublicUserId = null;
-
-    // Гарантирует наличие списков источников (_books) и логов изменений (_changeLogs) внутри объекта CATEGORIES (синхронизируется с облаком автоматически)
+    
+    // Гарантируем наличие массивов источников (_books) и логов изменений (_changeLogs)
     function ensureMetaArraysInCategories() {
       if (!Array.isArray(CATEGORIES._books) || CATEGORIES._books.length === 0) {
         CATEGORIES._books = [...DEFAULT_BOOK_SOURCES];
@@ -1144,8 +1140,30 @@
     }
 
     // =========================================================================
-    // ПОДГРУЗКА БАЗЫ
+    // БЕЗОПАСНОЕ ХРАНИЛИЩЕ И ПОДГРУЗКА БАЗЫ
     // =========================================================================
+    function safeLocalSet(key, valueStr) {
+      try {
+        localStorage.setItem(key, valueStr);
+      } catch (quotaErr) {
+        const keysToClean = [
+          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
+          "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_users_v51",
+          STORAGE_DB_KEY, STORAGE_USERS_KEY, STORAGE_COMMENTS_KEY, STORAGE_NOTIF_KEY
+        ];
+        keysToClean.forEach(k => {
+          if (k !== key && k !== STORAGE_SESSION_KEY) {
+            try { localStorage.removeItem(k); } catch (e) {}
+          }
+        });
+        try {
+          localStorage.setItem(key, valueStr);
+        } catch (e2) {
+          console.warn(`Ключ ${key} превышает лимит localStorage (5 МБ) и работает через облако Supabase.`);
+        }
+      }
+    }
+
     function mergeExternalDataIntoMemory(extData) {
       if (!extData) return;
       const srcDb = extData.db || extData;
@@ -1183,33 +1201,8 @@
       switchMainView("catalog", "roles");
     }
 
-    // Безопасная запись в localStorage: никогда не роняет сайт при превышении 5 МБ лимита браузера!
-    function safeLocalSet(key, valueStr) {
-      try {
-        localStorage.setItem(key, valueStr);
-      } catch (quotaErr) {
-        // Если память браузера (5 МБ) переполнена из-за тяжёлых картинок/GIF — очищаем старые кэши, оставляя только сессию входа
-        const keysToClean = [
-          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
-          "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_users_v51",
-          STORAGE_DB_KEY, STORAGE_USERS_KEY, STORAGE_COMMENTS_KEY, STORAGE_NOTIF_KEY
-        ];
-        keysToClean.forEach(k => {
-          if (k !== key && k !== STORAGE_SESSION_KEY) {
-            try { localStorage.removeItem(k); } catch (e) {}
-          }
-        });
-        try {
-          localStorage.setItem(key, valueStr);
-        } catch (e2) {
-          console.warn(`Ключ ${key} превышает лимит localStorage (5 МБ) и работает напрямую через облако Supabase.`);
-        }
-      }
-    }
-
     function loadSavedData() {
       try {
-        // Сразу удаляем все устаревшие ключи прошлых версий, которые забивали память браузера
         const legacyKeys = [
           "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
           "cp2020_full_db_v40", "cp2020_full_db_v51",
@@ -1290,15 +1283,12 @@
       safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
       updateAuthHeaderUI();
     }
+    function persistComments() { safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS)); }
+    function persistNotifications() { safeLocalSet(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS)); updateNotifBellUI(); }
 
-    function persistComments() {
-      safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
-    }
-
-    function persistNotifications() {
-      safeLocalSet(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
-      updateNotifBellUI();
-    }
+    function getCurrentUser() { return currentUserId ? (USERS.find(u => u.id === currentUserId) || null) : null; }
+    function isCurrentUserAdmin() { const u = getCurrentUser(); return Boolean(u && (u.role === "ROOT" || u.role === "ADMIN")); }
+    function isCurrentUserRoot() { const u = getCurrentUser(); return Boolean(u && u.role === "ROOT"); }
 
     // =========================================================================
     // КОЛОКОЛЬЧИК УВЕДОМЛЕНИЙ
@@ -1388,50 +1378,6 @@
       if (sectionKey === "rules") { selectedRuleId = itemId; switchMainView("rules"); }
       else { selectedItemId = itemId; switchMainView("catalog", sectionKey); }
       if (commentId) setTimeout(() => scrollToAndHighlightComment(commentId), 120);
-    }
-
-    // =========================================================================
-    // ПРОВЕРКА ФАЙЛОВ «СЕТЕВОЙ ДОЗОР БДИТ!»
-    // =========================================================================
-    function showNetwatchAlert(msg) {
-      document.getElementById("netwatchModalTitle").textContent = "🚨 СЕТЕВОЙ ДОЗОР БДИТ!";
-      document.getElementById("netwatchErrorText").innerHTML = msg;
-      document.getElementById("netwatchModal").classList.remove("hidden");
-    }
-    function closeNetwatchModal() { document.getElementById("netwatchModal").classList.add("hidden"); }
-
-    function validateUploadedFile(file) {
-      if (!file) return false;
-      const u = getCurrentUser();
-      const role = u ? u.role : "USER";
-      if (role === "ROOT") return true;
-      const fileName = (file.name || "").toLowerCase();
-      const mime = (file.type || "").toLowerCase();
-      const size = file.size || 0;
-      const isJpgPng = mime === "image/jpeg" || mime === "image/png" || fileName.endsWith(".jpg") || fileName.endsWith(".jpeg") || fileName.endsWith(".png");
-      const isGif = mime === "image/gif" || fileName.endsWith(".gif");
-
-      if (role === "ADMIN") {
-        if (!isJpgPng && !isGif) { showNetwatchAlert(`Ошибка загрузки файла <b>«${file.name}»</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG, PNG и GIF весом до 50мб</b>.`); return false; }
-        if (size > 50 * 1024 * 1024) { showNetwatchAlert(`Превышен допустимый размер файла <b>«${file.name}» (${(size/1048576).toFixed(1)} МБ)</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG, PNG и GIF весом до 50мб</b>.`); return false; }
-        return true;
-      } else {
-        if (!isJpgPng) { showNetwatchAlert(`Ошибка загрузки файла <b>«${file.name}»</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`); return false; }
-        if (size > 10 * 1024 * 1024) { showNetwatchAlert(`Превышен допустимый размер файла <b>«${file.name}» (${(size/1048576).toFixed(1)} МБ)</b>.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`); return false; }
-        return true;
-      }
-    }
-
-    function validateImageUrlForRole(urlStr) {
-      if (!urlStr) return true;
-      const u = getCurrentUser();
-      const role = u ? u.role : "USER";
-      if (role === "ROOT") return true;
-      if (role === "USER" && urlStr.split("?")[0].toLowerCase().endsWith(".gif")) {
-        showNetwatchAlert(`Сетевой Дозор заблокировал прямую ссылку на GIF.<br><br>Вам разрешена загрузка только форматов <b>JPG и PNG весом до 10мб</b>.`);
-        return false;
-      }
-      return true;
     }
 
     // =========================================================================
@@ -2037,7 +1983,7 @@
     }
 
     // =========================================================================
-    // НАСТРОЙКА ФИЛЬТРОВ КАТАЛОГА (С НОВЫМИ СОРТИРОВКАМИ И ИСТОЧНИКАМИ)
+    // НАСТРОЙКА ФИЛЬТРОВ КАТАЛОГА
     // =========================================================================
     function populateBookFilterDropdown() {
       const bookSelect = document.getElementById("bookFilter");
@@ -2081,7 +2027,6 @@
       relBox.classList.toggle("hidden", !isWeapons);
       availBox.classList.toggle("hidden", !isWeapons);
 
-      // Адаптивная ширина колонок фильтров
       subColBox.className = isWeapons ? "col-span-2" : "col-span-3";
       extraColBox.className = isWeapons ? "col-span-2" : "col-span-4";
 
@@ -2168,7 +2113,6 @@
       return s.includes("ОТ") ? 4 : s.includes("ОН") ? 3 : (s.includes("ОБ") || s.includes("СТ")) ? 2 : s.includes("НН") ? 1 : 0;
     }
 
-    // Ранг доступности оружия: Отл (4) -> Обы (3) -> Мал (2) -> Ред (1)
     function getAvailabilityRank(dosStr) {
       if (!dosStr) return 0;
       const s = dosStr.toUpperCase();
@@ -2237,7 +2181,6 @@
         return textOk && subOk && bookOk && extraOk && relOk && availOk;
       });
 
-      // Сортировки по вкладкам
       if (activeCatalogTab === "weapons") {
         if (avail === "SORT_DESC" || avail === "SORT_ASC") {
           filtered = [...filtered].sort((a, b) => avail === "SORT_DESC" ? (getAvailabilityRank(b.dos) - getAvailabilityRank(a.dos)) : (getAvailabilityRank(a.dos) - getAvailabilityRank(b.dos)));
@@ -2422,7 +2365,6 @@
       const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">HOMEBREW</span>` : "";
       const namedHeaderBadge = (activeCatalogTab === "characters" && item.isNamed) ? `<span class="ml-2 text-[10px] bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/50 px-1.5 py-0.5 font-bold align-middle">⭐ ИМЕННОЙ</span>` : "";
 
-      // ОСОБАЯ СТРУКТУРА ДЛЯ КАРТОЧКИ РОЛЕЙ (СНАЧАЛА ОСОБАЯ СПОСОБНОСТЬ, ЗАТЕМ НАВЫКИ, А ОПИСАНИЕ — ВНИЗУ)
       if (activeCatalogTab === "roles") {
         const skillsArr = Array.isArray(item.skills) && item.skills.length > 0 ? item.skills : ["—"];
         const abilityBlockHtml = (item.abilityDesc && String(item.abilityDesc).trim() !== "" && item.abilityDesc !== "—")
@@ -2747,7 +2689,6 @@
         CATEGORIES[activeBuilderType].push(catField);
       }
 
-      // Автоматически добавляем новый источник в список книг, если его вписали вручную
       if (data.book && data.book !== "—" && !CATEGORIES._books.includes(data.book)) {
         CATEGORIES._books.push(data.book);
       }
@@ -3239,7 +3180,6 @@
       }).join("");
     }
 
-    // Статистика базы + показ кнопок выгрузки/сброса строго только для ROOT
     function renderAdminBackupStats() {
       const totalItems = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
       const userItems = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.filter(i => i.isUser).length || 0), 0);
@@ -3310,7 +3250,7 @@
     initApp();
   </script>
 
-<!-- ========================================================================= -->
+  <!-- ========================================================================= -->
   <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ (SUPABASE REALTIME)                       -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3395,7 +3335,6 @@
       }
     }
 
-    // Скачивает из облака ТОЛЬКО изменившиеся колонки (вызывается по лёгкому сигналу)
     async function pullUpdatedSectionsFromCloud(sectionsList) {
       if (!sbClient || isPushingToCloud) return;
       try {
@@ -3443,7 +3382,6 @@
 
         setCloudStatusBadge("🔄", "Синхронизация...");
 
-        // Вызываем серверную функцию save_cp2020_part, передавая только изменившиеся отсеки
         const rpcParams = {
           p_db: (sections.includes("all") || sections.includes("db")) ? DB : null,
           p_categories: (sections.includes("all") || sections.includes("db")) ? CATEGORIES : null,
@@ -3455,7 +3393,6 @@
         const { data: newTs, error } = await sbClient.rpc("save_cp2020_part", rpcParams);
 
         if (error) {
-          // Фолбэк на прямой upsert, если пользователь ещё не выполнил SQL-скрипт save_cp2020_part
           const fallbackPayload = {
             id: "main_state",
             db: DB,
@@ -3471,7 +3408,6 @@
           lastKnownCloudTimestamp = newTs;
         }
 
-        // Отправляем КРОШЕЧНЫЙ сигнал (50 байт) всем остальным браузерам — сокет никогда не упадёт от перегрузки!
         if (liveChannel) {
           liveChannel.send({
             type: "broadcast",
@@ -3622,7 +3558,6 @@
       if (!isApplyingRemoteUpdate) scheduleCloudPush("notifications");
     };
 
-    // Таймер проверки истечения банов + лёгкий фоновый контроль синхронизации каждые 5 секунд
     setInterval(async () => {
       checkAndEnforceCurrentSessionValidity();
       if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
