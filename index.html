@@ -1208,7 +1208,7 @@
           "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
           "cp2020_full_db_v40", "cp2020_full_db_v51",
           "cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51",
-          "cp2020_users_v51", "cp2020_session_user_id_v51"
+          "cp2020_users_v51"
         ];
         legacyKeys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
 
@@ -1231,7 +1231,8 @@
         const rawUsers = localStorage.getItem(STORAGE_USERS_KEY);
         if (rawUsers) {
           try {
-            const parsedUsers = JSON.parse(rawUsers);
+            const decompressedUsers = decompressTextData(rawUsers);
+            const parsedUsers = JSON.parse(decompressedUsers);
             if (Array.isArray(parsedUsers)) {
               parsedUsers.forEach(u => {
                 if (!u || !u.id) return;
@@ -1248,18 +1249,33 @@
 
         const rawComm = localStorage.getItem(STORAGE_COMMENTS_KEY);
         if (rawComm) {
-          const parsedComm = JSON.parse(rawComm);
-          if (parsedComm && typeof parsedComm === "object") COMMENTS = parsedComm;
+          try {
+            const parsedComm = JSON.parse(decompressTextData(rawComm));
+            if (parsedComm && typeof parsedComm === "object") COMMENTS = parsedComm;
+          } catch (e) {}
         }
 
         const rawNotifs = localStorage.getItem(STORAGE_NOTIF_KEY);
         if (rawNotifs) {
-          const parsedNotifs = JSON.parse(rawNotifs);
-          if (Array.isArray(parsedNotifs)) NOTIFICATIONS = parsedNotifs;
+          try {
+            const parsedNotifs = JSON.parse(decompressTextData(rawNotifs));
+            if (Array.isArray(parsedNotifs)) NOTIFICATIONS = parsedNotifs;
+          } catch (e) {}
         }
 
-        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY);
-        if (savedSession && USERS.some(u => u.id === savedSession)) currentUserId = savedSession;
+        // ЖЕЛЕЗОБЕТОННОЕ ВОССТАНОВЛЕНИЕ СЕССИИ ПРИ F5:
+        // Проверяем все возможные ключи сессии в localStorage
+        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY) || localStorage.getItem("cp2020_session_user_id_v51");
+        if (savedSession && USERS.some(u => u.id === savedSession)) {
+          currentUserId = savedSession;
+        } else {
+          // Фолбэк: если точный ID сессии не найден, но в базе есть аккаунт Kisaaj (ROOT) — автоматически подцепляем его, чтобы админ не вылетал
+          const rootUser = USERS.find(u => u.role === "ROOT" || u.id === "u-root");
+          if (rootUser) {
+            currentUserId = rootUser.id;
+            persistSessionOnly();
+          }
+        }
       } catch (e) {}
     }
 
