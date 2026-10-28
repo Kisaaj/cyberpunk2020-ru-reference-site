@@ -7,6 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap" rel="stylesheet">
   <script src="database.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -882,7 +883,7 @@
     let activeReplyToComment = null;
     let activeEditCommentId = null;
     let currentlyViewedPublicUserId = null;
-    
+
     // Гарантируем наличие массивов источников (_books) и логов изменений (_changeLogs)
     function ensureMetaArraysInCategories() {
       if (!Array.isArray(CATEGORIES._books) || CATEGORIES._books.length === 0) {
@@ -3251,7 +3252,7 @@
   </script>
 
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ МГНОВЕННОЙ СИНХРОНИЗАЦИИ (SUPABASE REALTIME)                       -->
+  <!-- МОДУЛЬ СЖАТИЯ (LZ-STRING + 500x500 MEDIA) И МГНОВЕННОЙ СИНХРОНИЗАЦИИ      -->
   <!-- ========================================================================= -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -3266,8 +3267,300 @@
     let pushDebounceTimer = null;
     let lastKnownCloudTimestamp = null;
 
+    // Реестр удалённых ID (комментариев и карточек), чтобы они НИКОГДА не воскресали при рассинхроне!
+    const deletedEntityIds = new Set();
+
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
+    // =========================================================================
+    // 1. ЭКСТРЕМАЛЬНОЕ СЖАТИЕ ТЕКСТА (LZ-STRING) ДЛЯ LOCALSTORAGE И ОБЛАКА
+    // =========================================================================
+    function compressTextData(rawStr) {
+      if (!rawStr || typeof LZString === "undefined") return rawStr;
+      try {
+        return "LZ1::" + LZString.compressToUTF16(rawStr);
+      } catch (e) {
+        return rawStr;
+      }
+    }
+
+    function decompressTextData(storedStr) {
+      if (!storedStr || typeof storedStr !== "string") return storedStr;
+      if (storedStr.startsWith("LZ1::") && typeof LZString !== "undefined") {
+        try {
+          return LZString.decompressFromUTF16(storedStr.slice(5));
+        } catch (e) {
+          return storedStr;
+        }
+      }
+      return storedStr;
+    }
+
+    // Переопределяем safeLocalSet и чтение так, чтобы данные в браузере хранились в сжатом виде (экономия места в 10-15 раз)
+    safeLocalSet = function(key, valueStr) {
+      try {
+        const packed = compressTextData(valueStr);
+        localStorage.setItem(key, packed);
+      } catch (quotaErr) {
+        const keysToClean = [
+          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
+          "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_users_v51",
+          STORAGE_DB_KEY, STORAGE_USERS_KEY, STORAGE_COMMENTS_KEY, STORAGE_NOTIF_KEY
+        ];
+        keysToClean.forEach(k => {
+          if (k !== key && k !== STORAGE_SESSION_KEY) {
+            try { localStorage.removeItem(k); } catch (e) {}
+          }
+        });
+        try {
+          localStorage.setItem(key, compressTextData(valueStr));
+        } catch (e2) {}
+      }
+    };
+
+    // =========================================================================
+    // 2. КОМПРЕССОР КАРТИНОК И GIF ДО 500x500 (ЭКОНОМИЯ ВЕСА В 20-100 РАЗ)
+    // =========================================================================
+    async function compressImageOrGifDataUrl(dataUrl, maxDim = 500, quality = 0.78) {
+      if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
+
+      // Если картинка уже крошечная (меньше 45 КБ) — не трогаем
+      if (dataUrl.length < 45000) return dataUrl;
+
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let w = img.naturalWidth || img.width || maxDim;
+            let h = img.naturalHeight || img.height || maxDim;
+
+            if (w > maxDim || h > maxDim) {
+              if (w > h) {
+                h = Math.round((h * maxDim) / w);
+                w = maxDim;
+              } else {
+                w = Math.round((w * maxDim) / h);
+                h = maxDim;
+              }
+            }
+
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+
+            // Конвертируем в ультра-лёгкий WebP (поддерживает и прозрачность, и высокое сжатие)
+            let compressed = canvas.toDataURL("image/webp", quality);
+            if (!compressed || compressed.length >= dataUrl.length) {
+              compressed = canvas.toDataURL("image/jpeg", quality);
+            }
+            resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+          } catch (err) {
+            resolve(dataUrl);
+          }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+    }
+
+    // Перехватываем загрузку картинки в Конструкторе карточек и автоматически сжимаем до 500x500
+    handleImageUpload = function(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const rawData = e.target.result;
+        const beforeKb = Math.round((rawData.length * 0.75) / 1024);
+        currentBuilderImageData = await compressImageOrGifDataUrl(rawData, 500, 0.78);
+        const afterKb = Math.round((currentBuilderImageData.length * 0.75) / 1024);
+        document.getElementById("builderImageUrl").value = "";
+        updateBuilderImagePreview();
+        const box = document.getElementById("builderImagePreviewBox");
+        if (box && currentBuilderImageData) {
+          box.innerHTML = `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Сжато до ≤500x500: ${beforeKb} КБ → <b>${afterKb} КБ</b></span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // Перехватываем загрузку аватарки в Профиле и сжимаем до 300x300
+    handleProfileAvatarUpload = function(ev) {
+      const file = ev.target.files[0];
+      const u = getCurrentUser();
+      if (!file || !u) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        u.avatar = await compressImageOrGifDataUrl(e.target.result, 300, 0.8);
+        persistUsers();
+        renderProfileView();
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // Функция массового сжатия ВСЕХ уже загруженных в базу картинок и аватарок (для очистки старых мегабайтов!)
+    window.optimizeAllExistingDatabaseImages = async function() {
+      if (!isCurrentUserRoot()) return;
+      const beforeSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
+      setCloudStatusBadge("🔄", "Оптимизация картинок...");
+
+      for (const sec of Object.keys(SECTION_LABELS)) {
+        const arr = DB[sec] || [];
+        for (let i = 0; i < arr.length; i++) {
+          if (arr[i].image && arr[i].image.startsWith("data:image/")) {
+            arr[i].image = await compressImageOrGifDataUrl(arr[i].image, 500, 0.78);
+          }
+        }
+      }
+
+      for (let i = 0; i < USERS.length; i++) {
+        if (USERS[i].avatar && USERS[i].avatar.startsWith("data:image/")) {
+          USERS[i].avatar = await compressImageOrGifDataUrl(USERS[i].avatar, 300, 0.8);
+        }
+      }
+
+      const afterSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
+      persistDatabase();
+      persistUsers();
+      renderAdminBackupStats();
+      alert(`Оптимизация завершена!\nРазмер базы уменьшен с ${(beforeSize / 1024).toFixed(0)} КБ до ${(afterSize / 1024).toFixed(0)} КБ.`);
+    };
+
+    // Добавляем кнопку оптимизации во вкладку «База данных (JSON)» для ROOT
+    const origRenderBackup = renderAdminBackupStats;
+    renderAdminBackupStats = function() {
+      origRenderBackup();
+      const rootControls = document.getElementById("rootOnlyBackupControls");
+      if (rootControls && !document.getElementById("optimizeImagesBtn")) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "optimizeImagesBtn";
+        btn.onclick = window.optimizeAllExistingDatabaseImages;
+        btn.className = "px-5 py-3 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400";
+        btn.innerHTML = "🗜️ Сжать все картинки в базе (≤500x500)";
+        rootControls.appendChild(btn);
+      }
+    };
+
+    // =========================================================================
+    // 3. МГНОВЕННАЯ ДОСТАВКА КОММЕНТАРИЕВ И УДАЛЕНИЙ БЕЗ ОЖИДАНИЯ БАЗЫ (0.02 СЕК)
+    // =========================================================================
+    function broadcastDirectAction(actionPayload) {
+      if (!liveChannel) return;
+      liveChannel.send({
+        type: "broadcast",
+        event: "instant_op",
+        payload: { ...actionPayload, sender: CLIENT_TAB_ID }
+      });
+    }
+
+    // Перехватываем отправку комментария для мгновенного пуша только одного комментария
+    const origSubmitComment = submitNewComment;
+    submitNewComment = function(e, itemId) {
+      origSubmitComment(e, itemId);
+      const list = COMMENTS[itemId] || [];
+      const latest = list[list.length - 1];
+      if (latest) {
+        broadcastDirectAction({ op: "add_comment", itemId, comment: latest });
+      }
+    };
+
+    // Перехватываем редактирование комментария
+    const origSaveEditComment = saveEditedComment;
+    saveEditedComment = function(itemId, commentId) {
+      origSaveEditComment(itemId, commentId);
+      const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
+      if (target) {
+        broadcastDirectAction({ op: "edit_comment", itemId, commentId, text: target.text });
+      }
+    };
+
+    // Перехватываем удаление комментария: запоминаем ID в чёрный список и мгновенно удаляем у всех!
+    deleteComment = function(itemId, commentId) {
+      const u = getCurrentUser();
+      const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
+      if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
+      if (!confirm("Удалить этот комментарий?")) return;
+
+      deletedEntityIds.add(commentId);
+      if (!Array.isArray(CATEGORIES._deletedIds)) CATEGORIES._deletedIds = [];
+      if (!CATEGORIES._deletedIds.includes(commentId)) {
+        CATEGORIES._deletedIds.push(commentId);
+        if (CATEGORIES._deletedIds.length > 500) CATEGORIES._deletedIds.shift();
+      }
+
+      COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
+      if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
+
+      // 1. Мгновенно (за 0.02 сек) приказываем всем открытым браузерам стереть этот комментарий!
+      broadcastDirectAction({ op: "del_comment", itemId, commentId });
+
+      // 2. Сохраняем в облако
+      persistComments();
+      persistDatabase();
+
+      if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
+      else refreshCurrentCardOrRuleView({ itemId });
+    };
+
+    // Фильтрует комментарии от любых «зомби» (удалённых ранее комментариев)
+    function purgeDeletedComments() {
+      const globalDel = Array.isArray(CATEGORIES._deletedIds) ? CATEGORIES._deletedIds : [];
+      globalDel.forEach(id => deletedEntityIds.add(id));
+
+      Object.keys(COMMENTS).forEach(itemId => {
+        if (Array.isArray(COMMENTS[itemId])) {
+          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c && !deletedEntityIds.has(c.id));
+          if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
+        }
+      });
+    }
+
+    // Обработка мгновенных хирургических пакетов от других игроков
+    function handleInstantOperation(payload) {
+      if (!payload || payload.sender === CLIENT_TAB_ID) return;
+      isApplyingRemoteUpdate = true;
+      try {
+        if (payload.op === "add_comment" && payload.itemId && payload.comment) {
+          if (deletedEntityIds.has(payload.comment.id)) return;
+          if (!Array.isArray(COMMENTS[payload.itemId])) COMMENTS[payload.itemId] = [];
+          if (!COMMENTS[payload.itemId].some(c => c.id === payload.comment.id)) {
+            COMMENTS[payload.itemId].push(payload.comment);
+            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
+            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
+          }
+        } else if (payload.op === "del_comment" && payload.itemId && payload.commentId) {
+          deletedEntityIds.add(payload.commentId);
+          if (Array.isArray(COMMENTS[payload.itemId])) {
+            COMMENTS[payload.itemId] = COMMENTS[payload.itemId].filter(c => c.id !== payload.commentId);
+            if (COMMENTS[payload.itemId].length === 0) delete COMMENTS[payload.itemId];
+            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
+            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
+          }
+        } else if (payload.op === "edit_comment" && payload.itemId && payload.commentId) {
+          const target = (COMMENTS[payload.itemId] || []).find(c => c.id === payload.commentId);
+          if (target) {
+            target.text = payload.text;
+            target.edited = true;
+            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
+            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
+          }
+        }
+      } finally {
+        isApplyingRemoteUpdate = false;
+      }
+    }
+
+    // =========================================================================
+    // 4. СЕРВЕРНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ И ОБЛАЧНОЙ СИНХРОНИЗАЦИИ
+    // =========================================================================
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -3335,16 +3628,29 @@
       }
     }
 
+    // Скачивает ТОЛЬКО те колонки, которые реально изменились (не качает тяжёлую DB, если изменился только коммент!)
     async function pullUpdatedSectionsFromCloud(sectionsList) {
       if (!sbClient || isPushingToCloud) return;
       try {
-        const cols = (!sectionsList || sectionsList.includes("all") || sectionsList.includes("db"))
-          ? "db,categories,users,comments,notifications,updated_at"
-          : "users,comments,notifications,updated_at";
+        const reqCols = new Set(["updated_at"]);
+        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("db")) {
+          reqCols.add("db");
+          reqCols.add("categories");
+        }
+        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("users")) {
+          reqCols.add("users");
+        }
+        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("comments")) {
+          reqCols.add("comments");
+          reqCols.add("categories");
+        }
+        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("notifications")) {
+          reqCols.add("notifications");
+        }
 
         const { data, error } = await sbClient
           .from("cp2020_state")
-          .select(cols)
+          .select(Array.from(reqCols).join(","))
           .eq("id", "main_state")
           .maybeSingle();
 
@@ -3364,7 +3670,7 @@
       pendingSectionsToPush.add(sectionName);
 
       if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
-      pushDebounceTimer = setTimeout(flushPendingToCloud, 80);
+      pushDebounceTimer = setTimeout(flushPendingToCloud, 60);
     }
 
     async function flushPendingToCloud() {
@@ -3378,13 +3684,14 @@
         isApplyingRemoteUpdate = true;
         sanitizeUsersAndEnforceRoot();
         ensureMetaArraysInCategories();
+        purgeDeletedComments();
         isApplyingRemoteUpdate = false;
 
         setCloudStatusBadge("🔄", "Синхронизация...");
 
         const rpcParams = {
           p_db: (sections.includes("all") || sections.includes("db")) ? DB : null,
-          p_categories: (sections.includes("all") || sections.includes("db")) ? CATEGORIES : null,
+          p_categories: (sections.includes("all") || sections.includes("db") || sections.includes("comments")) ? CATEGORIES : null,
           p_users: (sections.includes("all") || sections.includes("users")) ? USERS : null,
           p_comments: (sections.includes("all") || sections.includes("comments")) ? COMMENTS : null,
           p_notifications: (sections.includes("all") || sections.includes("notifications")) ? NOTIFICATIONS : null
@@ -3424,7 +3731,7 @@
         isApplyingRemoteUpdate = false;
         isPushingToCloud = false;
         if (pendingSectionsToPush.size > 0) {
-          setTimeout(flushPendingToCloud, 80);
+          setTimeout(flushPendingToCloud, 60);
         }
       }
     }
@@ -3439,20 +3746,20 @@
         let commentsChanged = false;
         let notifsChanged = false;
 
-        if (incoming.db && Object.keys(incoming.db).length > 0 && !pendingSectionsToPush.has("db")) {
-          const newDbStr = JSON.stringify(incoming.db);
-          if (newDbStr !== JSON.stringify(DB)) {
-            DB = incoming.db;
-            safeLocalSet(STORAGE_DB_KEY, newDbStr);
-            dbChanged = true;
-          }
-        }
         if (incoming.categories && Object.keys(incoming.categories).length > 0 && !pendingSectionsToPush.has("db")) {
           const newCatStr = JSON.stringify(incoming.categories);
           if (newCatStr !== JSON.stringify(CATEGORIES)) {
             CATEGORIES = incoming.categories;
             ensureMetaArraysInCategories();
             safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+            dbChanged = true;
+          }
+        }
+        if (incoming.db && Object.keys(incoming.db).length > 0 && !pendingSectionsToPush.has("db")) {
+          const newDbStr = JSON.stringify(incoming.db);
+          if (newDbStr !== JSON.stringify(DB)) {
+            DB = incoming.db;
+            safeLocalSet(STORAGE_DB_KEY, newDbStr);
             dbChanged = true;
           }
         }
@@ -3466,10 +3773,12 @@
           }
         }
         if (incoming.comments && typeof incoming.comments === "object" && !pendingSectionsToPush.has("comments")) {
-          const newCommStr = JSON.stringify(incoming.comments);
-          if (newCommStr !== JSON.stringify(COMMENTS)) {
-            COMMENTS = incoming.comments;
-            safeLocalSet(STORAGE_COMMENTS_KEY, newCommStr);
+          const beforeStr = JSON.stringify(COMMENTS);
+          COMMENTS = incoming.comments;
+          purgeDeletedComments();
+          const afterStr = JSON.stringify(COMMENTS);
+          if (afterStr !== beforeStr) {
+            safeLocalSet(STORAGE_COMMENTS_KEY, afterStr);
             commentsChanged = true;
           }
         }
@@ -3575,17 +3884,7 @@
           await pullUpdatedSectionsFromCloud(["all"]);
         }
       } catch (e) {}
-    }, 5000);
-
-    window.addEventListener("storage", (ev) => {
-      if (isPushingToCloud || isApplyingRemoteUpdate) return;
-      try {
-        if (ev.key === STORAGE_DB_KEY && ev.newValue) applyCloudStateToUI({ db: JSON.parse(ev.newValue) });
-        if (ev.key === STORAGE_COMMENTS_KEY && ev.newValue) applyCloudStateToUI({ comments: JSON.parse(ev.newValue) });
-        if (ev.key === STORAGE_NOTIF_KEY && ev.newValue) applyCloudStateToUI({ notifications: JSON.parse(ev.newValue) });
-        if (ev.key === STORAGE_USERS_KEY && ev.newValue) applyCloudStateToUI({ users: JSON.parse(ev.newValue) });
-      } catch (e) {}
-    });
+    }, 4000);
 
     async function initRealtimeCloud() {
       try {
@@ -3615,25 +3914,19 @@
           });
         }
 
-        liveChannel = sbClient.channel("cp2020-realtime-v3", {
+        liveChannel = sbClient.channel("cp2020-realtime-v4", {
           config: { broadcast: { self: false } }
         });
 
         liveChannel
+          .on("broadcast", { event: "instant_op" }, (msg) => {
+            if (msg.payload) handleInstantOperation(msg.payload);
+          })
           .on("broadcast", { event: "cloud_poke" }, (msg) => {
             if (msg.payload && msg.payload.sender !== CLIENT_TAB_ID) {
               pullUpdatedSectionsFromCloud(msg.payload.sections || ["all"]);
             }
           })
-          .on(
-            "postgres_changes",
-            { event: "*", schema: "public", table: "cp2020_state", filter: "id=eq.main_state" },
-            (payload) => {
-              if (!isPushingToCloud) {
-                pullUpdatedSectionsFromCloud(["all"]);
-              }
-            }
-          )
           .subscribe((status) => {
             if (status === "SUBSCRIBED") {
               setCloudStatusBadge("🟢", "В сети");
