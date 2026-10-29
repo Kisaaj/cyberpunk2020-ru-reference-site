@@ -3285,9 +3285,9 @@
     let isApplyingRemoteUpdate = false;
     let isPushingDb = false;
 
-    // Счётчики комментариев для карточек каталога (без скачивания самих текстов!)
+    // Единый клиентский буфер аватарок (подтягивается из отдельного хранилища cp2020_avatar_store / Storage)
+    const AVATAR_CACHE = {};
     let COMMENT_COUNTS = {};
-    // Множество ID карточек, для которых комментарии уже подгружены в буфер COMMENTS
     const loadedCommentItemIds = new Set();
 
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
@@ -3301,16 +3301,200 @@
     }
 
     // =========================================================================
-    // 1. ПРЕОБРАЗОВАНИЕ СТРОКИ ТАБЛИЦЫ CP2020_USERS <-> ОБЪЕКТ ПОЛЬЗОВАТЕЛЯ
+    // 1. ВЫДЕЛЕННОЕ ХРАНИЛИЩЕ АВАТАРОК (ДЛЯ ПРОФИЛЕЙ И КОММЕНТАРИЕВ)
+    // =========================================================================
+    async function compressImageForStorage(dataUrl, maxDim = 320, quality = 0.82) {
+      if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
+      // Анимированные GIF сохраняем как есть, чтобы не ломать анимацию кадров
+      if (dataUrl.startsWith("data:image/gif")) return dataUrl;
+
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let w = img.naturalWidth || img.width || maxDim;
+            let h = img.naturalHeight || img.height || maxDim;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w; canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            let compressed = canvas.toDataURL("image/webp", quality);
+            if (!compressed || compressed.length >= dataUrl.length) {
+              compressed = canvas.toDataURL("image/jpeg", quality);
+            }
+            resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+          } catch (err) { resolve(dataUrl); }
+        };
+        img.onerror = () => resolve(dataUrl);
+        img.src = dataUrl;
+      });
+    }
+
+    // Сохраняет аватарку пользователя в отдельное хранилище (Storage Bucket или таблицу cp2020_avatar_store)
+    async function uploadUserAvatarToStore(userId, fileOrDataUrl) {
+      if (!sbClient || !userId) return "";
+      setCloudStatusBadge("🔄", "Загрузка аватара в хранилище...");
+      try {
+        let finalAvatarUrl = "";
+
+        // Попытка №1: если передан File, пробуем загрузить в файловый бакет Supabase Storage (cp2020_avatars)
+        if (fileOrDataUrl instanceof File) {
+          const ext = (fileOrDataUrl.name.split(".").pop() || "png").toLowerCase();
+          const filePath = `${userId}_${Date.now()}.${ext}`;
+          const { error: upErr } = await sbClient.storage
+            .from("cp2020_avatars")
+            .upload(filePath, fileOrDataUrl, { upsert: true, contentType: fileOrDataUrl.type });
+
+          if (!upErr) {
+            const { data: pubData } = sbClient.storage.from("cp2020_avatars").getPublicUrl(filePath);
+            if (pubData && pubData.publicUrl) {
+              finalAvatarUrl = pubData.publicUrl;
+            }
+          }
+        }
+
+        // Если бакет закрыт или передан DataURL — пережимаем и сохраняем в выделенную таблицу cp2020_avatar_store
+        if (!finalAvatarUrl) {
+          const rawDataUrl = (fileOrDataUrl instanceof File)
+            ? await new Promise((res) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(fileOrDataUrl); })
+            : String(fileOrDataUrl || "");
+
+          finalAvatarUrl = rawDataUrl.startsWith("data:image/")
+            ? await compressImageForStorage(rawDataUrl, 300, 0.82)
+            : rawDataUrl;
+        }
+
+        // Записываем в выделенную таблицу-реестр аватарок cp2020_avatar_store
+        await sbClient
+          .from("cp2020_avatar_store")
+          .upsert({
+            user_id: userId,
+            avatar_data: finalAvatarUrl,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id" });
+
+        // Если это короткая публичная ссылка (http/https), дублируем её и в avatar_url профиля
+        const shortUrl = finalAvatarUrl.startsWith("http") ? finalAvatarUrl : `store://${userId}`;
+        await sbClient
+          .from("cp2020_users")
+          .update({ avatar_url: shortUrl, updated_at: new Date().toISOString() })
+          .eq("id", userId);
+
+        // Обновляем локальный кэш аватарок и пользователя
+        AVATAR_CACHE[userId] = finalAvatarUrl;
+        const targetUser = USERS.find(u => u.id === userId);
+        if (targetUser) targetUser.avatar = finalAvatarUrl;
+
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "avatar_updated",
+            payload: { sender: CLIENT_TAB_ID, userId }
+          });
+        }
+
+        setCloudStatusBadge("🟢", "В сети");
+        return finalAvatarUrl;
+      } catch (err) {
+        console.error("Ошибка сохранения аватарки в хранилище:", err);
+        setCloudStatusBadge("🔴", "Ошибка загрузки аватара");
+        return "";
+      }
+    }
+
+    // Подгружает все аватарки из выделенного хранилища cp2020_avatar_store и раздаёт их профилям и комментариям
+    async function syncAllAvatarsFromStore(specificUserId = null) {
+      if (!sbClient) return;
+      try {
+        let query = sbClient.from("cp2020_avatar_store").select("user_id,avatar_data");
+        if (specificUserId) query = query.eq("user_id", specificUserId);
+
+        const { data, error } = await query;
+        if (error || !Array.isArray(data)) return;
+
+        data.forEach(row => {
+          if (row.user_id && row.avatar_data) {
+            AVATAR_CACHE[row.user_id] = row.avatar_data;
+          }
+        });
+
+        // Привязываем аватарки ко всем пользователям в памяти (откуда их берут и профили, и комментарии!)
+        let anyAttached = false;
+        USERS.forEach(u => {
+          if (AVATAR_CACHE[u.id] && u.avatar !== AVATAR_CACHE[u.id]) {
+            u.avatar = AVATAR_CACHE[u.id];
+            anyAttached = true;
+          }
+        });
+
+        if (anyAttached) {
+          updateAuthHeaderUI();
+          const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+          if (currentOpenId && (activeMainView === "catalog" || activeMainView === "rules")) {
+            refreshCurrentCardOrRuleView({ itemId: currentOpenId });
+          }
+          if (activeMainView === "profile") renderProfileView();
+          if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
+        }
+      } catch (err) {
+        console.error("Ошибка чтения хранилища аватарок:", err);
+      }
+    }
+
+    // Возвращаем полноценную загрузку файла аватарки с ПК в Профиле (с проверкой Сетевого Дозора и отправкой в хранилище!)
+    handleProfileAvatarUpload = async function(ev) {
+      const file = ev.target.files[0];
+      const u = getCurrentUser();
+      if (!file || !u) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+
+      const newAvatarData = await uploadUserAvatarToStore(u.id, file);
+      if (newAvatarData) {
+        u.avatar = newAvatarData;
+        updateAuthHeaderUI();
+        renderProfileView();
+      }
+      ev.target.value = "";
+    };
+
+    // Также сжимаем иллюстрации карточек в конструкторе до 500x500
+    handleImageUpload = function(ev) {
+      const file = ev.target.files[0];
+      if (!file) return;
+      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const rawData = e.target.result;
+        const beforeKb = Math.round((rawData.length * 0.75) / 1024);
+        currentBuilderImageData = await compressImageForStorage(rawData, 500, 0.78);
+        const afterKb = Math.round((currentBuilderImageData.length * 0.75) / 1024);
+        document.getElementById("builderImageUrl").value = "";
+        updateBuilderImagePreview();
+        const box = document.getElementById("builderImagePreviewBox");
+        if (box && currentBuilderImageData) {
+          box.innerHTML = `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Оптимизировано: ${beforeKb} КБ → <b>${afterKb} КБ</b></span>`;
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+
+    // =========================================================================
+    // 2. СИНХРОНИЗАЦИЯ ТАБЛИЦЫ ПРОФИЛЕЙ (CP2020_USERS) И ЖЕЛЕЗОБЕТОННОЕ УДАЛЕНИЕ
     // =========================================================================
     function mapRowToUser(r) {
+      const rawUrl = r.avatar_url || "";
+      const resolvedAvatar = AVATAR_CACHE[r.id] || (!rawUrl.startsWith("store://") ? rawUrl : "");
       return {
         id: r.id,
         displayName: r.display_name || "Эджраннер",
-        role: r.role || "USER",
+        role: r.id === "u-root" ? "ROOT" : (r.role || "USER"),
         favRole: r.fav_role || "Соло",
-        // Если в старой записи осталась тяжёлая Base64-аватарка (>15 КБ), отсекаем её, оставляя только URL или лёгкую иконку
-        avatar: (r.avatar_url && r.avatar_url.length < 15000) ? r.avatar_url : "",
+        avatar: resolvedAvatar,
         bio: r.bio || "",
         favorites: Array.isArray(r.favorites) ? r.favorites : [],
         notes: r.notes || "",
@@ -3320,12 +3504,14 @@
     }
 
     function mapUserToRow(u) {
+      const isExternalUrl = u.avatar && (u.avatar.startsWith("http://") || u.avatar.startsWith("https://"));
+      const hasStoredAvatar = Boolean(AVATAR_CACHE[u.id] || (u.avatar && u.avatar.startsWith("data:")));
       return {
         id: u.id,
         display_name: u.displayName || "Эджраннер",
         role: u.id === "u-root" ? "ROOT" : (u.role || "USER"),
         fav_role: u.favRole || "Соло",
-        avatar_url: (u.avatar && !u.avatar.startsWith("data:")) ? u.avatar : "",
+        avatar_url: isExternalUrl ? u.avatar : (hasStoredAvatar ? `store://${u.id}` : ""),
         bio: u.bio || "",
         favorites: Array.isArray(u.favorites) ? u.favorites : [],
         notes: u.notes || "",
@@ -3350,11 +3536,20 @@
       };
     }
 
-    // Сохраняет в таблицу cp2020_users ТОЛЬКО ОДНОГО конкретного пользователя (не трогая базу и других людей!)
     async function saveSingleUserToCloud(userObj) {
       if (!sbClient || !userObj || !userObj.id) return;
       try {
         setCloudStatusBadge("🔄", "Сохранение профиля...");
+        // Если пользователь вставил прямую URL-ссылку на аватарку — сохраняем её и в хранилище аватарок
+        if (userObj.avatar && userObj.avatar.startsWith("http")) {
+          AVATAR_CACHE[userObj.id] = userObj.avatar;
+          await sbClient.from("cp2020_avatar_store").upsert({
+            user_id: userObj.id,
+            avatar_data: userObj.avatar,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id" });
+        }
+
         const row = mapUserToRow(userObj);
         const { error } = await sbClient
           .from("cp2020_users")
@@ -3375,7 +3570,7 @@
       }
     }
 
-    // Загружает список профилей из изолированной таблицы cp2020_users
+    // Загружает точный список пользователей с сервера (полностью заменяя локальный кэш, чтобы удалённые никогда не воскресали!)
     async function fetchAllUsersFromCloud() {
       if (!sbClient) return;
       try {
@@ -3384,8 +3579,10 @@
           .select("*")
           .order("created_at", { ascending: true });
         if (error) throw error;
+
         if (Array.isArray(data) && data.length > 0) {
           isApplyingRemoteUpdate = true;
+          // Полностью заменяем массив USERS списком из базы (никакого слияния со старым кэшем браузера!)
           USERS = data.map(mapRowToUser);
           sanitizeUsersAndEnforceRoot();
           safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
@@ -3394,7 +3591,8 @@
           updateCounts();
           isApplyingRemoteUpdate = false;
 
-          // Обновляем только открытые экраны пользователей, НЕ сбрасывая ввод в конструкторе!
+          await syncAllAvatarsFromStore();
+
           const activeEl = document.activeElement;
           const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
           if (activeMainView === "admin" && activeAdminSubtab === "users" && !isTyping) {
@@ -3408,8 +3606,52 @@
       }
     }
 
+    // ЖЕЛЕЗОБЕТОННОЕ УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (больше никогда не вернётся после F5!)
+    deleteUserAccount = async function(uid) {
+      if (!isCurrentUserRoot()) return;
+      const t = USERS.find(u => u.id === uid);
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» навсегда со всеми его комментариями и аватаркой?`)) return;
+
+      try {
+        setCloudStatusBadge("🔄", "Удаление пользователя...");
+
+        // 1. Удаляем из локальной памяти и кэша браузера
+        delete AVATAR_CACHE[uid];
+        USERS = USERS.filter(u => u.id !== uid);
+        Object.keys(COMMENTS).forEach(itemId => {
+          if (Array.isArray(COMMENTS[itemId])) {
+            COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
+          }
+        });
+        safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+        safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+        updateCounts();
+        renderAdminUsersManager();
+
+        // 2. Прямое удаление из таблиц Supabase + вызов серверной функции очистки
+        if (sbClient) {
+          await sbClient.from("cp2020_users").delete().eq("id", uid);
+          await sbClient.from("cp2020_comments").delete().eq("user_id", uid);
+          await sbClient.from("cp2020_avatar_store").delete().eq("user_id", uid);
+          await sbClient.rpc("delete_cp2020_user_completely", { p_user_id: uid });
+
+          if (liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "user_deleted",
+              payload: { sender: CLIENT_TAB_ID, userId: uid }
+            });
+          }
+        }
+        setCloudStatusBadge("🟢", "В сети");
+      } catch (err) {
+        console.error("Ошибка удаления пользователя:", err);
+        setCloudStatusBadge("🔴", "Ошибка удаления пользователя");
+      }
+    };
+
     // =========================================================================
-    // 2. ТОЧЕЧНАЯ (ЛЕНИВАЯ) ПОДГРУЗКА И СОХРАНЕНИЕ КОММЕНТАРИЕВ ДЛЯ ОТКРЫТОЙ КАРТОЧКИ
+    // 3. ЛЕНИВАЯ ПОДГРУЗКА И СОХРАНЕНИЕ КОММЕНТАРИЕВ (С ПОДТЯГИВАНИЕМ АВАТАРОК)
     // =========================================================================
     async function loadCommentsForCardFromCloud(itemId, forceReload = false) {
       if (!sbClient || !itemId) return;
@@ -3431,7 +3673,6 @@
         safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
         isApplyingRemoteUpdate = false;
 
-        // Точечно обновляем ТОЛЬКО блок комментариев под карточкой, не трогая остальные поля сайта!
         refreshCurrentCardOrRuleView({ itemId });
       } catch (err) {
         console.error("Ошибка подгрузки комментариев карточки:", err);
@@ -3449,7 +3690,6 @@
       } catch (e) {}
     }
 
-    // Перехватываем открытие любой карточки или механики, чтобы подгружать ТОЛЬКО её комментарии!
     const origRenderDetailCard = renderDetailCard;
     renderDetailCard = function(item) {
       origRenderDetailCard(item);
@@ -3466,7 +3706,6 @@
       }
     };
 
-    // Перехватываем отправку комментария: делаем прямой INSERT одной строки в таблицу cp2020_comments!
     submitNewComment = async function(e, itemId) {
       if (e) e.preventDefault();
       const u = getCurrentUser();
@@ -3493,7 +3732,6 @@
         replyToSnippet: isReplying ? activeReplyToComment.snippet : null
       };
 
-      // 1. Сразу кладём в локальный буфер браузера и рисуем
       if (!Array.isArray(COMMENTS[itemId])) COMMENTS[itemId] = [];
       COMMENTS[itemId].push(newCommentObj);
       COMMENT_COUNTS[itemId] = COMMENTS[itemId].length;
@@ -3506,7 +3744,6 @@
       const newInp = document.getElementById(`new-comment-input-${itemId}`);
       if (newInp) newInp.focus();
 
-      // 2. Отправляем ТОЛЬКО ЭТОТ КОММЕНТАРИЙ отдельной строкой в базу cp2020_comments
       if (sbClient) {
         try {
           setCloudStatusBadge("🔄", "Отправка комментария...");
@@ -3550,7 +3787,6 @@
       }
     };
 
-    // Редактирование одного комментария в таблице cp2020_comments
     saveEditedComment = async function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
@@ -3585,7 +3821,6 @@
       }
     };
 
-    // Удаление одного комментария из таблицы cp2020_comments
     deleteComment = async function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
@@ -3620,8 +3855,6 @@
       }
     };
 
-    // При открытии вкладки «Логи -> Комментарии» у Админа подгружаем последние 150 комментариев со всего сайта
-    const origSwitchLogsSubtab = switchAdminLogsSubtab;
     switchAdminLogsSubtab = async function(sub) {
       activeAdminLogsSubtab = sub;
       if (sub === "comments" && sbClient) {
@@ -3645,15 +3878,8 @@
     };
 
     // =========================================================================
-    // 3. ТОЧЕЧНАЯ РЕГИСТРАЦИЯ, РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ЗАПИСИ ВСЕЙ БАЗЫ!)
+    // 4. РЕГИСТРАЦИЯ И СОЗДАНИЕ АККАУНТОВ АДМИНОМ
     // =========================================================================
-    // Запрещаем загрузку тяжёлых файлов аватарок с ПК в базу (оставляем только лёгкие внешние URL-ссылки)
-    handleProfileAvatarUpload = function(ev) {
-      ev.target.value = "";
-      showNetwatchAlert("Чтобы не перегружать облачную базу данных картинками, загрузка файлов аватарок с ПК отключена.<br><br>Пожалуйста, вставьте <b>прямую ссылку (URL)</b> на картинку в поле слева (например, с Imgur, Discord, ВК или GitHub).");
-    };
-
-    // Регистрация создаёт ТОЛЬКО 1 запись в cp2020_PassVault и 1 строку в cp2020_users!
     handleRegisterSubmit = async function(e) {
       e.preventDefault();
       const username = document.getElementById("regUsername").value.trim();
@@ -3706,7 +3932,6 @@
         persistSessionOnly();
         safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
 
-        // Записываем в облако ТОЛЬКО строку нового игрока! Никакая общая база не перезаписывается!
         await saveSingleUserToCloud(newUser);
 
         e.target.reset();
@@ -3717,34 +3942,42 @@
       }
     };
 
-    // Удаление аккаунта вызывает серверную функцию delete_cp2020_user_completely
-    deleteUserAccount = async function(uid) {
-      if (!isCurrentUserRoot()) return;
-      const t = USERS.find(u => u.id === uid);
-      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями?`)) return;
+    adminCreateUserManually = async function(e) {
+      e.preventDefault();
+      const username = document.getElementById("admNewLogin").value.trim();
+      const displayName = document.getElementById("admNewName").value.trim();
+      const password = document.getElementById("admNewPass").value.trim();
+      const avatar = document.getElementById("admNewAvatar").value.trim();
+      const role = document.getElementById("admNewRole").value;
 
-      USERS = USERS.filter(u => u.id !== uid);
-      Object.keys(COMMENTS).forEach(itemId => {
-        if (Array.isArray(COMMENTS[itemId])) {
-          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
-        }
-      });
-      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
-      renderAdminUsersManager();
-
-      if (sbClient) {
-        await sbClient.rpc("delete_cp2020_user_completely", { p_user_id: uid });
-        if (liveChannel) {
-          liveChannel.send({
-            type: "broadcast",
-            event: "user_deleted",
-            payload: { sender: CLIENT_TAB_ID, userId: uid }
-          });
-        }
+      if (window.checkUsernameTakenInVault) {
+        const isTaken = await window.checkUsernameTakenInVault(username);
+        if (isTaken) { alert("Такой логин уже существует!"); return; }
       }
+
+      const newUserId = "u-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+      await window.savePasswordInCloudVault(newUserId, username, password);
+
+      const newUser = {
+        id: newUserId,
+        displayName,
+        role: isCurrentUserRoot() ? role : "USER",
+        favRole: "Соло",
+        avatar: avatar || "",
+        bio: "Аккаунт создан через панель Администратора.",
+        favorites: [],
+        notes: "",
+        createdAt: new Date().toISOString().slice(0, 10)
+      };
+
+      USERS.push(newUser);
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+      await saveSingleUserToCloud(newUser);
+      e.target.reset();
+      document.getElementById("adminQuickUserForm").classList.add("hidden");
+      renderAdminUsersManager();
     };
 
-    // При изменении настроек профиля, бане или добавлении в избранное — сохраняем в облако только целевого пользователя
     persistUsers = function() {
       try {
         if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
@@ -3759,7 +3992,6 @@
       }
     };
 
-    // Перехватываем бан, разбан и выдачу прав админа, чтобы сохранялась именно строка целевого пользователя
     const origConfirmBan = confirmBanUserSubmit;
     confirmBanUserSubmit = function(e) {
       const targetId = document.getElementById("banModalTargetId").value;
@@ -3782,9 +4014,6 @@
       if (target) saveSingleUserToCloud(target);
     };
 
-    // =========================================================================
-    // 4. СИНХРОНИЗАЦИЯ КАРТОЧЕК СПРАВОЧНИКА (ТОЛЬКО КОГДА АДМИН РЕДАКТИРУЕТ КАРТОЧКИ)
-    // =========================================================================
     const origPersistDB = persistDatabase;
     persistDatabase = async function() {
       origPersistDB();
@@ -3812,7 +4041,6 @@
       }
     };
 
-    // Серверные функции паролей
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -3848,7 +4076,7 @@
     window.deleteUserFromCloudVault = async function(userId) {
       if (!sbClient) return false;
       try {
-        await sbClient.rpc("delete_cp2020_user_vault", { p_user_id: userId });
+        await sbClient.rpc("delete_cp2020_user_completely", { p_user_id: userId });
         return true;
       } catch (e) { return false; }
     };
@@ -3886,7 +4114,7 @@
         // 1. Загружаем справочник карточек (main_state)
         const { data: mainRow, error: mainErr } = await sbClient
           .from("cp2020_state")
-          .select("db,categories,users,comments")
+          .select("db,categories")
           .eq("id", "main_state")
           .maybeSingle();
 
@@ -3902,24 +4130,13 @@
           isApplyingRemoteUpdate = false;
         }
 
-        // 2. Загружаем пользователей из отдельной таблицы cp2020_users
-        const { data: userRows } = await sbClient.from("cp2020_users").select("*");
-        if (Array.isArray(userRows) && userRows.length > 1) {
-          USERS = userRows.map(mapRowToUser);
-          sanitizeUsersAndEnforceRoot();
-        } else if (mainRow && Array.isArray(mainRow.users) && mainRow.users.length > 0) {
-          // Автоматический перенос существующих пользователей в новую таблицу cp2020_users при первом запуске
-          USERS = mainRow.users;
-          sanitizeUsersAndEnforceRoot();
-          for (const u of USERS) {
-            await sbClient.from("cp2020_users").upsert(mapUserToRow(u), { onConflict: "id" });
-          }
-        }
-        window.hasCloudUsersLoaded = true;
-        checkAndEnforceCurrentSessionValidity();
-        updateCounts();
+        // 2. Сначала подгружаем реестр аватарок из отдельного хранилища cp2020_avatar_store
+        await syncAllAvatarsFromStore();
 
-        // 3. Подгружаем счётчики комментариев и комментарии ТОЛЬКО для текущей открытой карточки!
+        // 3. Загружаем актуальный список профилей строго из таблицы cp2020_users (никакого возврата удалённых юзеров!)
+        await fetchAllUsersFromCloud();
+
+        // 4. Подгружаем счётчики и комментарии открытой карточки
         await fetchCommentCountsFromCloud();
         const activeCardId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
         if (activeCardId) {
@@ -3931,8 +4148,8 @@
           renderCatalog();
         }
 
-        // 4. Подписываемся на мгновенные точечные уведомления
-        liveChannel = sbClient.channel("cp2020-relational-v1", {
+        // 5. Подписываемся на мгновенные события
+        liveChannel = sbClient.channel("cp2020-relational-v2", {
           config: { broadcast: { self: false } }
         });
 
@@ -3941,7 +4158,6 @@
             const p = msg.payload;
             if (!p || p.sender === CLIENT_TAB_ID) return;
 
-            // Обновляем буфер комментариев для конкретной карточки
             if (p.op === "insert" && p.comment) {
               if (!Array.isArray(COMMENTS[p.itemId])) COMMENTS[p.itemId] = [];
               if (!COMMENTS[p.itemId].some(c => c.id === p.comment.id)) {
@@ -3956,7 +4172,6 @@
               }
             }
 
-            // Перерисовываем ТОЛЬКО блок комментариев и ТОЛЬКО если у пользователя сейчас открыта эта самая карточка!
             const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
             if (currentOpenId === p.itemId) {
               refreshCurrentCardOrRuleView({ itemId: p.itemId });
@@ -3964,13 +4179,19 @@
               renderAdminLogsView();
             }
           })
+          .on("broadcast", { event: "avatar_updated" }, (msg) => {
+            const uid = msg.payload?.userId;
+            if (uid) syncAllAvatarsFromStore(uid);
+          })
           .on("broadcast", { event: "user_changed" }, () => {
             fetchAllUsersFromCloud();
           })
           .on("broadcast", { event: "user_deleted" }, (msg) => {
             const uid = msg.payload?.userId;
             if (!uid) return;
+            delete AVATAR_CACHE[uid];
             USERS = USERS.filter(u => u.id !== uid);
+            safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
             checkAndEnforceCurrentSessionValidity();
             updateCounts();
             if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
@@ -3997,7 +4218,6 @@
       }
     }
 
-    // Лёгкая проверка актуальности комментариев открытой карточки раз в 4 секунды (резервный канал на случай потери WebSocket-пакета)
     setInterval(() => {
       if (!sbClient || document.hidden) return;
       const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
