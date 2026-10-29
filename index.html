@@ -3285,7 +3285,6 @@
     let isApplyingRemoteUpdate = false;
     let isPushingDb = false;
 
-    // Единый клиентский буфер аватарок (подтягивается из отдельного хранилища cp2020_avatar_store / Storage)
     const AVATAR_CACHE = {};
     let COMMENT_COUNTS = {};
     const loadedCommentItemIds = new Set();
@@ -3301,12 +3300,63 @@
     }
 
     // =========================================================================
-    // 1. ВЫДЕЛЕННОЕ ХРАНИЛИЩЕ АВАТАРОК (ДЛЯ ПРОФИЛЕЙ И КОММЕНТАРИЕВ)
+    // 1. ЕДИНОЕ ВРЕМЯ ПО МОСКВЕ (МСК / UTC+3) НЕЗАВИСИМО ОТ ЧАСОВ НА ПК ИГРОКА
     // =========================================================================
-    async function compressImageForStorage(dataUrl, maxDim = 320, quality = 0.82) {
+    function getMoscowTimeFormatted(onlyDate = false) {
+      try {
+        const now = new Date();
+        const parts = new Intl.DateTimeFormat("ru-RU", {
+          timeZone: "Europe/Moscow",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: false
+        }).formatToParts(now);
+
+        const map = {};
+        parts.forEach(p => { map[p.type] = p.value; });
+        const dateStr = `${map.year}-${map.month}-${map.day}`;
+        if (onlyDate) return dateStr;
+        return `${dateStr} ${map.hour}:${map.minute} (МСК)`;
+      } catch (e) {
+        // Резервный расчёт UTC+3 вручную, если браузер старый
+        const msk = new Date(Date.now() + 3 * 3600 * 1000);
+        const iso = msk.toISOString();
+        return onlyDate ? iso.slice(0, 10) : (iso.slice(0, 10) + " " + iso.slice(11, 16) + " (МСК)");
+      }
+    }
+
+    // Переопределяем запись логов изменений карточек на время по МСК
+    addChangeLogEntry = function(actionType, sectionKey, itemObj) {
+      ensureMetaArraysInCategories();
+      const u = getCurrentUser();
+      const entry = {
+        id: "chg-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        action: actionType,
+        sectionKey,
+        itemId: itemObj.id,
+        itemName: itemObj.name || itemObj.title || "Без названия",
+        itemCategory: itemObj.category || itemObj.subsection || "—",
+        itemBook: itemObj.book || "—",
+        userId: u ? u.id : "u-root",
+        userName: u ? u.displayName : "Администратор",
+        createdAt: getMoscowTimeFormatted(false)
+      };
+      CATEGORIES._changeLogs.unshift(entry);
+      if (CATEGORIES._changeLogs.length > 250) {
+        CATEGORIES._changeLogs = CATEGORIES._changeLogs.slice(0, 250);
+      }
+    };
+
+    // =========================================================================
+    // 2. БЕЗОТКАЗНАЯ ЗАГРУЗКА И ПРИМЕНЕНИЕ АВАТАРОК (С ПК И ПО ССЫЛКЕ)
+    // =========================================================================
+    async function compressImageForStorage(dataUrl, maxDim = 260, quality = 0.82) {
       if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
-      // Анимированные GIF сохраняем как есть, чтобы не ломать анимацию кадров
-      if (dataUrl.startsWith("data:image/gif")) return dataUrl;
+      // Если это GIF небольшого размера — оставляем анимацию, иначе аккуратно сжимаем кадр до 260x260
+      if (dataUrl.startsWith("data:image/gif") && dataUrl.length < 350000) return dataUrl;
 
       return new Promise((resolve) => {
         const img = new Image();
@@ -3327,7 +3377,7 @@
             if (!compressed || compressed.length >= dataUrl.length) {
               compressed = canvas.toDataURL("image/jpeg", quality);
             }
-            resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+            resolve(compressed);
           } catch (err) { resolve(dataUrl); }
         };
         img.onerror = () => resolve(dataUrl);
@@ -3335,135 +3385,129 @@
       });
     }
 
-    // Сохраняет аватарку пользователя в отдельное хранилище (Storage Bucket или таблицу cp2020_avatar_store)
-    async function uploadUserAvatarToStore(userId, fileOrDataUrl) {
-      if (!sbClient || !userId) return "";
-      setCloudStatusBadge("🔄", "Загрузка аватара в хранилище...");
+    async function saveAvatarToCloudEverywhere(userId, avatarDataStr) {
+      if (!userId || !avatarDataStr) return;
+      AVATAR_CACHE[userId] = avatarDataStr;
+
+      const u = USERS.find(x => x.id === userId);
+      if (u) u.avatar = avatarDataStr;
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+
+      if (!sbClient) return;
       try {
-        let finalAvatarUrl = "";
-
-        // Попытка №1: если передан File, пробуем загрузить в файловый бакет Supabase Storage (cp2020_avatars)
-        if (fileOrDataUrl instanceof File) {
-          const ext = (fileOrDataUrl.name.split(".").pop() || "png").toLowerCase();
-          const filePath = `${userId}_${Date.now()}.${ext}`;
-          const { error: upErr } = await sbClient.storage
-            .from("cp2020_avatars")
-            .upload(filePath, fileOrDataUrl, { upsert: true, contentType: fileOrDataUrl.type });
-
-          if (!upErr) {
-            const { data: pubData } = sbClient.storage.from("cp2020_avatars").getPublicUrl(filePath);
-            if (pubData && pubData.publicUrl) {
-              finalAvatarUrl = pubData.publicUrl;
-            }
-          }
-        }
-
-        // Если бакет закрыт или передан DataURL — пережимаем и сохраняем в выделенную таблицу cp2020_avatar_store
-        if (!finalAvatarUrl) {
-          const rawDataUrl = (fileOrDataUrl instanceof File)
-            ? await new Promise((res) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.readAsDataURL(fileOrDataUrl); })
-            : String(fileOrDataUrl || "");
-
-          finalAvatarUrl = rawDataUrl.startsWith("data:image/")
-            ? await compressImageForStorage(rawDataUrl, 300, 0.82)
-            : rawDataUrl;
-        }
-
-        // Записываем в выделенную таблицу-реестр аватарок cp2020_avatar_store
+        setCloudStatusBadge("🔄", "Сохранение аватарки...");
+        // 1. Записываем в выделенное хранилище cp2020_avatar_store
         await sbClient
           .from("cp2020_avatar_store")
           .upsert({
             user_id: userId,
-            avatar_data: finalAvatarUrl,
+            avatar_data: avatarDataStr,
             updated_at: new Date().toISOString()
           }, { onConflict: "user_id" });
 
-        // Если это короткая публичная ссылка (http/https), дублируем её и в avatar_url профиля
-        const shortUrl = finalAvatarUrl.startsWith("http") ? finalAvatarUrl : `store://${userId}`;
+        // 2. Одновременно записываем напрямую в строку пользователя cp2020_users, чтобы она гарантированно читалась везде!
         await sbClient
           .from("cp2020_users")
-          .update({ avatar_url: shortUrl, updated_at: new Date().toISOString() })
+          .update({
+            avatar_url: avatarDataStr,
+            updated_at: new Date().toISOString()
+          })
           .eq("id", userId);
-
-        // Обновляем локальный кэш аватарок и пользователя
-        AVATAR_CACHE[userId] = finalAvatarUrl;
-        const targetUser = USERS.find(u => u.id === userId);
-        if (targetUser) targetUser.avatar = finalAvatarUrl;
 
         if (liveChannel) {
           liveChannel.send({
             type: "broadcast",
             event: "avatar_updated",
-            payload: { sender: CLIENT_TAB_ID, userId }
+            payload: { sender: CLIENT_TAB_ID, userId, avatar: avatarDataStr }
           });
         }
-
         setCloudStatusBadge("🟢", "В сети");
-        return finalAvatarUrl;
       } catch (err) {
-        console.error("Ошибка сохранения аватарки в хранилище:", err);
-        setCloudStatusBadge("🔴", "Ошибка загрузки аватара");
-        return "";
+        console.error("Ошибка сохранения аватара:", err);
+        setCloudStatusBadge("🔴", "Ошибка сохранения аватара");
       }
     }
 
-    // Подгружает все аватарки из выделенного хранилища cp2020_avatar_store и раздаёт их профилям и комментариям
-    async function syncAllAvatarsFromStore(specificUserId = null) {
-      if (!sbClient) return;
-      try {
-        let query = sbClient.from("cp2020_avatar_store").select("user_id,avatar_data");
-        if (specificUserId) query = query.eq("user_id", specificUserId);
-
-        const { data, error } = await query;
-        if (error || !Array.isArray(data)) return;
-
-        data.forEach(row => {
-          if (row.user_id && row.avatar_data) {
-            AVATAR_CACHE[row.user_id] = row.avatar_data;
-          }
-        });
-
-        // Привязываем аватарки ко всем пользователям в памяти (откуда их берут и профили, и комментарии!)
-        let anyAttached = false;
-        USERS.forEach(u => {
-          if (AVATAR_CACHE[u.id] && u.avatar !== AVATAR_CACHE[u.id]) {
-            u.avatar = AVATAR_CACHE[u.id];
-            anyAttached = true;
-          }
-        });
-
-        if (anyAttached) {
-          updateAuthHeaderUI();
-          const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
-          if (currentOpenId && (activeMainView === "catalog" || activeMainView === "rules")) {
-            refreshCurrentCardOrRuleView({ itemId: currentOpenId });
-          }
-          if (activeMainView === "profile") renderProfileView();
-          if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
-        }
-      } catch (err) {
-        console.error("Ошибка чтения хранилища аватарок:", err);
-      }
-    }
-
-    // Возвращаем полноценную загрузку файла аватарки с ПК в Профиле (с проверкой Сетевого Дозора и отправкой в хранилище!)
-    handleProfileAvatarUpload = async function(ev) {
-      const file = ev.target.files[0];
+    // При выборе файла с ПК сразу читаем, сжимаем, отображаем в профиле и сохраняем в облако!
+    window.handleProfileAvatarUpload = async function(ev) {
+      const file = ev.target.files && ev.target.files[0];
       const u = getCurrentUser();
       if (!file || !u) return;
       if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
 
-      const newAvatarData = await uploadUserAvatarToStore(u.id, file);
-      if (newAvatarData) {
-        u.avatar = newAvatarData;
-        updateAuthHeaderUI();
-        renderProfileView();
-      }
+      const rawDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+
+      if (!rawDataUrl) return;
+      const optimizedAvatar = await compressImageForStorage(rawDataUrl, 260, 0.82);
+
+      // Мгновенно ставим аватарку текущему пользователю и обновляем весь экран!
+      u.avatar = optimizedAvatar;
+      AVATAR_CACHE[u.id] = optimizedAvatar;
+      const urlInp = document.getElementById("editProfAvatarUrl");
+      if (urlInp) urlInp.value = "";
+
+      updateAuthHeaderUI();
+      renderProfileView();
+
+      await saveAvatarToCloudEverywhere(u.id, optimizedAvatar);
       ev.target.value = "";
     };
 
-    // Также сжимаем иллюстрации карточек в конструкторе до 500x500
-    handleImageUpload = function(ev) {
+    // Переопределяем кнопку «Сохранить профиль», чтобы она НЕ затирала загруженную с ПК аватарку пустым полем URL!
+    window.saveUserProfileChanges = async function(e) {
+      e.preventDefault();
+      const u = getCurrentUser();
+      if (!u) return;
+
+      const newUrl = document.getElementById("editProfAvatarUrl").value.trim();
+      if (newUrl !== "" && !validateImageUrlForRole(newUrl)) return;
+
+      const newName = document.getElementById("editProfDisplayName").value.trim();
+      const newPass = document.getElementById("editProfPassword").value;
+
+      if (newName) u.displayName = newName;
+      u.favRole = document.getElementById("editProfFavRole").value;
+      u.bio = document.getElementById("editProfBio").value.trim();
+
+      // Если вписана новая внешняя ссылка — ставим её, иначе бережно сохраняем уже загруженную с ПК аватарку!
+      if (newUrl !== "") {
+        u.avatar = newUrl;
+        AVATAR_CACHE[u.id] = newUrl;
+      } else if (AVATAR_CACHE[u.id]) {
+        u.avatar = AVATAR_CACHE[u.id];
+      }
+
+      if (newPass.trim() !== "" && window.updatePasswordByIdInVault) {
+        await window.updatePasswordByIdInVault(u.id, newPass.trim());
+      }
+
+      updateAuthHeaderUI();
+      renderProfileView();
+      await saveSingleUserToCloud(u);
+      if (u.avatar) {
+        await saveAvatarToCloudEverywhere(u.id, u.avatar);
+      }
+
+      const btn = document.getElementById("saveProfileBtn");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "✓ СОХРАНЕНО!";
+        btn.className = "w-full py-2.5 bg-cp-green text-black font-display font-black uppercase tracking-wider cursor-not-allowed transition-all";
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = "💾 Сохранить профиль";
+          btn.className = "w-full py-2.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold uppercase tracking-wider transition-all";
+        }, 2000);
+      }
+    };
+
+    // Сжатие картинок в конструкторе карточек
+    window.handleImageUpload = function(ev) {
       const file = ev.target.files[0];
       if (!file) return;
       if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
@@ -3483,12 +3527,167 @@
       reader.readAsDataURL(file);
     };
 
+    async function syncAllAvatarsFromStore(specificUserId = null) {
+      if (!sbClient) return;
+      try {
+        let query = sbClient.from("cp2020_avatar_store").select("user_id,avatar_data");
+        if (specificUserId) query = query.eq("user_id", specificUserId);
+
+        const { data, error } = await query;
+        if (!error && Array.isArray(data)) {
+          data.forEach(row => {
+            if (row.user_id && row.avatar_data) {
+              AVATAR_CACHE[row.user_id] = row.avatar_data;
+            }
+          });
+        }
+
+        let anyAttached = false;
+        USERS.forEach(u => {
+          if (AVATAR_CACHE[u.id] && u.avatar !== AVATAR_CACHE[u.id]) {
+            u.avatar = AVATAR_CACHE[u.id];
+            anyAttached = true;
+          }
+        });
+
+        if (anyAttached) {
+          updateAuthHeaderUI();
+          const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+          if (currentOpenId && (activeMainView === "catalog" || activeMainView === "rules")) {
+            refreshCurrentCardOrRuleView({ itemId: currentOpenId });
+          }
+          if (activeMainView === "profile") renderProfileView();
+          if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
+        }
+      } catch (err) {}
+    }
+
     // =========================================================================
-    // 2. СИНХРОНИЗАЦИЯ ТАБЛИЦЫ ПРОФИЛЕЙ (CP2020_USERS) И ЖЕЛЕЗОБЕТОННОЕ УДАЛЕНИЕ
+    // 3. МГНОВЕННЫЕ ОБЛАЧНЫЕ УВЕДОМЛЕНИЯ (КОЛОКОЛЬЧИК РАБОТАЕТ У ВСЕХ!)
+    // =========================================================================
+    function mapRowToNotif(r) {
+      return {
+        id: r.id,
+        targetUserId: r.target_user_id,
+        type: r.type || "reply",
+        text: r.text || "",
+        linkData: r.link_data || null,
+        read: Boolean(r.read),
+        createdAt: r.created_at || ""
+      };
+    }
+
+    async function fetchMyNotificationsFromCloud() {
+      const u = getCurrentUser();
+      if (!sbClient || !u) return;
+      try {
+        const { data, error } = await sbClient
+          .from("cp2020_notifications")
+          .select("*")
+          .eq("target_user_id", u.id)
+          .order("id", { ascending: false })
+          .limit(60);
+
+        if (!error && Array.isArray(data)) {
+          NOTIFICATIONS = data.map(mapRowToNotif);
+          safeLocalSet(STORAGE_NOTIF_KEY, JSON.stringify(NOTIFICATIONS));
+          updateNotifBellUI();
+        }
+      } catch (e) {}
+    }
+
+    // Переопределяем создание уведомления: сохраняем в таблицу cp2020_notifications и шлём по WebSocket!
+    window.createNotification = async function(targetUserId, type, text, linkData = null) {
+      if (!targetUserId) return;
+      const newNotif = {
+        id: "ntf-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        targetUserId,
+        type: type || "reply",
+        text,
+        linkData,
+        read: false,
+        createdAt: getMoscowTimeFormatted(false)
+      };
+
+      const cur = getCurrentUser();
+      if (cur && cur.id === targetUserId) {
+        NOTIFICATIONS.unshift(newNotif);
+        updateNotifBellUI();
+      }
+
+      if (sbClient) {
+        try {
+          await sbClient.from("cp2020_notifications").insert({
+            id: newNotif.id,
+            target_user_id: newNotif.targetUserId,
+            type: newNotif.type,
+            text: newNotif.text,
+            link_data: newNotif.linkData,
+            read: false,
+            created_at: newNotif.createdAt
+          });
+        } catch (e) {}
+
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "notif_op",
+            payload: { sender: CLIENT_TAB_ID, op: "add", notif: newNotif }
+          });
+        }
+      }
+    };
+
+    // При открытии колокольчика помечаем уведомления прочитанными и в базе данных
+    window.toggleNotifDropdown = async function(e) {
+      e.stopPropagation();
+      closeUserDropdown();
+      const menu = document.getElementById("notifDropdownMenu");
+      if (menu.classList.contains("hidden")) {
+        renderNotifDropdownList();
+        menu.classList.remove("hidden");
+        const u = getCurrentUser();
+        if (u) {
+          let changed = false;
+          NOTIFICATIONS.forEach(n => {
+            if (n.targetUserId === u.id && !n.read) { n.read = true; changed = true; }
+          });
+          if (changed) {
+            updateNotifBellUI();
+            if (sbClient) {
+              await sbClient
+                .from("cp2020_notifications")
+                .update({ read: true })
+                .eq("target_user_id", u.id);
+            }
+          }
+        }
+      } else {
+        menu.classList.add("hidden");
+      }
+    };
+
+    // Очистка уведомлений удаляет их и из таблицы базы данных
+    window.clearAllMyNotifications = async function() {
+      const u = getCurrentUser();
+      if (!u) return;
+      NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== u.id);
+      updateNotifBellUI();
+      renderNotifDropdownList();
+      if (sbClient) {
+        try {
+          await sbClient.from("cp2020_notifications").delete().eq("target_user_id", u.id);
+        } catch (e) {}
+      }
+    };
+
+    // =========================================================================
+    // 4. ПРОФИЛИ И КОММЕНТАРИИ (ВРЕМЯ СТРОГО ПО МСК)
     // =========================================================================
     function mapRowToUser(r) {
       const rawUrl = r.avatar_url || "";
       const resolvedAvatar = AVATAR_CACHE[r.id] || (!rawUrl.startsWith("store://") ? rawUrl : "");
+      if (resolvedAvatar) AVATAR_CACHE[r.id] = resolvedAvatar;
       return {
         id: r.id,
         displayName: r.display_name || "Эджраннер",
@@ -3504,19 +3703,18 @@
     }
 
     function mapUserToRow(u) {
-      const isExternalUrl = u.avatar && (u.avatar.startsWith("http://") || u.avatar.startsWith("https://"));
-      const hasStoredAvatar = Boolean(AVATAR_CACHE[u.id] || (u.avatar && u.avatar.startsWith("data:")));
+      const avatarVal = u.avatar || AVATAR_CACHE[u.id] || "";
       return {
         id: u.id,
         display_name: u.displayName || "Эджраннер",
         role: u.id === "u-root" ? "ROOT" : (u.role || "USER"),
         fav_role: u.favRole || "Соло",
-        avatar_url: isExternalUrl ? u.avatar : (hasStoredAvatar ? `store://${u.id}` : ""),
+        avatar_url: avatarVal,
         bio: u.bio || "",
         favorites: Array.isArray(u.favorites) ? u.favorites : [],
         notes: u.notes || "",
         ban_info: u.banInfo || null,
-        created_at: u.createdAt || new Date().toISOString().slice(0, 10),
+        created_at: u.createdAt || getMoscowTimeFormatted(true),
         updated_at: new Date().toISOString()
       };
     }
@@ -3540,16 +3738,6 @@
       if (!sbClient || !userObj || !userObj.id) return;
       try {
         setCloudStatusBadge("🔄", "Сохранение профиля...");
-        // Если пользователь вставил прямую URL-ссылку на аватарку — сохраняем её и в хранилище аватарок
-        if (userObj.avatar && userObj.avatar.startsWith("http")) {
-          AVATAR_CACHE[userObj.id] = userObj.avatar;
-          await sbClient.from("cp2020_avatar_store").upsert({
-            user_id: userObj.id,
-            avatar_data: userObj.avatar,
-            updated_at: new Date().toISOString()
-          }, { onConflict: "user_id" });
-        }
-
         const row = mapUserToRow(userObj);
         const { error } = await sbClient
           .from("cp2020_users")
@@ -3566,11 +3754,10 @@
         setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
         console.error("Ошибка сохранения профиля:", err);
-        setCloudStatusBadge("🔴", "Ошибка сохранения профиля: " + (err.message || ""));
+        setCloudStatusBadge("🔴", "Ошибка сохранения профиля");
       }
     }
 
-    // Загружает точный список пользователей с сервера (полностью заменяя локальный кэш, чтобы удалённые никогда не воскресали!)
     async function fetchAllUsersFromCloud() {
       if (!sbClient) return;
       try {
@@ -3582,7 +3769,6 @@
 
         if (Array.isArray(data) && data.length > 0) {
           isApplyingRemoteUpdate = true;
-          // Полностью заменяем массив USERS списком из базы (никакого слияния со старым кэшем браузера!)
           USERS = data.map(mapRowToUser);
           sanitizeUsersAndEnforceRoot();
           safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
@@ -3606,8 +3792,7 @@
       }
     }
 
-    // ЖЕЛЕЗОБЕТОННОЕ УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЯ (больше никогда не вернётся после F5!)
-    deleteUserAccount = async function(uid) {
+    window.deleteUserAccount = async function(uid) {
       if (!isCurrentUserRoot()) return;
       const t = USERS.find(u => u.id === uid);
       if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» навсегда со всеми его комментариями и аватаркой?`)) return;
@@ -3615,7 +3800,6 @@
       try {
         setCloudStatusBadge("🔄", "Удаление пользователя...");
 
-        // 1. Удаляем из локальной памяти и кэша браузера
         delete AVATAR_CACHE[uid];
         USERS = USERS.filter(u => u.id !== uid);
         Object.keys(COMMENTS).forEach(itemId => {
@@ -3628,11 +3812,11 @@
         updateCounts();
         renderAdminUsersManager();
 
-        // 2. Прямое удаление из таблиц Supabase + вызов серверной функции очистки
         if (sbClient) {
           await sbClient.from("cp2020_users").delete().eq("id", uid);
           await sbClient.from("cp2020_comments").delete().eq("user_id", uid);
           await sbClient.from("cp2020_avatar_store").delete().eq("user_id", uid);
+          await sbClient.from("cp2020_notifications").delete().eq("target_user_id", uid);
           await sbClient.rpc("delete_cp2020_user_completely", { p_user_id: uid });
 
           if (liveChannel) {
@@ -3650,9 +3834,7 @@
       }
     };
 
-    // =========================================================================
-    // 3. ЛЕНИВАЯ ПОДГРУЗКА И СОХРАНЕНИЕ КОММЕНТАРИЕВ (С ПОДТЯГИВАНИЕМ АВАТАРОК)
-    // =========================================================================
+    // Подгрузка комментариев карточки с сортировкой по серверному времени (updated_at / id), чтобы часовые пояса никогда не ломали порядок!
     async function loadCommentsForCardFromCloud(itemId, forceReload = false) {
       if (!sbClient || !itemId) return;
       if (loadedCommentItemIds.has(itemId) && !forceReload) return;
@@ -3662,14 +3844,16 @@
           .from("cp2020_comments")
           .select("*")
           .eq("item_id", itemId)
-          .order("id", { ascending: true });
+          .order("updated_at", { ascending: true });
 
         if (error) throw error;
         loadedCommentItemIds.add(itemId);
 
         isApplyingRemoteUpdate = true;
-        COMMENTS[itemId] = Array.isArray(data) ? data.map(mapRowToComment) : [];
-        COMMENT_COUNTS[itemId] = COMMENTS[itemId].length;
+        const mapped = Array.isArray(data) ? data.map(mapRowToComment) : [];
+        mapped.sort((a, b) => (a.id || "").localeCompare(b.id || ""));
+        COMMENTS[itemId] = mapped;
+        COMMENT_COUNTS[itemId] = mapped.length;
         safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
         isApplyingRemoteUpdate = false;
 
@@ -3706,7 +3890,8 @@
       }
     };
 
-    submitNewComment = async function(e, itemId) {
+    // Отправка комментария со временем строго по Москве (МСК)!
+    window.submitNewComment = async function(e, itemId) {
       if (e) e.preventDefault();
       const u = getCurrentUser();
       const inp = document.getElementById(`new-comment-input-${itemId}`);
@@ -3715,7 +3900,6 @@
       const textVal = inp.value.trim();
       inp.value = "";
 
-      const now = new Date();
       const newCommId = "cm-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
       const isReplying = Boolean(activeReplyToComment && activeReplyToComment.itemId === itemId);
 
@@ -3725,7 +3909,7 @@
         userId: u.id,
         fallbackName: u.displayName,
         text: textVal,
-        createdAt: now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 5),
+        createdAt: getMoscowTimeFormatted(false),
         edited: false,
         replyToId: isReplying ? activeReplyToComment.commentId : null,
         replyToName: isReplying ? activeReplyToComment.authorName : null,
@@ -3757,7 +3941,8 @@
             edited: false,
             reply_to_id: newCommentObj.replyToId,
             reply_to_name: newCommentObj.replyToName,
-            reply_to_snippet: newCommentObj.replyToSnippet
+            reply_to_snippet: newCommentObj.replyToSnippet,
+            updated_at: new Date().toISOString()
           });
           if (error) throw error;
 
@@ -3779,7 +3964,7 @@
         const foundObj = findItemAcrossAllSections(itemId);
         const cardTitle = foundObj ? (foundObj.item.name || foundObj.item.title) : "карточке";
         const secKey = foundObj ? foundObj.section : activeCatalogTab;
-        createNotification(
+        await window.createNotification(
           replyTargetUserId, "reply",
           `Пользователь <b>${u.displayName}</b> ответил на ваш комментарий к «<b>${cardTitle}</b>»: «${truncateQuote(textVal, 60)}»`,
           { sectionKey: secKey, itemId, commentId: newCommId }
@@ -3787,7 +3972,7 @@
       }
     };
 
-    saveEditedComment = async function(itemId, commentId) {
+    window.saveEditedComment = async function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
       const area = document.getElementById(`edit-comm-textarea-${commentId}`);
@@ -3804,7 +3989,7 @@
         try {
           const { error } = await sbClient
             .from("cp2020_comments")
-            .update({ text: newText, edited: true, updated_at: new Date().toISOString() })
+            .update({ text: newText, edited: true })
             .eq("id", commentId);
           if (error) throw error;
 
@@ -3815,13 +4000,11 @@
               payload: { sender: CLIENT_TAB_ID, op: "update", itemId, commentId, text: newText }
             });
           }
-        } catch (err) {
-          console.error("Ошибка обновления комментария:", err);
-        }
+        } catch (err) {}
       }
     };
 
-    deleteComment = async function(itemId, commentId) {
+    window.deleteComment = async function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
       if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
@@ -3849,13 +4032,11 @@
               payload: { sender: CLIENT_TAB_ID, op: "delete", itemId, commentId }
             });
           }
-        } catch (err) {
-          console.error("Ошибка удаления комментария из БД:", err);
-        }
+        } catch (err) {}
       }
     };
 
-    switchAdminLogsSubtab = async function(sub) {
+    window.switchAdminLogsSubtab = async function(sub) {
       activeAdminLogsSubtab = sub;
       if (sub === "comments" && sbClient) {
         try {
@@ -3877,10 +4058,14 @@
       renderAdminLogsView();
     };
 
-    // =========================================================================
-    // 4. РЕГИСТРАЦИЯ И СОЗДАНИЕ АККАУНТОВ АДМИНОМ
-    // =========================================================================
-    handleRegisterSubmit = async function(e) {
+    // При входе в аккаунт сразу подтягиваем персональные уведомления из облака
+    const origHandleLogin = handleLoginSubmit;
+    window.handleLoginSubmit = async function(e) {
+      await origHandleLogin(e);
+      await fetchMyNotificationsFromCloud();
+    };
+
+    window.handleRegisterSubmit = async function(e) {
       e.preventDefault();
       const username = document.getElementById("regUsername").value.trim();
       const displayName = document.getElementById("regDisplayName").value.trim();
@@ -3924,7 +4109,7 @@
           bio: bio || "Эджраннер Найт-Сити.",
           favorites: [],
           notes: "",
-          createdAt: new Date().toISOString().slice(0, 10)
+          createdAt: getMoscowTimeFormatted(true)
         };
 
         USERS.push(newUser);
@@ -3942,7 +4127,7 @@
       }
     };
 
-    adminCreateUserManually = async function(e) {
+    window.adminCreateUserManually = async function(e) {
       e.preventDefault();
       const username = document.getElementById("admNewLogin").value.trim();
       const displayName = document.getElementById("admNewName").value.trim();
@@ -3967,12 +4152,13 @@
         bio: "Аккаунт создан через панель Администратора.",
         favorites: [],
         notes: "",
-        createdAt: new Date().toISOString().slice(0, 10)
+        createdAt: getMoscowTimeFormatted(true)
       };
 
       USERS.push(newUser);
       safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
       await saveSingleUserToCloud(newUser);
+      if (avatar) await saveAvatarToCloudEverywhere(newUserId, avatar);
       e.target.reset();
       document.getElementById("adminQuickUserForm").classList.add("hidden");
       renderAdminUsersManager();
@@ -3992,26 +4178,66 @@
       }
     };
 
-    const origConfirmBan = confirmBanUserSubmit;
-    confirmBanUserSubmit = function(e) {
+    window.confirmBanUserSubmit = function(e) {
+      e.preventDefault();
       const targetId = document.getElementById("banModalTargetId").value;
-      origConfirmBan(e);
       const target = USERS.find(u => u.id === targetId);
-      if (target) saveSingleUserToCloud(target);
+      const curAdmin = getCurrentUser();
+      if (!target || !curAdmin || !canCurrentAdminBanTarget(target)) return;
+
+      const durVal = document.getElementById("banDurationSelect").value;
+      const reason = document.getElementById("banReasonInput").value.trim() || "Нарушение правил";
+
+      let untilValue = "PERM";
+      let durationLabel = "Перманентно (Навсегда)";
+
+      if (durVal !== "PERM") {
+        const mins = durVal === "CUSTOM"
+          ? Math.max(1, parseInt(document.getElementById("banCustomMinutesInput").value, 10) || 10)
+          : parseInt(durVal, 10);
+        untilValue = Date.now() + mins * 60 * 1000;
+        const selEl = document.getElementById("banDurationSelect");
+        durationLabel = durVal === "CUSTOM" ? `${mins} мин.` : selEl.options[selEl.selectedIndex].text;
+      }
+
+      target.banInfo = {
+        reason,
+        until: untilValue,
+        durationLabel,
+        bannedAt: getMoscowTimeFormatted(false),
+        bannedBy: curAdmin.displayName
+      };
+
+      closeBanModal();
+      saveSingleUserToCloud(target);
+
+      if (currentlyViewedPublicUserId === target.id && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+        openPublicProfileModal(target.id);
+      }
+      if (activeMainView === "admin") {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
     };
 
     const origUnban = unbanUserAccount;
-    unbanUserAccount = function(targetUserId) {
+    window.unbanUserAccount = function(targetUserId) {
       origUnban(targetUserId);
       const target = USERS.find(u => u.id === targetUserId);
       if (target) saveSingleUserToCloud(target);
     };
 
-    const origTogglePrivilege = toggleUserAdminPrivilege;
-    toggleUserAdminPrivilege = function(uid) {
-      origTogglePrivilege(uid);
-      const target = USERS.find(u => u.id === uid);
-      if (target) saveSingleUserToCloud(target);
+    window.toggleUserAdminPrivilege = async function(uid) {
+      if (!isCurrentUserRoot()) { alert("Назначать Админов может только ROOT!"); return; }
+      const t = USERS.find(u => u.id === uid);
+      if (!t || t.role === "ROOT") return;
+      t.role = t.role === "ADMIN" ? "USER" : "ADMIN";
+      const rankMsg = t.role === "ADMIN"
+        ? `Поздравляем! Главный Администратор повысил ваш ранг до <b>Администратора (ADMIN)</b>. Теперь вам доступна Админ-панель и загрузка файлов до 50мб (включая GIF).`
+        : `Ваш статус доступа был изменён Главным Администратором на <b>Игрок (USER)</b>.`;
+      await saveSingleUserToCloud(t);
+      await window.createNotification(t.id, "rank", rankMsg, null);
+      renderAdminUsersManager();
     };
 
     const origPersistDB = persistDatabase;
@@ -4111,7 +4337,6 @@
         setCloudStatusBadge("⏳", "Подключение...");
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        // 1. Загружаем справочник карточек (main_state)
         const { data: mainRow, error: mainErr } = await sbClient
           .from("cp2020_state")
           .select("db,categories")
@@ -4130,14 +4355,11 @@
           isApplyingRemoteUpdate = false;
         }
 
-        // 2. Сначала подгружаем реестр аватарок из отдельного хранилища cp2020_avatar_store
         await syncAllAvatarsFromStore();
-
-        // 3. Загружаем актуальный список профилей строго из таблицы cp2020_users (никакого возврата удалённых юзеров!)
         await fetchAllUsersFromCloud();
-
-        // 4. Подгружаем счётчики и комментарии открытой карточки
+        await fetchMyNotificationsFromCloud();
         await fetchCommentCountsFromCloud();
+
         const activeCardId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
         if (activeCardId) {
           await loadCommentsForCardFromCloud(activeCardId, true);
@@ -4148,8 +4370,7 @@
           renderCatalog();
         }
 
-        // 5. Подписываемся на мгновенные события
-        liveChannel = sbClient.channel("cp2020-relational-v2", {
+        liveChannel = sbClient.channel("cp2020-relational-v3", {
           config: { broadcast: { self: false } }
         });
 
@@ -4179,9 +4400,35 @@
               renderAdminLogsView();
             }
           })
+          .on("broadcast", { event: "notif_op" }, (msg) => {
+            const p = msg.payload;
+            const u = getCurrentUser();
+            if (!p || !u || p.sender === CLIENT_TAB_ID) return;
+            if (p.op === "add" && p.notif && p.notif.targetUserId === u.id) {
+              if (!NOTIFICATIONS.some(n => n.id === p.notif.id)) {
+                NOTIFICATIONS.unshift(p.notif);
+                updateNotifBellUI();
+                const menu = document.getElementById("notifDropdownMenu");
+                if (menu && !menu.classList.contains("hidden")) {
+                  renderNotifDropdownList();
+                }
+              }
+            }
+          })
           .on("broadcast", { event: "avatar_updated" }, (msg) => {
             const uid = msg.payload?.userId;
-            if (uid) syncAllAvatarsFromStore(uid);
+            const av = msg.payload?.avatar;
+            if (uid && av) {
+              AVATAR_CACHE[uid] = av;
+              const target = USERS.find(u => u.id === uid);
+              if (target) target.avatar = av;
+              updateAuthHeaderUI();
+              const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+              if (currentOpenId) refreshCurrentCardOrRuleView({ itemId: currentOpenId });
+              if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
+            } else if (uid) {
+              syncAllAvatarsFromStore(uid);
+            }
           })
           .on("broadcast", { event: "user_changed" }, () => {
             fetchAllUsersFromCloud();
@@ -4218,11 +4465,15 @@
       }
     }
 
+    // Резервная синхронизация открытой карточки и колокольчика раз в 4 секунды
     setInterval(() => {
       if (!sbClient || document.hidden) return;
       const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
       if (currentOpenId && (activeMainView === "catalog" || activeMainView === "rules")) {
         loadCommentsForCardFromCloud(currentOpenId, true);
+      }
+      if (getCurrentUser()) {
+        fetchMyNotificationsFromCloud();
       }
     }, 4000);
 
