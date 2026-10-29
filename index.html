@@ -3283,353 +3283,536 @@
     let sbClient = null;
     let liveChannel = null;
     let isApplyingRemoteUpdate = false;
-    let isPushingToCloud = false;
-    let pendingSectionsToPush = new Set();
-    let pushDebounceTimer = null;
-    let lastKnownRowTimestamps = {
-      main_state: null,
-      users_state: null,
-      comments_state: null
-    };
+    let isPushingDb = false;
 
-    const deletedEntityIds = new Set();
-    const deletedUserIds = new Set();
+    // Счётчики комментариев для карточек каталога (без скачивания самих текстов!)
+    let COMMENT_COUNTS = {};
+    // Множество ID карточек, для которых комментарии уже подгружены в буфер COMMENTS
+    const loadedCommentItemIds = new Set();
+
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
-    checkAndEnforceCurrentSessionValidity = function() {
-      if (!currentUserId || !window.hasCloudUsersLoaded) return;
-      const u = USERS.find(x => x.id === currentUserId);
-      if (!u || deletedUserIds.has(currentUserId)) {
-        currentUserId = null;
-        persistSessionOnly();
-        switchMainView("profile");
-        showNetwatchAlert("Ваш аккаунт был удалён Администратором. Сессия завершена.");
-        return;
+    function setCloudStatusBadge(emojiIcon, tooltipText) {
+      const badge = document.getElementById("cloudRealtimeBadge");
+      if (badge) {
+        badge.textContent = emojiIcon;
+        badge.title = tooltipText || "";
       }
-      if (isUserCurrentlyBanned(u)) {
-        const bInfo = u.banInfo;
-        currentUserId = null;
-        persistSessionOnly();
-        switchMainView("profile");
-        showBanScreenModal(bInfo);
-      } else if (u.banInfo) {
-        delete u.banInfo;
-        persistUsers();
-      }
-    };
-
-    async function compressImageOrGifDataUrl(dataUrl, maxDim = 500, quality = 0.78) {
-      if (!dataUrl || !dataUrl.startsWith("data:image/") || dataUrl.length < 35000) return dataUrl;
-      return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            let w = img.naturalWidth || img.width || maxDim;
-            let h = img.naturalHeight || img.height || maxDim;
-            if (w > maxDim || h > maxDim) {
-              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
-              else { w = Math.round((w * maxDim) / h); h = maxDim; }
-            }
-            const canvas = document.createElement("canvas");
-            canvas.width = w; canvas.height = h;
-            const ctx = canvas.getContext("2d");
-            ctx.clearRect(0, 0, w, h);
-            ctx.drawImage(img, 0, 0, w, h);
-            let compressed = canvas.toDataURL("image/webp", quality);
-            if (!compressed || compressed.length >= dataUrl.length) {
-              compressed = canvas.toDataURL("image/jpeg", quality);
-            }
-            resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
-          } catch (err) { resolve(dataUrl); }
-        };
-        img.onerror = () => resolve(dataUrl);
-        img.src = dataUrl;
-      });
     }
 
-    handleImageUpload = function(ev) {
-      const file = ev.target.files[0];
-      if (!file) return;
-      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const rawData = e.target.result;
-        const beforeKb = Math.round((rawData.length * 0.75) / 1024);
-        currentBuilderImageData = await compressImageOrGifDataUrl(rawData, 500, 0.78);
-        const afterKb = Math.round((currentBuilderImageData.length * 0.75) / 1024);
-        document.getElementById("builderImageUrl").value = "";
-        updateBuilderImagePreview();
-        const box = document.getElementById("builderImagePreviewBox");
-        if (box && currentBuilderImageData) {
-          box.innerHTML = `<img src="${currentBuilderImageData}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Сжато до ≤500x500: ${beforeKb} КБ → <b>${afterKb} КБ</b></span>`;
+    // =========================================================================
+    // 1. ПРЕОБРАЗОВАНИЕ СТРОКИ ТАБЛИЦЫ CP2020_USERS <-> ОБЪЕКТ ПОЛЬЗОВАТЕЛЯ
+    // =========================================================================
+    function mapRowToUser(r) {
+      return {
+        id: r.id,
+        displayName: r.display_name || "Эджраннер",
+        role: r.role || "USER",
+        favRole: r.fav_role || "Соло",
+        // Если в старой записи осталась тяжёлая Base64-аватарка (>15 КБ), отсекаем её, оставляя только URL или лёгкую иконку
+        avatar: (r.avatar_url && r.avatar_url.length < 15000) ? r.avatar_url : "",
+        bio: r.bio || "",
+        favorites: Array.isArray(r.favorites) ? r.favorites : [],
+        notes: r.notes || "",
+        banInfo: r.ban_info || undefined,
+        createdAt: r.created_at || "2026"
+      };
+    }
+
+    function mapUserToRow(u) {
+      return {
+        id: u.id,
+        display_name: u.displayName || "Эджраннер",
+        role: u.id === "u-root" ? "ROOT" : (u.role || "USER"),
+        fav_role: u.favRole || "Соло",
+        avatar_url: (u.avatar && !u.avatar.startsWith("data:")) ? u.avatar : "",
+        bio: u.bio || "",
+        favorites: Array.isArray(u.favorites) ? u.favorites : [],
+        notes: u.notes || "",
+        ban_info: u.banInfo || null,
+        created_at: u.createdAt || new Date().toISOString().slice(0, 10),
+        updated_at: new Date().toISOString()
+      };
+    }
+
+    function mapRowToComment(r) {
+      return {
+        id: r.id,
+        itemId: r.item_id,
+        userId: r.user_id,
+        fallbackName: r.fallback_name || "Раннер",
+        text: r.text || "",
+        createdAt: r.created_at || "",
+        edited: Boolean(r.edited),
+        replyToId: r.reply_to_id || null,
+        replyToName: r.reply_to_name || null,
+        replyToSnippet: r.reply_to_snippet || null
+      };
+    }
+
+    // Сохраняет в таблицу cp2020_users ТОЛЬКО ОДНОГО конкретного пользователя (не трогая базу и других людей!)
+    async function saveSingleUserToCloud(userObj) {
+      if (!sbClient || !userObj || !userObj.id) return;
+      try {
+        setCloudStatusBadge("🔄", "Сохранение профиля...");
+        const row = mapUserToRow(userObj);
+        const { error } = await sbClient
+          .from("cp2020_users")
+          .upsert(row, { onConflict: "id" });
+        if (error) throw error;
+
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "user_changed",
+            payload: { sender: CLIENT_TAB_ID, userId: userObj.id }
+          });
         }
-      };
-      reader.readAsDataURL(file);
-    };
+        setCloudStatusBadge("🟢", "В сети");
+      } catch (err) {
+        console.error("Ошибка сохранения профиля:", err);
+        setCloudStatusBadge("🔴", "Ошибка сохранения профиля: " + (err.message || ""));
+      }
+    }
 
-    handleProfileAvatarUpload = function(ev) {
-      const file = ev.target.files[0];
-      const u = getCurrentUser();
-      if (!file || !u) return;
-      if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        u.avatar = await compressImageOrGifDataUrl(e.target.result, 240, 0.8);
-        persistUsers();
-        renderProfileView();
-      };
-      reader.readAsDataURL(file);
-    };
+    // Загружает список профилей из изолированной таблицы cp2020_users
+    async function fetchAllUsersFromCloud() {
+      if (!sbClient) return;
+      try {
+        const { data, error } = await sbClient
+          .from("cp2020_users")
+          .select("*")
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        if (Array.isArray(data) && data.length > 0) {
+          isApplyingRemoteUpdate = true;
+          USERS = data.map(mapRowToUser);
+          sanitizeUsersAndEnforceRoot();
+          safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+          window.hasCloudUsersLoaded = true;
+          checkAndEnforceCurrentSessionValidity();
+          updateCounts();
+          isApplyingRemoteUpdate = false;
 
-    window.optimizeAllExistingDatabaseImages = async function() {
-      if (!isCurrentUserRoot()) return;
-      const beforeSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
-      setCloudStatusBadge("🔄", "Оптимизация картинок...");
-      for (const sec of Object.keys(SECTION_LABELS)) {
-        const arr = DB[sec] || [];
-        for (let i = 0; i < arr.length; i++) {
-          if (arr[i].image && arr[i].image.startsWith("data:image/")) {
-            arr[i].image = await compressImageOrGifDataUrl(arr[i].image, 500, 0.78);
+          // Обновляем только открытые экраны пользователей, НЕ сбрасывая ввод в конструкторе!
+          const activeEl = document.activeElement;
+          const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+          if (activeMainView === "admin" && activeAdminSubtab === "users" && !isTyping) {
+            renderAdminUsersManager();
+          } else if (activeMainView === "admin" && activeAdminSubtab === "logs") {
+            renderAdminLogsView();
           }
         }
+      } catch (err) {
+        console.error("Ошибка загрузки пользователей:", err);
       }
-      for (let i = 0; i < USERS.length; i++) {
-        if (USERS[i].avatar && USERS[i].avatar.startsWith("data:image/")) {
-          USERS[i].avatar = await compressImageOrGifDataUrl(USERS[i].avatar, 240, 0.8);
-        }
-      }
-      const afterSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
-      persistDatabase();
-      persistUsers();
-      renderAdminBackupStats();
-      alert(`Оптимизация завершена!\nРазмер базы уменьшен с ${(beforeSize / 1024).toFixed(0)} КБ до ${(afterSize / 1024).toFixed(0)} КБ.`);
-    };
-
-    const origRenderBackup = renderAdminBackupStats;
-    renderAdminBackupStats = function() {
-      origRenderBackup();
-      const rootControls = document.getElementById("rootOnlyBackupControls");
-      if (rootControls && !document.getElementById("optimizeImagesBtn")) {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.id = "optimizeImagesBtn";
-        btn.onclick = window.optimizeAllExistingDatabaseImages;
-        btn.className = "px-5 py-3 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400";
-        btn.innerHTML = "🗜️ Сжать все картинки в базе (≤500x500)";
-        rootControls.appendChild(btn);
-      }
-    };
-
-    function broadcastDirectAction(actionPayload) {
-      if (!liveChannel) return;
-      liveChannel.send({
-        type: "broadcast",
-        event: "instant_op",
-        payload: { ...actionPayload, sender: CLIENT_TAB_ID }
-      });
     }
 
-    const origSubmitComment = submitNewComment;
-    submitNewComment = function(e, itemId) {
-      origSubmitComment(e, itemId);
-      const list = COMMENTS[itemId] || [];
-      const latest = list[list.length - 1];
-      if (latest) broadcastDirectAction({ op: "add_comment", itemId, comment: latest });
+    // =========================================================================
+    // 2. ТОЧЕЧНАЯ (ЛЕНИВАЯ) ПОДГРУЗКА И СОХРАНЕНИЕ КОММЕНТАРИЕВ ДЛЯ ОТКРЫТОЙ КАРТОЧКИ
+    // =========================================================================
+    async function loadCommentsForCardFromCloud(itemId, forceReload = false) {
+      if (!sbClient || !itemId) return;
+      if (loadedCommentItemIds.has(itemId) && !forceReload) return;
+
+      try {
+        const { data, error } = await sbClient
+          .from("cp2020_comments")
+          .select("*")
+          .eq("item_id", itemId)
+          .order("id", { ascending: true });
+
+        if (error) throw error;
+        loadedCommentItemIds.add(itemId);
+
+        isApplyingRemoteUpdate = true;
+        COMMENTS[itemId] = Array.isArray(data) ? data.map(mapRowToComment) : [];
+        COMMENT_COUNTS[itemId] = COMMENTS[itemId].length;
+        safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+        isApplyingRemoteUpdate = false;
+
+        // Точечно обновляем ТОЛЬКО блок комментариев под карточкой, не трогая остальные поля сайта!
+        refreshCurrentCardOrRuleView({ itemId });
+      } catch (err) {
+        console.error("Ошибка подгрузки комментариев карточки:", err);
+      }
+    }
+
+    async function fetchCommentCountsFromCloud() {
+      if (!sbClient) return;
+      try {
+        const { data, error } = await sbClient.rpc("get_cp2020_comment_counts");
+        if (!error && Array.isArray(data)) {
+          COMMENT_COUNTS = {};
+          data.forEach(r => { COMMENT_COUNTS[r.item_id] = Number(r.cnt) || 0; });
+        }
+      } catch (e) {}
+    }
+
+    // Перехватываем открытие любой карточки или механики, чтобы подгружать ТОЛЬКО её комментарии!
+    const origRenderDetailCard = renderDetailCard;
+    renderDetailCard = function(item) {
+      origRenderDetailCard(item);
+      if (item && item.id) {
+        loadCommentsForCardFromCloud(item.id, false);
+      }
     };
 
-    const origSaveEditComment = saveEditedComment;
-    saveEditedComment = function(itemId, commentId) {
-      origSaveEditComment(itemId, commentId);
+    const origRenderRulesSidebar = renderRulesSidebar;
+    renderRulesSidebar = function() {
+      origRenderRulesSidebar();
+      if (selectedRuleId) {
+        loadCommentsForCardFromCloud(selectedRuleId, false);
+      }
+    };
+
+    // Перехватываем отправку комментария: делаем прямой INSERT одной строки в таблицу cp2020_comments!
+    submitNewComment = async function(e, itemId) {
+      if (e) e.preventDefault();
+      const u = getCurrentUser();
+      const inp = document.getElementById(`new-comment-input-${itemId}`);
+      if (!u || !inp || !inp.value.trim()) return;
+
+      const textVal = inp.value.trim();
+      inp.value = "";
+
+      const now = new Date();
+      const newCommId = "cm-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+      const isReplying = Boolean(activeReplyToComment && activeReplyToComment.itemId === itemId);
+
+      const newCommentObj = {
+        id: newCommId,
+        itemId: itemId,
+        userId: u.id,
+        fallbackName: u.displayName,
+        text: textVal,
+        createdAt: now.toISOString().slice(0, 10) + " " + now.toTimeString().slice(0, 5),
+        edited: false,
+        replyToId: isReplying ? activeReplyToComment.commentId : null,
+        replyToName: isReplying ? activeReplyToComment.authorName : null,
+        replyToSnippet: isReplying ? activeReplyToComment.snippet : null
+      };
+
+      // 1. Сразу кладём в локальный буфер браузера и рисуем
+      if (!Array.isArray(COMMENTS[itemId])) COMMENTS[itemId] = [];
+      COMMENTS[itemId].push(newCommentObj);
+      COMMENT_COUNTS[itemId] = COMMENTS[itemId].length;
+
+      const replyTargetUserId = isReplying ? activeReplyToComment.targetUserId : null;
+      activeReplyToComment = null;
+      safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+      refreshCurrentCardOrRuleView({ itemId, scrollToBottom: true });
+
+      const newInp = document.getElementById(`new-comment-input-${itemId}`);
+      if (newInp) newInp.focus();
+
+      // 2. Отправляем ТОЛЬКО ЭТОТ КОММЕНТАРИЙ отдельной строкой в базу cp2020_comments
+      if (sbClient) {
+        try {
+          setCloudStatusBadge("🔄", "Отправка комментария...");
+          const { error } = await sbClient.from("cp2020_comments").insert({
+            id: newCommentObj.id,
+            item_id: itemId,
+            user_id: newCommentObj.userId,
+            fallback_name: newCommentObj.fallbackName,
+            text: newCommentObj.text,
+            created_at: newCommentObj.createdAt,
+            edited: false,
+            reply_to_id: newCommentObj.replyToId,
+            reply_to_name: newCommentObj.replyToName,
+            reply_to_snippet: newCommentObj.replyToSnippet
+          });
+          if (error) throw error;
+
+          if (liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "comment_op",
+              payload: { sender: CLIENT_TAB_ID, op: "insert", itemId, comment: newCommentObj }
+            });
+          }
+          setCloudStatusBadge("🟢", "В сети");
+        } catch (err) {
+          console.error("Ошибка записи комментария в БД:", err);
+          setCloudStatusBadge("🔴", "Ошибка отправки комментария");
+        }
+      }
+
+      if (replyTargetUserId && replyTargetUserId !== u.id) {
+        const foundObj = findItemAcrossAllSections(itemId);
+        const cardTitle = foundObj ? (foundObj.item.name || foundObj.item.title) : "карточке";
+        const secKey = foundObj ? foundObj.section : activeCatalogTab;
+        createNotification(
+          replyTargetUserId, "reply",
+          `Пользователь <b>${u.displayName}</b> ответил на ваш комментарий к «<b>${cardTitle}</b>»: «${truncateQuote(textVal, 60)}»`,
+          { sectionKey: secKey, itemId, commentId: newCommId }
+        );
+      }
+    };
+
+    // Редактирование одного комментария в таблице cp2020_comments
+    saveEditedComment = async function(itemId, commentId) {
+      const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
-      if (target) broadcastDirectAction({ op: "edit_comment", itemId, commentId, text: target.text });
+      const area = document.getElementById(`edit-comm-textarea-${commentId}`);
+      if (!u || !target || target.userId !== u.id || !area || !area.value.trim()) return;
+
+      const newText = area.value.trim();
+      target.text = newText;
+      target.edited = true;
+      activeEditCommentId = null;
+      safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+      refreshCurrentCardOrRuleView({ itemId });
+
+      if (sbClient) {
+        try {
+          const { error } = await sbClient
+            .from("cp2020_comments")
+            .update({ text: newText, edited: true, updated_at: new Date().toISOString() })
+            .eq("id", commentId);
+          if (error) throw error;
+
+          if (liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "comment_op",
+              payload: { sender: CLIENT_TAB_ID, op: "update", itemId, commentId, text: newText }
+            });
+          }
+        } catch (err) {
+          console.error("Ошибка обновления комментария:", err);
+        }
+      }
     };
 
-    deleteComment = function(itemId, commentId) {
+    // Удаление одного комментария из таблицы cp2020_comments
+    deleteComment = async function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
       if (!u || !target || (target.userId !== u.id && !isCurrentUserAdmin())) return;
-      if (!confirm("Удалить этот комментарий?")) return;
-
-      deletedEntityIds.add(commentId);
-      if (!Array.isArray( COMMENTS._deletedIds )) COMMENTS._deletedIds = [];
-      if (!COMMENTS._deletedIds.includes(commentId)) {
-        COMMENTS._deletedIds.push(commentId);
-        if (COMMENTS._deletedIds.length > 600) COMMENTS._deletedIds.shift();
-      }
+      if (!confirm("Удалить этот комментарий навсегда из базы?")) return;
 
       COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
-      if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
-
-      broadcastDirectAction({ op: "del_comment", itemId, commentId });
-      persistComments();
+      COMMENT_COUNTS[itemId] = (COMMENTS[itemId] || []).length;
+      safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
 
       if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
       else refreshCurrentCardOrRuleView({ itemId });
+
+      if (sbClient) {
+        try {
+          const { error } = await sbClient
+            .from("cp2020_comments")
+            .delete()
+            .eq("id", commentId);
+          if (error) throw error;
+
+          if (liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "comment_op",
+              payload: { sender: CLIENT_TAB_ID, op: "delete", itemId, commentId }
+            });
+          }
+        } catch (err) {
+          console.error("Ошибка удаления комментария из БД:", err);
+        }
+      }
     };
 
+    // При открытии вкладки «Логи -> Комментарии» у Админа подгружаем последние 150 комментариев со всего сайта
+    const origSwitchLogsSubtab = switchAdminLogsSubtab;
+    switchAdminLogsSubtab = async function(sub) {
+      activeAdminLogsSubtab = sub;
+      if (sub === "comments" && sbClient) {
+        try {
+          const { data } = await sbClient
+            .from("cp2020_comments")
+            .select("*")
+            .order("id", { ascending: false })
+            .limit(150);
+          if (Array.isArray(data)) {
+            COMMENTS = {};
+            data.reverse().forEach(r => {
+              const c = mapRowToComment(r);
+              if (!Array.isArray(COMMENTS[c.itemId])) COMMENTS[c.itemId] = [];
+              COMMENTS[c.itemId].push(c);
+            });
+          }
+        } catch (e) {}
+      }
+      renderAdminLogsView();
+    };
+
+    // =========================================================================
+    // 3. ТОЧЕЧНАЯ РЕГИСТРАЦИЯ, РЕДАКТИРОВАНИЕ И УДАЛЕНИЕ ПОЛЬЗОВАТЕЛЕЙ (БЕЗ ЗАПИСИ ВСЕЙ БАЗЫ!)
+    // =========================================================================
+    // Запрещаем загрузку тяжёлых файлов аватарок с ПК в базу (оставляем только лёгкие внешние URL-ссылки)
+    handleProfileAvatarUpload = function(ev) {
+      ev.target.value = "";
+      showNetwatchAlert("Чтобы не перегружать облачную базу данных картинками, загрузка файлов аватарок с ПК отключена.<br><br>Пожалуйста, вставьте <b>прямую ссылку (URL)</b> на картинку в поле слева (например, с Imgur, Discord, ВК или GitHub).");
+    };
+
+    // Регистрация создаёт ТОЛЬКО 1 запись в cp2020_PassVault и 1 строку в cp2020_users!
+    handleRegisterSubmit = async function(e) {
+      e.preventDefault();
+      const username = document.getElementById("regUsername").value.trim();
+      const displayName = document.getElementById("regDisplayName").value.trim();
+      const password = document.getElementById("regPassword").value;
+      const favRole = document.getElementById("regFavRole").value;
+      const bio = document.getElementById("regBio").value.trim();
+      const errBox = document.getElementById("regErrorMsg");
+      const btn = document.getElementById("regSubmitBtn");
+
+      if (username.length < 3) { errBox.textContent = "Логин должен содержать минимум 3 символа."; errBox.classList.remove("hidden"); return; }
+      if (password.length < 4) { errBox.textContent = "Пароль должен содержать минимум 4 символа."; errBox.classList.remove("hidden"); return; }
+
+      btn.disabled = true;
+      btn.textContent = "⏳ Создание профиля...";
+
+      try {
+        if (window.checkUsernameTakenInVault) {
+          const isTaken = await window.checkUsernameTakenInVault(username);
+          if (isTaken) {
+            errBox.textContent = "Этот логин уже занят!";
+            errBox.classList.remove("hidden");
+            return;
+          }
+        }
+
+        const newUserId = "u-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+        const savedOk = await window.savePasswordInCloudVault(newUserId, username, password);
+        if (!savedOk) {
+          errBox.textContent = "Этот логин уже занят или произошла ошибка сервера безопасности.";
+          errBox.classList.remove("hidden");
+          return;
+        }
+
+        errBox.classList.add("hidden");
+        const newUser = {
+          id: newUserId,
+          displayName: displayName || "Эджраннер",
+          role: "USER",
+          favRole,
+          avatar: "",
+          bio: bio || "Эджраннер Найт-Сити.",
+          favorites: [],
+          notes: "",
+          createdAt: new Date().toISOString().slice(0, 10)
+        };
+
+        USERS.push(newUser);
+        currentUserId = newUser.id;
+        persistSessionOnly();
+        safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+
+        // Записываем в облако ТОЛЬКО строку нового игрока! Никакая общая база не перезаписывается!
+        await saveSingleUserToCloud(newUser);
+
+        e.target.reset();
+        renderProfileView();
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Зарегистрировать профиль +";
+      }
+    };
+
+    // Удаление аккаунта вызывает серверную функцию delete_cp2020_user_completely
     deleteUserAccount = async function(uid) {
       if (!isCurrentUserRoot()) return;
       const t = USERS.find(u => u.id === uid);
-      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями и уведомлениями?`)) return;
-
-      deletedUserIds.add(uid);
-      if (!Array.isArray(COMMENTS._deletedUserIds)) COMMENTS._deletedUserIds = [];
-      if (!COMMENTS._deletedUserIds.includes(uid)) COMMENTS._deletedUserIds.push(uid);
-
-      if (window.deleteUserFromCloudVault) {
-        await window.deleteUserFromCloudVault(uid);
-      }
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями?`)) return;
 
       USERS = USERS.filter(u => u.id !== uid);
       Object.keys(COMMENTS).forEach(itemId => {
-        if (itemId.startsWith("_")) return;
         if (Array.isArray(COMMENTS[itemId])) {
           COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
-          if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
         }
       });
-      NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== uid);
-
-      broadcastDirectAction({ op: "del_user", userId: uid });
-
-      persistUsers();
-      persistComments();
-      persistNotifications();
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
       renderAdminUsersManager();
+
+      if (sbClient) {
+        await sbClient.rpc("delete_cp2020_user_completely", { p_user_id: uid });
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "user_deleted",
+            payload: { sender: CLIENT_TAB_ID, userId: uid }
+          });
+        }
+      }
     };
 
-    // Считывает чёрные списки удалённых комментариев и пользователей
-    function syncDeletedSetsFromObject(commObj) {
-      if (commObj && Array.isArray(commObj._deletedIds)) {
-        commObj._deletedIds.forEach(id => deletedEntityIds.add(id));
-      }
-      if (commObj && Array.isArray(commObj._deletedUserIds)) {
-        commObj._deletedUserIds.forEach(id => deletedUserIds.add(id));
-      }
-      if (Array.isArray(CATEGORIES._deletedIds)) {
-        CATEGORIES._deletedIds.forEach(id => deletedEntityIds.add(id));
-      }
-      if (Array.isArray(CATEGORIES._deletedUserIds)) {
-        CATEGORIES._deletedUserIds.forEach(id => deletedUserIds.add(id));
-      }
-    }
-
-    // УМНОЕ БЕЗОПАСНОЕ СЛИЯНИЕ КОММЕНТАРИЕВ: ни один комментарий никогда не затрёт другой!
-    function mergeCommentsObjects(localComm, remoteComm) {
-      syncDeletedSetsFromObject(localComm);
-      syncDeletedSetsFromObject(remoteComm);
-
-      const result = {
-        _deletedIds: Array.from(deletedEntityIds).slice(-600),
-        _deletedUserIds: Array.from(deletedUserIds).slice(-300)
-      };
-
-      const allItemKeys = new Set([
-        ...Object.keys(localComm || {}),
-        ...Object.keys(remoteComm || {})
-      ]);
-
-      allItemKeys.forEach(itemId => {
-        if (itemId.startsWith("_")) return;
-        const locArr = Array.isArray(localComm?.[itemId]) ? localComm[itemId] : [];
-        const remArr = Array.isArray(remoteComm?.[itemId]) ? remoteComm[itemId] : [];
-
-        const mapById = new Map();
-        remArr.forEach(c => {
-          if (c && c.id && !deletedEntityIds.has(c.id) && !deletedUserIds.has(c.userId)) {
-            mapById.set(c.id, c);
-          }
-        });
-        locArr.forEach(c => {
-          if (c && c.id && !deletedEntityIds.has(c.id) && !deletedUserIds.has(c.userId)) {
-            const existing = mapById.get(c.id);
-            // Если комментарий редактировался — берём отредактированную версию
-            if (!existing || (c.edited && !existing.edited)) {
-              mapById.set(c.id, c);
-            }
-          }
-        });
-
-        const mergedList = Array.from(mapById.values()).sort((a, b) => (a.id || "").localeCompare(b.id || ""));
-        if (mergedList.length > 0) {
-          result[itemId] = mergedList;
-        }
-      });
-
-      return result;
-    }
-
-    // Умное слияние пользователей по ID (чтобы новые регистрации не пропадали)
-    function mergeUsersArrays(localUsers, remoteUsers) {
-      syncDeletedSetsFromObject(COMMENTS);
-      const mapById = new Map();
-      (Array.isArray(remoteUsers) ? remoteUsers : []).forEach(u => {
-        if (u && u.id && !deletedUserIds.has(u.id)) mapById.set(u.id, u);
-      });
-      (Array.isArray(localUsers) ? localUsers : []).forEach(u => {
-        if (u && u.id && !deletedUserIds.has(u.id) && !mapById.has(u.id)) {
-          mapById.set(u.id, u);
-        }
-      });
-      USERS = Array.from(mapById.values());
-      sanitizeUsersAndEnforceRoot();
-    }
-
-    function handleInstantOperation(payload) {
-      if (!payload || payload.sender === CLIENT_TAB_ID) return;
-      isApplyingRemoteUpdate = true;
+    // При изменении настроек профиля, бане или добавлении в избранное — сохраняем в облако только целевого пользователя
+    persistUsers = function() {
       try {
-        if (payload.op === "add_comment" && payload.itemId && payload.comment) {
-          if (deletedEntityIds.has(payload.comment.id)) return;
-          if (!Array.isArray(COMMENTS[payload.itemId])) COMMENTS[payload.itemId] = [];
-          if (!COMMENTS[payload.itemId].some(c => c.id === payload.comment.id)) {
-            COMMENTS[payload.itemId].push(payload.comment);
-            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
-            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
-            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
-          }
-        } else if (payload.op === "del_comment" && payload.itemId && payload.commentId) {
-          deletedEntityIds.add(payload.commentId);
-          if (!Array.isArray(COMMENTS._deletedIds)) COMMENTS._deletedIds = [];
-          if (!COMMENTS._deletedIds.includes(payload.commentId)) COMMENTS._deletedIds.push(payload.commentId);
-          if (Array.isArray(COMMENTS[payload.itemId])) {
-            COMMENTS[payload.itemId] = COMMENTS[payload.itemId].filter(c => c.id !== payload.commentId);
-            if (COMMENTS[payload.itemId].length === 0) delete COMMENTS[payload.itemId];
-            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
-            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
-            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
-          }
-        } else if (payload.op === "edit_comment" && payload.itemId && payload.commentId) {
-          const target = (COMMENTS[payload.itemId] || []).find(c => c.id === payload.commentId);
-          if (target) {
-            target.text = payload.text;
-            target.edited = true;
-            safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
-            if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
-            else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
-          }
-        } else if (payload.op === "del_user" && payload.userId) {
-          deletedUserIds.add(payload.userId);
-          if (!Array.isArray(COMMENTS._deletedUserIds)) COMMENTS._deletedUserIds = [];
-          if (!COMMENTS._deletedUserIds.includes(payload.userId)) COMMENTS._deletedUserIds.push(payload.userId);
-          USERS = USERS.filter(u => u.id !== payload.userId);
-          COMMENTS = mergeCommentsObjects(COMMENTS, {});
-          safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
-          safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
-          checkAndEnforceCurrentSessionValidity();
-          updateCounts();
-          if (activeMainView === "admin") {
-            if (activeAdminSubtab === "users") renderAdminUsersManager();
-            else if (activeAdminSubtab === "logs") renderAdminLogsView();
-          } else {
-            refreshCurrentCardOrRuleView();
-          }
-        }
-      } finally {
-        isApplyingRemoteUpdate = false;
-      }
-    }
+        if (currentUserId) localStorage.setItem(STORAGE_SESSION_KEY, currentUserId);
+        else localStorage.removeItem(STORAGE_SESSION_KEY);
+      } catch (e) {}
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+      updateAuthHeaderUI();
 
+      if (!isApplyingRemoteUpdate && sbClient) {
+        const cur = getCurrentUser();
+        if (cur) saveSingleUserToCloud(cur);
+      }
+    };
+
+    // Перехватываем бан, разбан и выдачу прав админа, чтобы сохранялась именно строка целевого пользователя
+    const origConfirmBan = confirmBanUserSubmit;
+    confirmBanUserSubmit = function(e) {
+      const targetId = document.getElementById("banModalTargetId").value;
+      origConfirmBan(e);
+      const target = USERS.find(u => u.id === targetId);
+      if (target) saveSingleUserToCloud(target);
+    };
+
+    const origUnban = unbanUserAccount;
+    unbanUserAccount = function(targetUserId) {
+      origUnban(targetUserId);
+      const target = USERS.find(u => u.id === targetUserId);
+      if (target) saveSingleUserToCloud(target);
+    };
+
+    const origTogglePrivilege = toggleUserAdminPrivilege;
+    toggleUserAdminPrivilege = function(uid) {
+      origTogglePrivilege(uid);
+      const target = USERS.find(u => u.id === uid);
+      if (target) saveSingleUserToCloud(target);
+    };
+
+    // =========================================================================
+    // 4. СИНХРОНИЗАЦИЯ КАРТОЧЕК СПРАВОЧНИКА (ТОЛЬКО КОГДА АДМИН РЕДАКТИРУЕТ КАРТОЧКИ)
+    // =========================================================================
+    const origPersistDB = persistDatabase;
+    persistDatabase = async function() {
+      origPersistDB();
+      if (isApplyingRemoteUpdate || !sbClient || isPushingDb) return;
+      isPushingDb = true;
+      try {
+        setCloudStatusBadge("🔄", "Сохранение карточек...");
+        await sbClient.rpc("save_cp2020_part", {
+          p_db: DB,
+          p_categories: CATEGORIES
+        });
+        if (liveChannel) {
+          liveChannel.send({
+            type: "broadcast",
+            event: "db_changed",
+            payload: { sender: CLIENT_TAB_ID }
+          });
+        }
+        setCloudStatusBadge("🟢", "В сети");
+      } catch (err) {
+        console.error("Ошибка сохранения карточек:", err);
+        setCloudStatusBadge("🔴", "Ошибка сохранения карточек");
+      } finally {
+        isPushingDb = false;
+      }
+    };
+
+    // Серверные функции паролей
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
@@ -3670,396 +3853,135 @@
       } catch (e) { return false; }
     };
 
-    window.migrateLegacyPasswordToVault = function(userId, username, legacyPass) {
-      if (!legacyPass || !username || userId === "u-root") return;
-      setTimeout(() => {
-        if (sbClient) window.savePasswordInCloudVault(userId, username, legacyPass);
-      }, 1500);
+    checkAndEnforceCurrentSessionValidity = function() {
+      if (!currentUserId || !window.hasCloudUsersLoaded) return;
+      const u = USERS.find(x => x.id === currentUserId);
+      if (!u) {
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showNetwatchAlert("Ваш аккаунт был удалён Администратором. Сессия завершена.");
+        return;
+      }
+      if (isUserCurrentlyBanned(u)) {
+        const bInfo = u.banInfo;
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showBanScreenModal(bInfo);
+      } else if (u.banInfo) {
+        delete u.banInfo;
+        saveSingleUserToCloud(u);
+      }
     };
 
-    function setCloudStatusBadge(emojiIcon, tooltipText) {
-      const badge = document.getElementById("cloudRealtimeBadge");
-      if (badge) {
-        badge.textContent = emojiIcon;
-        badge.title = tooltipText || "";
-      }
-    }
-
-    // Скачивает только нужные лёгкие строки (комментарии скачиваются за 10 мс отдельно от аватарок и карточек!)
-    async function pullUpdatedSectionsFromCloud(sectionsList) {
-      if (!sbClient || isPushingToCloud) return;
-      try {
-        const targetIds = new Set();
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("db")) targetIds.add("main_state");
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("users")) targetIds.add("users_state");
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("comments") || sectionsList.includes("notifications")) targetIds.add("comments_state");
-
-        if (targetIds.size === 0) return;
-
-        const { data: rows, error } = await sbClient
-          .from("cp2020_state")
-          .select("*")
-          .in("id", Array.from(targetIds));
-
-        if (error) throw error;
-        if (!Array.isArray(rows)) return;
-
-        const mainRow = rows.find(r => r.id === "main_state");
-        const usersRow = rows.find(r => r.id === "users_state");
-        const commRow = rows.find(r => r.id === "comments_state");
-
-        const combined = {};
-        if (mainRow) {
-          lastKnownRowTimestamps.main_state = mainRow.updated_at;
-          if (mainRow.db && Object.keys(mainRow.db).length > 0) combined.db = mainRow.db;
-          if (mainRow.categories && Object.keys(mainRow.categories).length > 0) combined.categories = mainRow.categories;
-        }
-        if (usersRow) {
-          lastKnownRowTimestamps.users_state = usersRow.updated_at;
-          if (Array.isArray(usersRow.users) && usersRow.users.length > 0) combined.users = usersRow.users;
-        }
-        if (commRow) {
-          lastKnownRowTimestamps.comments_state = commRow.updated_at;
-          if (commRow.comments && typeof commRow.comments === "object") combined.comments = commRow.comments;
-          if (Array.isArray(commRow.notifications)) combined.notifications = commRow.notifications;
-        }
-
-        window.hasCloudUsersLoaded = true;
-        applyCloudStateToUI(combined);
-        setCloudStatusBadge("🟢", "В сети");
-      } catch (err) {
-        console.error("Ошибка чтения облака:", err);
-      }
-    }
-
-    function scheduleCloudPush(sectionName) {
-      if (!sbClient || isApplyingRemoteUpdate) return;
-      pendingSectionsToPush.add(sectionName);
-
-      if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
-      pushDebounceTimer = setTimeout(flushPendingToCloud, 60);
-    }
-
-    async function flushPendingToCloud() {
-      if (!sbClient || pendingSectionsToPush.size === 0 || isPushingToCloud) return;
-      isPushingToCloud = true;
-
-      const sections = Array.from(pendingSectionsToPush);
-      pendingSectionsToPush.clear();
-
-      try {
-        setCloudStatusBadge("🔄", "Синхронизация...");
-
-        // ПЕРЕД записью комментариев или пользователей в облако быстренько подтягиваем свежую строку с сервера и сливаем, чтобы НИКОГДА не затереть чужой комментарий!
-        if (sections.includes("comments") || sections.includes("all")) {
-          const { data: remoteCommRow } = await sbClient
-            .from("cp2020_state")
-            .select("comments")
-            .eq("id", "comments_state")
-            .maybeSingle();
-          if (remoteCommRow && remoteCommRow.comments) {
-            isApplyingRemoteUpdate = true;
-            COMMENTS = mergeCommentsObjects(COMMENTS, remoteCommRow.comments);
-            isApplyingRemoteUpdate = false;
-          }
-        }
-
-        if (sections.includes("users") || sections.includes("all")) {
-          const { data: remoteUsersRow } = await sbClient
-            .from("cp2020_state")
-            .select("users")
-            .eq("id", "users_state")
-            .maybeSingle();
-          if (remoteUsersRow && Array.isArray(remoteUsersRow.users)) {
-            isApplyingRemoteUpdate = true;
-            mergeUsersArrays(USERS, remoteUsersRow.users);
-            isApplyingRemoteUpdate = false;
-          }
-        }
-
-        const rpcParams = {
-          p_db: (sections.includes("all") || sections.includes("db")) ? DB : null,
-          p_categories: (sections.includes("all") || sections.includes("db")) ? CATEGORIES : null,
-          p_users: (sections.includes("all") || sections.includes("users")) ? USERS : null,
-          p_comments: (sections.includes("all") || sections.includes("comments")) ? COMMENTS : null,
-          p_notifications: (sections.includes("all") || sections.includes("notifications")) ? NOTIFICATIONS : null
-        };
-
-        const { data: newTs, error } = await sbClient.rpc("save_cp2020_part", rpcParams);
-        if (error) throw error;
-
-        if (newTs) {
-          if (rpcParams.p_db) lastKnownRowTimestamps.main_state = newTs;
-          if (rpcParams.p_users) lastKnownRowTimestamps.users_state = newTs;
-          if (rpcParams.p_comments || rpcParams.p_notifications) lastKnownRowTimestamps.comments_state = newTs;
-        }
-
-        if (liveChannel) {
-          liveChannel.send({
-            type: "broadcast",
-            event: "cloud_poke",
-            payload: { sender: CLIENT_TAB_ID, sections }
-          });
-        }
-
-        // Если при слиянии перед пушем мы подтянули чей-то новый коммент — сразу отрисуем его и у себя!
-        if (sections.includes("comments")) {
-          isApplyingRemoteUpdate = true;
-          refreshCurrentCardOrRuleView();
-          isApplyingRemoteUpdate = false;
-        }
-
-        setCloudStatusBadge("🟢", "В сети");
-      } catch (err) {
-        console.error("Ошибка сохранения в облако:", err);
-        setCloudStatusBadge("🔴", "Ошибка сети: " + (err.message || JSON.stringify(err)));
-      } finally {
-        isApplyingRemoteUpdate = false;
-        isPushingToCloud = false;
-        if (pendingSectionsToPush.size > 0) {
-          setTimeout(flushPendingToCloud, 60);
-        }
-      }
-    }
-
-    function applyCloudStateToUI(incoming) {
-      if (!incoming || isPushingToCloud) return;
-
-      isApplyingRemoteUpdate = true;
-      try {
-        let dbChanged = false;
-        let usersChanged = false;
-        let commentsChanged = false;
-        let notifsChanged = false;
-
-        if (incoming.categories && Object.keys(incoming.categories).length > 0 && !pendingSectionsToPush.has("db")) {
-          const newCatStr = JSON.stringify(incoming.categories);
-          if (newCatStr !== JSON.stringify(CATEGORIES)) {
-            CATEGORIES = incoming.categories;
-            ensureMetaArraysInCategories();
-            safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
-            dbChanged = true;
-          }
-        }
-        if (incoming.db && Object.keys(incoming.db).length > 0 && !pendingSectionsToPush.has("db")) {
-          const newDbStr = JSON.stringify(incoming.db);
-          if (newDbStr !== JSON.stringify(DB)) {
-            DB = incoming.db;
-            safeLocalSet(STORAGE_DB_KEY, newDbStr);
-            dbChanged = true;
-          }
-        }
-        if (Array.isArray(incoming.users) && incoming.users.length > 0 && !pendingSectionsToPush.has("users")) {
-          const beforeUsersStr = JSON.stringify(USERS);
-          mergeUsersArrays(USERS, incoming.users);
-          const afterUsersStr = JSON.stringify(USERS);
-          if (afterUsersStr !== beforeUsersStr) {
-            safeLocalSet(STORAGE_USERS_KEY, afterUsersStr);
-            usersChanged = true;
-          }
-        }
-        if (incoming.comments && typeof incoming.comments === "object") {
-          const beforeStr = JSON.stringify(COMMENTS);
-          COMMENTS = mergeCommentsObjects(COMMENTS, incoming.comments);
-          const afterStr = JSON.stringify(COMMENTS);
-          if (afterStr !== beforeStr) {
-            safeLocalSet(STORAGE_COMMENTS_KEY, afterStr);
-            commentsChanged = true;
-          }
-        }
-        if (Array.isArray(incoming.notifications) && !pendingSectionsToPush.has("notifications")) {
-          const newNotifStr = JSON.stringify(incoming.notifications);
-          if (newNotifStr !== JSON.stringify(NOTIFICATIONS)) {
-            NOTIFICATIONS = incoming.notifications;
-            safeLocalSet(STORAGE_NOTIF_KEY, newNotifStr);
-            notifsChanged = true;
-          }
-        }
-
-        checkAndEnforceCurrentSessionValidity();
-        updateCounts();
-
-        if (!dbChanged && !usersChanged && !commentsChanged && !notifsChanged) {
-          return;
-        }
-
-        if (usersChanged && currentlyViewedPublicUserId && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
-          openPublicProfileModal(currentlyViewedPublicUserId);
-        }
-
-        const activeEl = document.activeElement;
-        const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
-        const savedId = isTyping ? activeEl.id : null;
-        const savedVal = isTyping ? activeEl.value : "";
-
-        if (!dbChanged && (activeMainView === "catalog" || activeMainView === "rules")) {
-          if (commentsChanged || usersChanged) {
-            refreshCurrentCardOrRuleView();
-          }
-          return;
-        }
-
-        if (activeMainView === "catalog") {
-          setupCatalogFilters();
-          renderCatalog();
-        } else if (activeMainView === "rules") {
-          renderRulesView();
-        } else if (activeMainView === "profile") {
-          if (!isTyping) renderProfileView();
-        } else if (activeMainView === "admin") {
-          if (activeAdminSubtab === "categories" && !isTyping) renderCategoryManager();
-          else if (activeAdminSubtab === "books" && !isTyping) renderBookSourcesManager();
-          else if (activeAdminSubtab === "users" && !isTyping) renderAdminUsersManager();
-          else if (activeAdminSubtab === "logs") renderAdminLogsView();
-          else if (activeAdminSubtab === "backup") renderAdminBackupStats();
-        }
-
-        if (savedId) {
-          const restored = document.getElementById(savedId);
-          if (restored) {
-            restored.value = savedVal;
-            restored.focus();
-          }
-        }
-      } finally {
-        isApplyingRemoteUpdate = false;
-      }
-    }
-
-    const origPersistDB = persistDatabase;
-    persistDatabase = function() {
-      origPersistDB();
-      if (!isApplyingRemoteUpdate) scheduleCloudPush("db");
-    };
-
-    const origPersistUsers = persistUsers;
-    persistUsers = function() {
-      origPersistUsers();
-      if (!isApplyingRemoteUpdate) scheduleCloudPush("users");
-    };
-
-    const origPersistComments = persistComments;
-    persistComments = function() {
-      origPersistComments();
-      if (!isApplyingRemoteUpdate) scheduleCloudPush("comments");
-    };
-
-    const origPersistNotifs = persistNotifications;
-    persistNotifications = function() {
-      origPersistNotifs();
-      if (!isApplyingRemoteUpdate) scheduleCloudPush("notifications");
-    };
-
-    // Быстрый фоновый радар (проверяет только 3 лёгкие метки времени раз в 2.5 секунды)
-    setInterval(async () => {
-      checkAndEnforceCurrentSessionValidity();
-      if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
-        if (activeAdminSubtab === "users") renderAdminUsersManager();
-        else if (activeAdminSubtab === "logs") renderAdminLogsView();
-      }
-      if (!sbClient || isPushingToCloud || isApplyingRemoteUpdate || document.hidden) return;
-      try {
-        const { data: metas } = await sbClient
-          .from("cp2020_state")
-          .select("id,updated_at")
-          .in("id", ["main_state", "users_state", "comments_state"]);
-        if (!Array.isArray(metas)) return;
-
-        const toPull = [];
-        metas.forEach(row => {
-          if (row.updated_at && row.updated_at !== lastKnownRowTimestamps[row.id]) {
-            if (row.id === "main_state") toPull.push("db");
-            if (row.id === "users_state") toPull.push("users");
-            if (row.id === "comments_state") toPull.push("comments", "notifications");
-          }
-        });
-        if (toPull.length > 0) await pullUpdatedSectionsFromCloud(toPull);
-      } catch (e) {}
-    }, 2500);
-
+    // =========================================================================
+    // 5. ИНИЦИАЛИЗАЦИЯ И ПОДПИСКА НА ТОЧЕЧНЫЕ СОБЫТИЯ
+    // =========================================================================
     async function initRealtimeCloud() {
       try {
         setCloudStatusBadge("⏳", "Подключение...");
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const { data: rows, error } = await sbClient
+        // 1. Загружаем справочник карточек (main_state)
+        const { data: mainRow, error: mainErr } = await sbClient
           .from("cp2020_state")
-          .select("*")
-          .in("id", ["main_state", "fast_state", "users_state", "comments_state"]);
+          .select("db,categories,users,comments")
+          .eq("id", "main_state")
+          .maybeSingle();
 
-        if (error) throw error;
-
-        const mainRow = Array.isArray(rows) ? rows.find(r => r.id === "main_state") : null;
-        const fastRow = Array.isArray(rows) ? rows.find(r => r.id === "fast_state") : null;
-        const usersRow = Array.isArray(rows) ? rows.find(r => r.id === "users_state") : null;
-        const commRow = Array.isArray(rows) ? rows.find(r => r.id === "comments_state") : null;
+        if (mainErr) throw mainErr;
 
         if (mainRow && mainRow.db && Object.keys(mainRow.db).length > 0) {
-          lastKnownRowTimestamps.main_state = mainRow.updated_at;
-          const initialPayload = { db: mainRow.db, categories: mainRow.categories };
-
-          const srcUsers = (usersRow && Array.isArray(usersRow.users) && usersRow.users.length > 0)
-            ? usersRow.users
-            : (fastRow && Array.isArray(fastRow.users) && fastRow.users.length > 0)
-              ? fastRow.users
-              : mainRow.users;
-
-          const srcComm = (commRow && commRow.comments && Object.keys(commRow.comments).length > 0)
-            ? commRow.comments
-            : (fastRow && fastRow.comments && Object.keys(fastRow.comments).length > 0)
-              ? fastRow.comments
-              : mainRow.comments;
-
-          const srcNotifs = (commRow && Array.isArray(commRow.notifications))
-            ? commRow.notifications
-            : (fastRow && Array.isArray(fastRow.notifications))
-              ? fastRow.notifications
-              : mainRow.notifications;
-
-          if (usersRow) lastKnownRowTimestamps.users_state = usersRow.updated_at;
-          if (commRow) lastKnownRowTimestamps.comments_state = commRow.updated_at;
-
-          initialPayload.users = srcUsers;
-          initialPayload.comments = srcComm;
-          initialPayload.notifications = srcNotifs;
-
-          window.hasCloudUsersLoaded = true;
-          applyCloudStateToUI(initialPayload);
-
-          // Если новые раздельные строки users_state / comments_state ещё не созданы — создаём их автоматически
-          if (!usersRow || !commRow) {
-            setTimeout(() => {
-              sbClient.rpc("save_cp2020_part", {
-                p_users: USERS,
-                p_comments: COMMENTS,
-                p_notifications: NOTIFICATIONS
-              });
-            }, 600);
-          }
-        } else {
-          window.hasCloudUsersLoaded = true;
+          isApplyingRemoteUpdate = true;
+          DB = mainRow.db;
+          if (mainRow.categories) CATEGORIES = mainRow.categories;
           ensureMetaArraysInCategories();
-          sanitizeUsersAndEnforceRoot();
-          await sbClient.rpc("save_cp2020_part", {
-            p_db: DB,
-            p_categories: CATEGORIES,
-            p_users: USERS,
-            p_comments: COMMENTS,
-            p_notifications: NOTIFICATIONS
-          });
+          safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
+          safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+          isApplyingRemoteUpdate = false;
         }
 
-        liveChannel = sbClient.channel("cp2020-realtime-v6", {
+        // 2. Загружаем пользователей из отдельной таблицы cp2020_users
+        const { data: userRows } = await sbClient.from("cp2020_users").select("*");
+        if (Array.isArray(userRows) && userRows.length > 1) {
+          USERS = userRows.map(mapRowToUser);
+          sanitizeUsersAndEnforceRoot();
+        } else if (mainRow && Array.isArray(mainRow.users) && mainRow.users.length > 0) {
+          // Автоматический перенос существующих пользователей в новую таблицу cp2020_users при первом запуске
+          USERS = mainRow.users;
+          sanitizeUsersAndEnforceRoot();
+          for (const u of USERS) {
+            await sbClient.from("cp2020_users").upsert(mapUserToRow(u), { onConflict: "id" });
+          }
+        }
+        window.hasCloudUsersLoaded = true;
+        checkAndEnforceCurrentSessionValidity();
+        updateCounts();
+
+        // 3. Подгружаем счётчики комментариев и комментарии ТОЛЬКО для текущей открытой карточки!
+        await fetchCommentCountsFromCloud();
+        const activeCardId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+        if (activeCardId) {
+          await loadCommentsForCardFromCloud(activeCardId, true);
+        }
+
+        if (activeMainView === "catalog") {
+          setupCatalogFilters();
+          renderCatalog();
+        }
+
+        // 4. Подписываемся на мгновенные точечные уведомления
+        liveChannel = sbClient.channel("cp2020-relational-v1", {
           config: { broadcast: { self: false } }
         });
 
         liveChannel
-          .on("broadcast", { event: "instant_op" }, (msg) => {
-            if (msg.payload) handleInstantOperation(msg.payload);
+          .on("broadcast", { event: "comment_op" }, (msg) => {
+            const p = msg.payload;
+            if (!p || p.sender === CLIENT_TAB_ID) return;
+
+            // Обновляем буфер комментариев для конкретной карточки
+            if (p.op === "insert" && p.comment) {
+              if (!Array.isArray(COMMENTS[p.itemId])) COMMENTS[p.itemId] = [];
+              if (!COMMENTS[p.itemId].some(c => c.id === p.comment.id)) {
+                COMMENTS[p.itemId].push(p.comment);
+              }
+            } else if (p.op === "update") {
+              const t = (COMMENTS[p.itemId] || []).find(c => c.id === p.commentId);
+              if (t) { t.text = p.text; t.edited = true; }
+            } else if (p.op === "delete") {
+              if (Array.isArray(COMMENTS[p.itemId])) {
+                COMMENTS[p.itemId] = COMMENTS[p.itemId].filter(c => c.id !== p.commentId);
+              }
+            }
+
+            // Перерисовываем ТОЛЬКО блок комментариев и ТОЛЬКО если у пользователя сейчас открыта эта самая карточка!
+            const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+            if (currentOpenId === p.itemId) {
+              refreshCurrentCardOrRuleView({ itemId: p.itemId });
+            } else if (activeMainView === "admin" && activeAdminSubtab === "logs") {
+              renderAdminLogsView();
+            }
           })
-          .on("broadcast", { event: "cloud_poke" }, (msg) => {
-            if (msg.payload && msg.payload.sender !== CLIENT_TAB_ID) {
-              pullUpdatedSectionsFromCloud(msg.payload.sections || ["comments", "notifications"]);
+          .on("broadcast", { event: "user_changed" }, () => {
+            fetchAllUsersFromCloud();
+          })
+          .on("broadcast", { event: "user_deleted" }, (msg) => {
+            const uid = msg.payload?.userId;
+            if (!uid) return;
+            USERS = USERS.filter(u => u.id !== uid);
+            checkAndEnforceCurrentSessionValidity();
+            updateCounts();
+            if (activeMainView === "admin" && activeAdminSubtab === "users") renderAdminUsersManager();
+          })
+          .on("broadcast", { event: "db_changed" }, async () => {
+            const { data: mRow } = await sbClient.from("cp2020_state").select("db,categories").eq("id", "main_state").maybeSingle();
+            if (mRow && mRow.db) {
+              DB = mRow.db;
+              if (mRow.categories) CATEGORIES = mRow.categories;
+              if (activeMainView === "catalog") renderCatalog();
+              else if (activeMainView === "rules") renderRulesView();
             }
           })
           .subscribe((status) => {
@@ -4071,9 +3993,18 @@
         setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
         console.error("Ошибка инициализации Supabase:", err);
-        setCloudStatusBadge("🔴", "Ошибка сети: " + (err.message || JSON.stringify(err)));
+        setCloudStatusBadge("🔴", "Ошибка сети: " + (err.message || ""));
       }
     }
+
+    // Лёгкая проверка актуальности комментариев открытой карточки раз в 4 секунды (резервный канал на случай потери WebSocket-пакета)
+    setInterval(() => {
+      if (!sbClient || document.hidden) return;
+      const currentOpenId = activeMainView === "rules" ? selectedRuleId : selectedItemId;
+      if (currentOpenId && (activeMainView === "catalog" || activeMainView === "rules")) {
+        loadCommentsForCardFromCloud(currentOpenId, true);
+      }
+    }, 4000);
 
     window.addEventListener("load", () => {
       setTimeout(initRealtimeCloud, 200);
