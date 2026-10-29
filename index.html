@@ -1143,9 +1143,23 @@
     // =========================================================================
     // БЕЗОПАСНОЕ ХРАНИЛИЩЕ И ПОДГРУЗКА БАЗЫ
     // =========================================================================
+    // Функции сжатия доступны сразу на старте первого скрипта (чтобы loadSavedData не падал при F5!)
+    function compressTextData(rawStr) {
+      if (!rawStr || typeof LZString === "undefined") return rawStr;
+      try { return "LZ1::" + LZString.compressToUTF16(rawStr); } catch (e) { return rawStr; }
+    }
+
+    function decompressTextData(storedStr) {
+      if (!storedStr || typeof storedStr !== "string") return storedStr;
+      if (storedStr.startsWith("LZ1::") && typeof LZString !== "undefined") {
+        try { return LZString.decompressFromUTF16(storedStr.slice(5)); } catch (e) { return storedStr; }
+      }
+      return storedStr;
+    }
+
     function safeLocalSet(key, valueStr) {
       try {
-        localStorage.setItem(key, valueStr);
+        localStorage.setItem(key, compressTextData(valueStr));
       } catch (quotaErr) {
         const keysToClean = [
           "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
@@ -1157,11 +1171,7 @@
             try { localStorage.removeItem(k); } catch (e) {}
           }
         });
-        try {
-          localStorage.setItem(key, valueStr);
-        } catch (e2) {
-          console.warn(`Ключ ${key} превышает лимит localStorage (5 МБ) и работает через облако Supabase.`);
-        }
+        try { localStorage.setItem(key, compressTextData(valueStr)); } catch (e2) {}
       }
     }
 
@@ -1190,6 +1200,9 @@
       }
     }
 
+    // Флаг: загрузился ли уже список пользователей с сервера (чтобы не разлогинить человека при F5 раньше времени!)
+    window.hasCloudUsersLoaded = false;
+
     async function initApp() {
       if (window.CP2020_EXTERNAL_DATA) {
         mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
@@ -1197,69 +1210,77 @@
       loadSavedData();
       ensureMetaArraysInCategories();
       sanitizeUsersAndEnforceRoot();
-      checkAndEnforceCurrentSessionValidity();
       updateCounts();
       switchMainView("catalog", "roles");
     }
 
     function loadSavedData() {
+      // 1. СНАЧАЛА считываем сохранённую сессию входа (изолированно от любых ошибок парсинга кэша!)
       try {
-        const legacyKeys = [
-          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
-          "cp2020_full_db_v40", "cp2020_full_db_v51",
-          "cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51",
-          "cp2020_users_v51", "cp2020_session_user_id_v51"
-        ];
-        legacyKeys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY);
+        currentUserId = (savedSession && savedSession !== "null" && savedSession !== "undefined") ? savedSession.trim() : null;
+      } catch (e) {
+        currentUserId = null;
+      }
 
+      // 2. Очищаем старый мусор прошлых версий
+      const legacyKeys = [
+        "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
+        "cp2020_full_db_v40", "cp2020_full_db_v51",
+        "cp2020_full_cats_v30", "cp2020_full_cats_v40", "cp2020_full_cats_v51",
+        "cp2020_users_v51", "cp2020_session_user_id_v51"
+      ];
+      legacyKeys.forEach(k => { try { localStorage.removeItem(k); } catch (e) {} });
+
+      // 3. Читаем локальный кэш карточек, пользователей и комментов
+      try {
         const rawDb = localStorage.getItem(STORAGE_DB_KEY);
         if (rawDb) {
-          try {
-            const parsed = JSON.parse(rawDb);
-            if (parsed && typeof parsed === "object") mergeExternalDataIntoMemory({ db: parsed });
-          } catch (e) {}
+          const parsed = JSON.parse(decompressTextData(rawDb));
+          if (parsed && typeof parsed === "object") mergeExternalDataIntoMemory({ db: parsed });
         }
+      } catch (e) {}
 
+      try {
         const rawCats = localStorage.getItem(STORAGE_CAT_KEY);
         if (rawCats) {
-          try {
-            const parsedCats = JSON.parse(rawCats);
-            if (parsedCats && typeof parsedCats === "object") mergeExternalDataIntoMemory({ categories: parsedCats });
-          } catch (e) {}
+          const parsedCats = JSON.parse(decompressTextData(rawCats));
+          if (parsedCats && typeof parsedCats === "object") mergeExternalDataIntoMemory({ categories: parsedCats });
         }
+      } catch (e) {}
 
+      try {
         const rawUsers = localStorage.getItem(STORAGE_USERS_KEY);
         if (rawUsers) {
-          try {
-            const parsedUsers = JSON.parse(rawUsers);
-            if (Array.isArray(parsedUsers)) {
-              parsedUsers.forEach(u => {
-                if (!u || !u.id) return;
-                const idx = USERS.findIndex(ex => ex.id === u.id);
-                if (idx !== -1) USERS[idx] = u;
-                else USERS.push(u);
-              });
-            }
-          } catch (e) {}
+          const parsedUsers = JSON.parse(decompressTextData(rawUsers));
+          if (Array.isArray(parsedUsers)) {
+            parsedUsers.forEach(u => {
+              if (!u || !u.id) return;
+              const idx = USERS.findIndex(ex => ex.id === u.id);
+              if (idx !== -1) USERS[idx] = u;
+              else USERS.push(u);
+            });
+          }
         }
+      } catch (e) {}
 
-        ensureMetaArraysInCategories();
-        sanitizeUsersAndEnforceRoot();
+      ensureMetaArraysInCategories();
+      sanitizeUsersAndEnforceRoot();
 
+      try {
         const rawComm = localStorage.getItem(STORAGE_COMMENTS_KEY);
         if (rawComm) {
-          const parsedComm = JSON.parse(rawComm);
+          const parsedComm = JSON.parse(decompressTextData(rawComm));
           if (parsedComm && typeof parsedComm === "object") COMMENTS = parsedComm;
         }
+      } catch (e) {}
 
+      try {
         const rawNotifs = localStorage.getItem(STORAGE_NOTIF_KEY);
         if (rawNotifs) {
-          const parsedNotifs = JSON.parse(rawNotifs);
+          const parsedNotifs = JSON.parse(decompressTextData(rawNotifs));
           if (Array.isArray(parsedNotifs)) NOTIFICATIONS = parsedNotifs;
         }
-
-        const savedSession = localStorage.getItem(STORAGE_SESSION_KEY);
-        if (savedSession && USERS.some(u => u.id === savedSession)) currentUserId = savedSession;
       } catch (e) {}
     }
 
@@ -3265,108 +3286,68 @@
     let isPushingToCloud = false;
     let pendingSectionsToPush = new Set();
     let pushDebounceTimer = null;
-    let lastKnownCloudTimestamp = null;
+    let lastKnownMainTs = null;
+    let lastKnownFastTs = null;
 
-    // Реестр удалённых ID (комментариев и карточек), чтобы они НИКОГДА не воскресали при рассинхроне!
     const deletedEntityIds = new Set();
-
+    const deletedUserIds = new Set();
     const CLIENT_TAB_ID = "tab-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
 
-    // =========================================================================
-    // 1. ЭКСТРЕМАЛЬНОЕ СЖАТИЕ ТЕКСТА (LZ-STRING) ДЛЯ LOCALSTORAGE И ОБЛАКА
-    // =========================================================================
-    function compressTextData(rawStr) {
-      if (!rawStr || typeof LZString === "undefined") return rawStr;
-      try {
-        return "LZ1::" + LZString.compressToUTF16(rawStr);
-      } catch (e) {
-        return rawStr;
-      }
-    }
+    // Переопределяем проверку сессии: она проверяет удаление аккаунта ТОЛЬКО после того, как загрузился список с сервера!
+    checkAndEnforceCurrentSessionValidity = function() {
+      if (!currentUserId) return;
+      if (!window.hasCloudUsersLoaded) return;
 
-    function decompressTextData(storedStr) {
-      if (!storedStr || typeof storedStr !== "string") return storedStr;
-      if (storedStr.startsWith("LZ1::") && typeof LZString !== "undefined") {
-        try {
-          return LZString.decompressFromUTF16(storedStr.slice(5));
-        } catch (e) {
-          return storedStr;
-        }
+      const u = USERS.find(x => x.id === currentUserId);
+      if (!u || deletedUserIds.has(currentUserId)) {
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showNetwatchAlert("Ваш аккаунт был удалён Администратором. Сессия завершена.");
+        return;
       }
-      return storedStr;
-    }
-
-    // Переопределяем safeLocalSet и чтение так, чтобы данные в браузере хранились в сжатом виде (экономия места в 10-15 раз)
-    safeLocalSet = function(key, valueStr) {
-      try {
-        const packed = compressTextData(valueStr);
-        localStorage.setItem(key, packed);
-      } catch (quotaErr) {
-        const keysToClean = [
-          "cp2020_rus_db_v2", "cp2020_rus_db_v25", "cp2020_full_db_v30",
-          "cp2020_full_db_v40", "cp2020_full_db_v51", "cp2020_users_v51",
-          STORAGE_DB_KEY, STORAGE_USERS_KEY, STORAGE_COMMENTS_KEY, STORAGE_NOTIF_KEY
-        ];
-        keysToClean.forEach(k => {
-          if (k !== key && k !== STORAGE_SESSION_KEY) {
-            try { localStorage.removeItem(k); } catch (e) {}
-          }
-        });
-        try {
-          localStorage.setItem(key, compressTextData(valueStr));
-        } catch (e2) {}
+      if (isUserCurrentlyBanned(u)) {
+        const bInfo = u.banInfo;
+        currentUserId = null;
+        persistSessionOnly();
+        switchMainView("profile");
+        showBanScreenModal(bInfo);
+      } else if (u.banInfo) {
+        delete u.banInfo;
+        persistUsers();
       }
     };
 
-    // =========================================================================
-    // 2. КОМПРЕССОР КАРТИНОК И GIF ДО 500x500 (ЭКОНОМИЯ ВЕСА В 20-100 РАЗ)
-    // =========================================================================
+    // Компрессор картинок до 500x500 (WebP)
     async function compressImageOrGifDataUrl(dataUrl, maxDim = 500, quality = 0.78) {
-      if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
-
-      // Если картинка уже крошечная (меньше 45 КБ) — не трогаем
-      if (dataUrl.length < 45000) return dataUrl;
-
+      if (!dataUrl || !dataUrl.startsWith("data:image/") || dataUrl.length < 40000) return dataUrl;
       return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
           try {
             let w = img.naturalWidth || img.width || maxDim;
             let h = img.naturalHeight || img.height || maxDim;
-
             if (w > maxDim || h > maxDim) {
-              if (w > h) {
-                h = Math.round((h * maxDim) / w);
-                w = maxDim;
-              } else {
-                w = Math.round((w * maxDim) / h);
-                h = maxDim;
-              }
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
             }
-
             const canvas = document.createElement("canvas");
-            canvas.width = w;
-            canvas.height = h;
+            canvas.width = w; canvas.height = h;
             const ctx = canvas.getContext("2d");
             ctx.clearRect(0, 0, w, h);
             ctx.drawImage(img, 0, 0, w, h);
-
-            // Конвертируем в ультра-лёгкий WebP (поддерживает и прозрачность, и высокое сжатие)
             let compressed = canvas.toDataURL("image/webp", quality);
             if (!compressed || compressed.length >= dataUrl.length) {
               compressed = canvas.toDataURL("image/jpeg", quality);
             }
             resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
-          } catch (err) {
-            resolve(dataUrl);
-          }
+          } catch (err) { resolve(dataUrl); }
         };
         img.onerror = () => resolve(dataUrl);
         img.src = dataUrl;
       });
     }
 
-    // Перехватываем загрузку картинки в Конструкторе карточек и автоматически сжимаем до 500x500
     handleImageUpload = function(ev) {
       const file = ev.target.files[0];
       if (!file) return;
@@ -3387,7 +3368,6 @@
       reader.readAsDataURL(file);
     };
 
-    // Перехватываем загрузку аватарки в Профиле и сжимаем до 300x300
     handleProfileAvatarUpload = function(ev) {
       const file = ev.target.files[0];
       const u = getCurrentUser();
@@ -3395,19 +3375,17 @@
       if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
       const reader = new FileReader();
       reader.onload = async (e) => {
-        u.avatar = await compressImageOrGifDataUrl(e.target.result, 300, 0.8);
+        u.avatar = await compressImageOrGifDataUrl(e.target.result, 260, 0.8);
         persistUsers();
         renderProfileView();
       };
       reader.readAsDataURL(file);
     };
 
-    // Функция массового сжатия ВСЕХ уже загруженных в базу картинок и аватарок (для очистки старых мегабайтов!)
     window.optimizeAllExistingDatabaseImages = async function() {
       if (!isCurrentUserRoot()) return;
       const beforeSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
       setCloudStatusBadge("🔄", "Оптимизация картинок...");
-
       for (const sec of Object.keys(SECTION_LABELS)) {
         const arr = DB[sec] || [];
         for (let i = 0; i < arr.length; i++) {
@@ -3416,13 +3394,11 @@
           }
         }
       }
-
       for (let i = 0; i < USERS.length; i++) {
         if (USERS[i].avatar && USERS[i].avatar.startsWith("data:image/")) {
-          USERS[i].avatar = await compressImageOrGifDataUrl(USERS[i].avatar, 300, 0.8);
+          USERS[i].avatar = await compressImageOrGifDataUrl(USERS[i].avatar, 260, 0.8);
         }
       }
-
       const afterSize = JSON.stringify(DB).length + JSON.stringify(USERS).length;
       persistDatabase();
       persistUsers();
@@ -3430,7 +3406,6 @@
       alert(`Оптимизация завершена!\nРазмер базы уменьшен с ${(beforeSize / 1024).toFixed(0)} КБ до ${(afterSize / 1024).toFixed(0)} КБ.`);
     };
 
-    // Добавляем кнопку оптимизации во вкладку «База данных (JSON)» для ROOT
     const origRenderBackup = renderAdminBackupStats;
     renderAdminBackupStats = function() {
       origRenderBackup();
@@ -3446,9 +3421,7 @@
       }
     };
 
-    // =========================================================================
-    // 3. МГНОВЕННАЯ ДОСТАВКА КОММЕНТАРИЕВ И УДАЛЕНИЙ БЕЗ ОЖИДАНИЯ БАЗЫ (0.02 СЕК)
-    // =========================================================================
+    // Мгновенные хирургические команды по WebSocket (комментарии, регистрации, баны и удаления аккаунтов)
     function broadcastDirectAction(actionPayload) {
       if (!liveChannel) return;
       liveChannel.send({
@@ -3458,28 +3431,21 @@
       });
     }
 
-    // Перехватываем отправку комментария для мгновенного пуша только одного комментария
     const origSubmitComment = submitNewComment;
     submitNewComment = function(e, itemId) {
       origSubmitComment(e, itemId);
       const list = COMMENTS[itemId] || [];
       const latest = list[list.length - 1];
-      if (latest) {
-        broadcastDirectAction({ op: "add_comment", itemId, comment: latest });
-      }
+      if (latest) broadcastDirectAction({ op: "add_comment", itemId, comment: latest });
     };
 
-    // Перехватываем редактирование комментария
     const origSaveEditComment = saveEditedComment;
     saveEditedComment = function(itemId, commentId) {
       origSaveEditComment(itemId, commentId);
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
-      if (target) {
-        broadcastDirectAction({ op: "edit_comment", itemId, commentId, text: target.text });
-      }
+      if (target) broadcastDirectAction({ op: "edit_comment", itemId, commentId, text: target.text });
     };
 
-    // Перехватываем удаление комментария: запоминаем ID в чёрный список и мгновенно удаляем у всех!
     deleteComment = function(itemId, commentId) {
       const u = getCurrentUser();
       const target = (COMMENTS[itemId] || []).find(c => c.id === commentId);
@@ -3496,31 +3462,74 @@
       COMMENTS[itemId] = (COMMENTS[itemId] || []).filter(c => c.id !== commentId);
       if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
 
-      // 1. Мгновенно (за 0.02 сек) приказываем всем открытым браузерам стереть этот комментарий!
       broadcastDirectAction({ op: "del_comment", itemId, commentId });
-
-      // 2. Сохраняем в облако
       persistComments();
-      persistDatabase();
 
       if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
       else refreshCurrentCardOrRuleView({ itemId });
     };
 
-    // Фильтрует комментарии от любых «зомби» (удалённых ранее комментариев)
-    function purgeDeletedComments() {
-      const globalDel = Array.isArray(CATEGORIES._deletedIds) ? CATEGORIES._deletedIds : [];
-      globalDel.forEach(id => deletedEntityIds.add(id));
+    // Переопределяем удаление аккаунта: мгновенный кик удалённого игрока и лёгкая перезапись без таймаутов!
+    deleteUserAccount = async function(uid) {
+      if (!isCurrentUserRoot()) return;
+      const t = USERS.find(u => u.id === uid);
+      if (!t || t.role === "ROOT" || !confirm(`Удалить аккаунт «${t.displayName}» со всеми его комментариями и уведомлениями?`)) return;
+
+      deletedUserIds.add(uid);
+      if (!Array.isArray(CATEGORIES._deletedUserIds)) CATEGORIES._deletedUserIds = [];
+      if (!CATEGORIES._deletedUserIds.includes(uid)) CATEGORIES._deletedUserIds.push(uid);
+
+      if (window.deleteUserFromCloudVault) {
+        await window.deleteUserFromCloudVault(uid);
+      }
+
+      USERS = USERS.filter(u => u.id !== uid);
+      Object.keys(COMMENTS).forEach(itemId => {
+        if (Array.isArray(COMMENTS[itemId])) {
+          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c.userId !== uid);
+          if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
+        }
+      });
+      NOTIFICATIONS = NOTIFICATIONS.filter(n => n.targetUserId !== uid);
+
+      // 1. Мгновенно выкидываем удалённого пользователя во всех открытых браузерах!
+      broadcastDirectAction({ op: "del_user", userId: uid });
+
+      // 2. Сохраняем в быструю строку fast_state
+      persistUsers();
+      persistComments();
+      persistNotifications();
+      renderAdminUsersManager();
+    };
+
+    function purgeDeletedEntities() {
+      const globalDelComm = Array.isArray(CATEGORIES._deletedIds) ? CATEGORIES._deletedIds : [];
+      globalDelComm.forEach(id => deletedEntityIds.add(id));
+
+      const globalDelUsers = Array.isArray(CATEGORIES._deletedUserIds) ? CATEGORIES._deletedUserIds : [];
+      globalDelUsers.forEach(id => deletedUserIds.add(id));
+
+      if (deletedUserIds.size > 0) {
+        USERS = USERS.filter(u => u && !deletedUserIds.has(u.id));
+      }
 
       Object.keys(COMMENTS).forEach(itemId => {
         if (Array.isArray(COMMENTS[itemId])) {
-          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c && !deletedEntityIds.has(c.id));
+          COMMENTS[itemId] = COMMENTS[itemId].filter(c => c && !deletedEntityIds.has(c.id) && !deletedUserIds.has(c.userId));
           if (COMMENTS[itemId].length === 0) delete COMMENTS[itemId];
         }
       });
     }
 
-    // Обработка мгновенных хирургических пакетов от других игроков
+    // Умное слияние массива пользователей (чтобы два новых аккаунта никогда не затирали друг друга!)
+    function mergeIncomingUsersList(incomingUsers) {
+      if (!Array.isArray(incomingUsers)) return;
+      purgeDeletedEntities();
+      const filteredIncoming = incomingUsers.filter(u => u && u.id && !deletedUserIds.has(u.id));
+      USERS = filteredIncoming;
+      sanitizeUsersAndEnforceRoot();
+    }
+
     function handleInstantOperation(payload) {
       if (!payload || payload.sender === CLIENT_TAB_ID) return;
       isApplyingRemoteUpdate = true;
@@ -3552,22 +3561,30 @@
             if (activeMainView === "admin" && activeAdminSubtab === "logs") renderAdminLogsView();
             else refreshCurrentCardOrRuleView({ itemId: payload.itemId });
           }
+        } else if (payload.op === "del_user" && payload.userId) {
+          deletedUserIds.add(payload.userId);
+          USERS = USERS.filter(u => u.id !== payload.userId);
+          purgeDeletedEntities();
+          safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+          safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+          checkAndEnforceCurrentSessionValidity();
+          updateCounts();
+          if (activeMainView === "admin") {
+            if (activeAdminSubtab === "users") renderAdminUsersManager();
+            else if (activeAdminSubtab === "logs") renderAdminLogsView();
+          } else {
+            refreshCurrentCardOrRuleView();
+          }
         }
       } finally {
         isApplyingRemoteUpdate = false;
       }
     }
 
-    // =========================================================================
-    // 4. СЕРВЕРНЫЕ ФУНКЦИИ БЕЗОПАСНОСТИ И ОБЛАЧНОЙ СИНХРОНИЗАЦИИ
-    // =========================================================================
     window.verifyPasswordInCloudVault = async function(username, password) {
       if (!sbClient) return null;
       try {
-        const { data, error } = await sbClient.rpc("verify_cp2020_login", {
-          p_username: username,
-          p_password: password
-        });
+        const { data, error } = await sbClient.rpc("verify_cp2020_login", { p_username: username, p_password: password });
         return error ? null : (data || null);
       } catch (e) { return null; }
     };
@@ -3575,9 +3592,7 @@
     window.checkUsernameTakenInVault = async function(username) {
       if (!sbClient) return false;
       try {
-        const { data, error } = await sbClient.rpc("check_cp2020_username_taken", {
-          p_username: username
-        });
+        const { data, error } = await sbClient.rpc("check_cp2020_username_taken", { p_username: username });
         return error ? false : Boolean(data);
       } catch (e) { return false; }
     };
@@ -3585,11 +3600,7 @@
     window.savePasswordInCloudVault = async function(userId, username, rawPassword) {
       if (!sbClient) return false;
       try {
-        const { data, error } = await sbClient.rpc("set_cp2020_password", {
-          p_user_id: userId,
-          p_username: username,
-          p_password: rawPassword
-        });
+        const { data, error } = await sbClient.rpc("set_cp2020_password", { p_user_id: userId, p_username: username, p_password: rawPassword });
         return error ? false : Boolean(data);
       } catch (e) { return false; }
     };
@@ -3597,10 +3608,7 @@
     window.updatePasswordByIdInVault = async function(userId, newPassword) {
       if (!sbClient) return false;
       try {
-        const { data, error } = await sbClient.rpc("update_cp2020_password_by_id", {
-          p_user_id: userId,
-          p_new_password: newPassword
-        });
+        const { data, error } = await sbClient.rpc("update_cp2020_password_by_id", { p_user_id: userId, p_new_password: newPassword });
         return error ? false : Boolean(data);
       } catch (e) { return false; }
     };
@@ -3628,40 +3636,50 @@
       }
     }
 
-    // Скачивает ТОЛЬКО те колонки, которые реально изменились (не качает тяжёлую DB, если изменился только коммент!)
+    // Чтение из двух раздельных строк (main_state для карточек, fast_state для юзеров/комментов)
     async function pullUpdatedSectionsFromCloud(sectionsList) {
       if (!sbClient || isPushingToCloud) return;
       try {
-        const reqCols = new Set(["updated_at"]);
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("db")) {
-          reqCols.add("db");
-          reqCols.add("categories");
-        }
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("users")) {
-          reqCols.add("users");
-        }
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("comments")) {
-          reqCols.add("comments");
-          reqCols.add("categories");
-        }
-        if (!sectionsList || sectionsList.includes("all") || sectionsList.includes("notifications")) {
-          reqCols.add("notifications");
-        }
+        const needDb = !sectionsList || sectionsList.includes("all") || sectionsList.includes("db");
+        const needFast = !sectionsList || sectionsList.includes("all") || sectionsList.includes("users") || sectionsList.includes("comments") || sectionsList.includes("notifications");
 
-        const { data, error } = await sbClient
+        const targetIds = [];
+        if (needDb) targetIds.push("main_state");
+        if (needFast) targetIds.push("fast_state");
+        if (targetIds.length === 0) return;
+
+        const { data: rows, error } = await sbClient
           .from("cp2020_state")
-          .select(Array.from(reqCols).join(","))
-          .eq("id", "main_state")
-          .maybeSingle();
+          .select("*")
+          .in("id", targetIds);
 
         if (error) throw error;
-        if (data) {
-          if (data.updated_at) lastKnownCloudTimestamp = data.updated_at;
-          applyCloudStateToUI(data);
-          setCloudStatusBadge("🟢", "В сети");
+        if (!Array.isArray(rows)) return;
+
+        const mainRow = rows.find(r => r.id === "main_state");
+        const fastRow = rows.find(r => r.id === "fast_state");
+
+        const combined = {};
+        if (mainRow) {
+          lastKnownMainTs = mainRow.updated_at;
+          if (mainRow.db && Object.keys(mainRow.db).length > 0) combined.db = mainRow.db;
+          if (mainRow.categories && Object.keys(mainRow.categories).length > 0) combined.categories = mainRow.categories;
         }
+        // Если fast_state уже создана — берём юзеров и комменты из неё, иначе фолбэк на main_state
+        const userSource = (fastRow && Array.isArray(fastRow.users) && fastRow.users.length > 0) ? fastRow : mainRow;
+        if (fastRow) lastKnownFastTs = fastRow.updated_at;
+
+        if (userSource) {
+          if (Array.isArray(userSource.users) && userSource.users.length > 0) combined.users = userSource.users;
+          if (userSource.comments && typeof userSource.comments === "object") combined.comments = userSource.comments;
+          if (Array.isArray(userSource.notifications)) combined.notifications = userSource.notifications;
+        }
+
+        window.hasCloudUsersLoaded = true;
+        applyCloudStateToUI(combined);
+        setCloudStatusBadge("🟢", "В сети");
       } catch (err) {
-        console.error("Ошибка загрузки из облака:", err);
+        console.error("Ошибка чтения облака:", err);
       }
     }
 
@@ -3670,7 +3688,7 @@
       pendingSectionsToPush.add(sectionName);
 
       if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
-      pushDebounceTimer = setTimeout(flushPendingToCloud, 60);
+      pushDebounceTimer = setTimeout(flushPendingToCloud, 80);
     }
 
     async function flushPendingToCloud() {
@@ -3684,35 +3702,26 @@
         isApplyingRemoteUpdate = true;
         sanitizeUsersAndEnforceRoot();
         ensureMetaArraysInCategories();
-        purgeDeletedComments();
+        purgeDeletedEntities();
         isApplyingRemoteUpdate = false;
 
         setCloudStatusBadge("🔄", "Синхронизация...");
 
+        // Отправляем строго те отсеки, которые изменились! При удалении/регистрации юзера тяжёлая DB вообще не затрагивается!
         const rpcParams = {
           p_db: (sections.includes("all") || sections.includes("db")) ? DB : null,
-          p_categories: (sections.includes("all") || sections.includes("db") || sections.includes("comments")) ? CATEGORIES : null,
+          p_categories: (sections.includes("all") || sections.includes("db")) ? CATEGORIES : null,
           p_users: (sections.includes("all") || sections.includes("users")) ? USERS : null,
           p_comments: (sections.includes("all") || sections.includes("comments")) ? COMMENTS : null,
           p_notifications: (sections.includes("all") || sections.includes("notifications")) ? NOTIFICATIONS : null
         };
 
         const { data: newTs, error } = await sbClient.rpc("save_cp2020_part", rpcParams);
+        if (error) throw error;
 
-        if (error) {
-          const fallbackPayload = {
-            id: "main_state",
-            db: DB,
-            categories: CATEGORIES,
-            users: USERS,
-            comments: COMMENTS,
-            notifications: NOTIFICATIONS,
-            updated_at: new Date().toISOString()
-          };
-          const { error: upErr } = await sbClient.from("cp2020_state").upsert(fallbackPayload, { onConflict: "id" });
-          if (upErr) throw upErr;
-        } else if (newTs) {
-          lastKnownCloudTimestamp = newTs;
+        if (newTs) {
+          if (rpcParams.p_db) lastKnownMainTs = newTs;
+          if (rpcParams.p_users || rpcParams.p_comments || rpcParams.p_notifications) lastKnownFastTs = newTs;
         }
 
         if (liveChannel) {
@@ -3731,7 +3740,7 @@
         isApplyingRemoteUpdate = false;
         isPushingToCloud = false;
         if (pendingSectionsToPush.size > 0) {
-          setTimeout(flushPendingToCloud, 60);
+          setTimeout(flushPendingToCloud, 80);
         }
       }
     }
@@ -3764,18 +3773,18 @@
           }
         }
         if (Array.isArray(incoming.users) && incoming.users.length > 0 && !pendingSectionsToPush.has("users")) {
-          const newUsersStr = JSON.stringify(incoming.users);
-          if (newUsersStr !== JSON.stringify(USERS)) {
-            USERS = incoming.users;
-            sanitizeUsersAndEnforceRoot();
-            safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+          const beforeUsersStr = JSON.stringify(USERS);
+          mergeIncomingUsersList(incoming.users);
+          const afterUsersStr = JSON.stringify(USERS);
+          if (afterUsersStr !== beforeUsersStr) {
+            safeLocalSet(STORAGE_USERS_KEY, afterUsersStr);
             usersChanged = true;
           }
         }
         if (incoming.comments && typeof incoming.comments === "object" && !pendingSectionsToPush.has("comments")) {
           const beforeStr = JSON.stringify(COMMENTS);
           COMMENTS = incoming.comments;
-          purgeDeletedComments();
+          purgeDeletedEntities();
           const afterStr = JSON.stringify(COMMENTS);
           if (afterStr !== beforeStr) {
             safeLocalSet(STORAGE_COMMENTS_KEY, afterStr);
@@ -3791,18 +3800,17 @@
           }
         }
 
+        // Всегда обновляем шапку и проверяем валидность сессии после загрузки облачных данных
+        checkAndEnforceCurrentSessionValidity();
+        updateCounts();
+
         if (!dbChanged && !usersChanged && !commentsChanged && !notifsChanged) {
           return;
         }
 
-        if (usersChanged) {
-          checkAndEnforceCurrentSessionValidity();
-          if (currentlyViewedPublicUserId && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
-            openPublicProfileModal(currentlyViewedPublicUserId);
-          }
+        if (usersChanged && currentlyViewedPublicUserId && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+          openPublicProfileModal(currentlyViewedPublicUserId);
         }
-
-        updateCounts();
 
         const activeEl = document.activeElement;
         const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
@@ -3867,6 +3875,7 @@
       if (!isApplyingRemoteUpdate) scheduleCloudPush("notifications");
     };
 
+    // Фоновый радар (проверяет только крошечные метки времени раз в 4 сек)
     setInterval(async () => {
       checkAndEnforceCurrentSessionValidity();
       if (activeMainView === "admin" && (activeAdminSubtab === "users" || activeAdminSubtab === "logs")) {
@@ -3875,14 +3884,18 @@
       }
       if (!sbClient || isPushingToCloud || isApplyingRemoteUpdate || document.hidden) return;
       try {
-        const { data: meta } = await sbClient
+        const { data: metas } = await sbClient
           .from("cp2020_state")
-          .select("updated_at")
-          .eq("id", "main_state")
-          .maybeSingle();
-        if (meta && meta.updated_at && meta.updated_at !== lastKnownCloudTimestamp) {
-          await pullUpdatedSectionsFromCloud(["all"]);
-        }
+          .select("id,updated_at")
+          .in("id", ["main_state", "fast_state"]);
+        if (!Array.isArray(metas)) return;
+        const mRow = metas.find(r => r.id === "main_state");
+        const fRow = metas.find(r => r.id === "fast_state");
+
+        const toPull = [];
+        if (mRow && mRow.updated_at && mRow.updated_at !== lastKnownMainTs) toPull.push("db");
+        if (fRow && fRow.updated_at && fRow.updated_at !== lastKnownFastTs) toPull.push("users", "comments", "notifications");
+        if (toPull.length > 0) await pullUpdatedSectionsFromCloud(toPull);
       } catch (e) {}
     }, 4000);
 
@@ -3891,18 +3904,43 @@
         setCloudStatusBadge("⏳", "Подключение...");
         sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-        const { data, error } = await sbClient
+        const { data: rows, error } = await sbClient
           .from("cp2020_state")
           .select("*")
-          .eq("id", "main_state")
-          .maybeSingle();
+          .in("id", ["main_state", "fast_state"]);
 
         if (error) throw error;
 
-        if (data && data.db && Object.keys(data.db).length > 0) {
-          if (data.updated_at) lastKnownCloudTimestamp = data.updated_at;
-          applyCloudStateToUI(data);
+        const mainRow = Array.isArray(rows) ? rows.find(r => r.id === "main_state") : null;
+        const fastRow = Array.isArray(rows) ? rows.find(r => r.id === "fast_state") : null;
+
+        if (mainRow && mainRow.db && Object.keys(mainRow.db).length > 0) {
+          lastKnownMainTs = mainRow.updated_at;
+          const initialPayload = { db: mainRow.db, categories: mainRow.categories };
+
+          if (fastRow && Array.isArray(fastRow.users) && fastRow.users.length > 0) {
+            lastKnownFastTs = fastRow.updated_at;
+            initialPayload.users = fastRow.users;
+            initialPayload.comments = fastRow.comments;
+            initialPayload.notifications = fastRow.notifications;
+          } else {
+            // Однократная миграция пользователей и комментов из main_state в быструю строку fast_state
+            initialPayload.users = mainRow.users;
+            initialPayload.comments = mainRow.comments;
+            initialPayload.notifications = mainRow.notifications;
+            setTimeout(() => {
+              sbClient.rpc("save_cp2020_part", {
+                p_users: USERS,
+                p_comments: COMMENTS,
+                p_notifications: NOTIFICATIONS
+              });
+            }, 800);
+          }
+
+          window.hasCloudUsersLoaded = true;
+          applyCloudStateToUI(initialPayload);
         } else {
+          window.hasCloudUsersLoaded = true;
           ensureMetaArraysInCategories();
           sanitizeUsersAndEnforceRoot();
           await sbClient.rpc("save_cp2020_part", {
@@ -3914,7 +3952,7 @@
           });
         }
 
-        liveChannel = sbClient.channel("cp2020-realtime-v4", {
+        liveChannel = sbClient.channel("cp2020-realtime-v5", {
           config: { broadcast: { self: false } }
         });
 
@@ -3924,7 +3962,7 @@
           })
           .on("broadcast", { event: "cloud_poke" }, (msg) => {
             if (msg.payload && msg.payload.sender !== CLIENT_TAB_ID) {
-              pullUpdatedSectionsFromCloud(msg.payload.sections || ["all"]);
+              pullUpdatedSectionsFromCloud(msg.payload.sections || ["users", "comments", "notifications"]);
             }
           })
           .subscribe((status) => {
