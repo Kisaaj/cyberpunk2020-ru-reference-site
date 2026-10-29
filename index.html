@@ -4480,6 +4480,228 @@
     window.addEventListener("load", () => {
       setTimeout(initRealtimeCloud, 200);
     });
+    // =========================================================================
+    // ПРЯМОЙ ПЕРЕХВАТЧИК ЗАГРУЗКИ АВАТАРКИ С ПК (БЕЗ КОНФЛИКТОВ ФУНКЦИЙ)
+    // =========================================================================
+    async function processDirectAvatarFile(file) {
+      const u = getCurrentUser();
+      if (!file || !u) return;
+
+      // 1. Проверка Сетевого Дозора (формат и размер по роли)
+      if (typeof validateUploadedFile === "function" && !validateUploadedFile(file)) {
+        return;
+      }
+
+      setCloudStatusBadge("🔄", "Обработка аватара...");
+
+      // 2. Читаем файл с ПК в DataURL
+      const rawDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+
+      if (!rawDataUrl) {
+        setCloudStatusBadge("🔴", "Ошибка чтения файла");
+        return;
+      }
+
+      // 3. Сжимаем картинку до 240x240 WebP (или оставляем GIF как есть, если он небольшой)
+      const finalAvatar = await new Promise((resolve) => {
+        if (rawDataUrl.startsWith("data:image/gif") && rawDataUrl.length < 400000) {
+          resolve(rawDataUrl);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 240;
+            let w = img.naturalWidth || img.width || maxDim;
+            let h = img.naturalHeight || img.height || maxDim;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            let webp = canvas.toDataURL("image/webp", 0.82);
+            if (!webp || webp.length >= rawDataUrl.length) {
+              webp = canvas.toDataURL("image/jpeg", 0.82);
+            }
+            resolve(webp);
+          } catch (err) {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+      });
+
+      // 4. МГНОВЕННО ставим аватарку на экран (в профиль, в шапку и в кэш)
+      u.avatar = finalAvatar;
+      AVATAR_CACHE[u.id] = finalAvatar;
+
+      const profBox = document.getElementById("profileAvatarBox");
+      if (profBox) profBox.innerHTML = `<img src="${finalAvatar}" class="w-full h-full object-cover">`;
+
+      const headerBox = document.getElementById("headerAvatarContent");
+      if (headerBox) headerBox.innerHTML = `<img src="${finalAvatar}" class="w-full h-full object-cover">`;
+
+      const urlInp = document.getElementById("editProfAvatarUrl");
+      if (urlInp) urlInp.value = "";
+
+      safeLocalSet(STORAGE_USERS_KEY, JSON.stringify(USERS));
+
+      // 5. Сохраняем в облако Supabase (и в реестр аватарок, и в таблицу пользователей)
+      if (sbClient) {
+        try {
+          await sbClient.from("cp2020_avatar_store").upsert({
+            user_id: u.id,
+            avatar_data: finalAvatar,
+            updated_at: new Date().toISOString()
+          }, { onConflict: "user_id" });
+
+          await sbClient.from("cp2020_users").update({
+            avatar_url: finalAvatar,
+            updated_at: new Date().toISOString()
+          }).eq("id", u.id);
+
+          if (liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "avatar_updated",
+              payload: { sender: CLIENT_TAB_ID, userId: u.id, avatar: finalAvatar }
+            });
+          }
+          setCloudStatusBadge("🟢", "Аватар сохранён!");
+        } catch (err) {
+          console.error("Ошибка записи аватара в БД:", err);
+          setCloudStatusBadge("🔴", "Ошибка записи аватара");
+        }
+      }
+    }
+
+    // Перехватываем и старый вызов onchange, и вешаем прямой слушатель на сам input!
+    window.handleProfileAvatarUpload = function(ev) {
+      if (!ev || !ev.target || !ev.target.files || !ev.target.files[0]) return;
+      const file = ev.target.files[0];
+      ev.target.value = "";
+      processDirectAvatarFile(file);
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const fileInp = document.getElementById("profileAvatarFileInput");
+      if (fileInp) {
+        fileInp.removeAttribute("onchange");
+        fileInp.addEventListener("change", (ev) => {
+          if (ev.target.files && ev.target.files[0]) {
+            const f = ev.target.files[0];
+            ev.target.value = "";
+            processDirectAvatarFile(f);
+          }
+        });
+      }
+    });
+    // =========================================================================
+    // ПРЯМОЙ ПЕРЕХВАТЧИК ЗАГРУЗКИ ИЛЛЮСТРАЦИЙ ДЛЯ КАРТОЧЕК (КОНСТРУКТОР)
+    // =========================================================================
+    async function processDirectCardImageFile(file) {
+      if (!file) return;
+      if (typeof validateUploadedFile === "function" && !validateUploadedFile(file)) {
+        return;
+      }
+
+      setCloudStatusBadge("🔄", "Сжатие иллюстрации...");
+
+      const rawDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+
+      if (!rawDataUrl) {
+        setCloudStatusBadge("🔴", "Ошибка чтения файла");
+        return;
+      }
+
+      // Сжимаем картинку до 500x500 WebP (для карточек справочника)
+      const optimizedImage = await new Promise((resolve) => {
+        if (rawDataUrl.startsWith("data:image/gif") && rawDataUrl.length < 500000) {
+          resolve(rawDataUrl);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          try {
+            const maxDim = 500;
+            let w = img.naturalWidth || img.width || maxDim;
+            let h = img.naturalHeight || img.height || maxDim;
+            if (w > maxDim || h > maxDim) {
+              if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+              else { w = Math.round((w * maxDim) / h); h = maxDim; }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.clearRect(0, 0, w, h);
+            ctx.drawImage(img, 0, 0, w, h);
+            let webp = canvas.toDataURL("image/webp", 0.78);
+            if (!webp || webp.length >= rawDataUrl.length) {
+              webp = canvas.toDataURL("image/jpeg", 0.78);
+            }
+            resolve(webp);
+          } catch (err) {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+      });
+
+      // Записываем в глобальную переменную конструктора
+      currentBuilderImageData = optimizedImage;
+      
+      const urlInp = document.getElementById("builderImageUrl");
+      if (urlInp) urlInp.value = "";
+
+      // Показываем превью в конструкторе
+      const beforeKb = Math.round((rawDataUrl.length * 0.75) / 1024);
+      const afterKb = Math.round((optimizedImage.length * 0.75) / 1024);
+      const box = document.getElementById("builderImagePreviewBox");
+      if (box) {
+        box.innerHTML = `<img src="${optimizedImage}" class="max-h-52 w-auto object-contain border border-cp-cyan/40"><span class="text-[11px] text-cp-green mt-2">✓ Оптимизировано: ${beforeKb} КБ → <b>${afterKb} КБ</b></span>`;
+      }
+
+      setCloudStatusBadge("🟢", "Иллюстрация готова!");
+    }
+
+    window.handleImageUpload = function(ev) {
+      if (!ev || !ev.target || !ev.target.files || !ev.target.files[0]) return;
+      const file = ev.target.files[0];
+      ev.target.value = "";
+      processDirectCardImageFile(file);
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      const cardFileInp = document.getElementById("builderImageFile");
+      if (cardFileInp) {
+        cardFileInp.removeAttribute("onchange");
+        cardFileInp.addEventListener("change", (ev) => {
+          if (ev.target.files && ev.target.files[0]) {
+            const f = ev.target.files[0];
+            ev.target.value = "";
+            processDirectCardImageFile(f);
+          }
+        });
+      }
+    });
   </script>
 
   <!-- ========================================================================= -->
