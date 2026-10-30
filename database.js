@@ -3543,3 +3543,468 @@ window.CP2020_EXTERNAL_DATA = {
     }
   });
 })();
+// ============================================================================
+// ДОПОЛНЕНИЕ БАЗЫ ОРУЖИЯ В DATABASE.JS (БЕЗ ПЕРЕЗАПИСИ СУЩЕСТВУЮЩИХ КАРТОЧЕК)
+// Пакет №5: Тяжёлое оружие, Оружие киборгов, Гранаты, Мины и Спецпатроны (стр. 34–47)
+// ============================================================================
+(function appendWeaponsPack5() {
+  if (!window.CP2020_EXTERNAL_DATA) return;
+  const extDb = window.CP2020_EXTERNAL_DATA.db;
+  const extCats = window.CP2020_EXTERNAL_DATA.categories;
+  if (!Array.isArray(extDb.weapons)) extDb.weapons = [];
+  if (!Array.isArray(extCats.weapons)) extCats.weapons = [];
+
+  const heavyAndBorgCategories = [
+    "Тяжёлое вооружение",
+    "Оружие киборгов ('Borg Weapons)",
+    "Гранаты, мины и взрывчатка",
+    "Боеприпасы и спецпатроны"
+  ];
+  heavyAndBorgCategories.forEach(c => {
+    if (!extCats.weapons.includes(c)) extCats.weapons.push(c);
+  });
+
+  const PACK_5_ITEMS = [
+    // --- ТЯЖЁЛОЕ ВООРУЖЕНИЕ (HEAVY WEAPONS, стр. 34-37) ---
+    {
+      id: "bsw-hvy-mortar60",
+      name: "60-мм лёгкий миномёт (60mm Light Mortar)",
+      origName: "60mm Light Mortar",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "8d10 (радиус 5м)", ammo: "60мм мины (ОФ, дым, фосфор)", mag: "1", sko: "2 (1 в одиночку)", nad: "ОТ", range: "1,000м", cost: "750 eb", book: "HotB",
+      desc: "Лёгкий ротный миномёт массой 15 кг (разбирается на трубу и опорную плиту). При обслуживании расчётом из 2 человек выдаёт СКО 2 (в одиночку — 1 выстрел в 2 раунда). Выстрел стоит 50 eb и весит 1 кг."
+    },
+    {
+      id: "bsw-hvy-coltmauser",
+      name: "20-мм пушка Colt-Mauser M2X Cannon",
+      origName: "Colt-Mauser M2X Cannon",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Ред",
+      damage: "8d10 (20мм)", ammo: "20мм гильзовый", mag: "8", sko: "1", nad: "ОБ", range: "600м", cost: "3,050 eb", book: "Chr2",
+      desc: "Мощное полуавтоматическое 20-мм орудие для стрельбы с плеча с длинноходным штоком гашения отдачи и штатным 4x оптическим прицелом (весит 23 кг в снаряжённом виде). При каждом выстреле требует проверки ТЕЛА 15+, иначе стрелок получает 1–2 ед. ушибов плеча (при критическом провале оружие роняется)."
+    },
+    {
+      id: "bsw-hvy-commgl",
+      name: "Коммерческий гранатомёт (Commercial Grenade Launchers)",
+      origName: "Commercial Grenade Launchers",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Плащ", dos: "Ред",
+      damage: "По типу 30–40мм гранаты", ammo: "30мм или 40мм гранаты", mag: "1", sko: "1", nad: "ОБ", range: "225м", cost: "150 eb", book: "CP20",
+      desc: "Стандартный однозарядный подствольный гранатомёт, совместимый с любой штурмовой винтовкой (либо используемый отдельно с простым плечевым прикладом)."
+    },
+    {
+      id: "bsw-hvy-f253flame",
+      name: "Ранцевый огнемёт Kenshiri-Adachi F-253 Flamethrower",
+      origName: "Kenshiri-Adachi F-253 Flamethrower",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-2", skr: "Нет", dos: "Ред",
+      damage: "2d10 (напалм)", ammo: "Сжиженный напалм", mag: "10", sko: "1", nad: "ОБ", range: "50м", cost: "1,500 eb", book: "CP20",
+      desc: "Тяжёлый армейский ранцевый огнемёт, выбрасывающий струю жидкого напалма на 50 метров."
+    },
+    {
+      id: "bsw-hvy-law",
+      name: "Лёгкий одноразовый гранатомёт LAW (60–70мм)",
+      origName: "Light Anti-tank Weapon (LAW)",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-2", skr: "Плащ", dos: "Мал",
+      damage: "4d10 ББ КС (рад. 2м)", ammo: "Кумулятивная ракета (однораз.)", mag: "1", sko: "1", nad: "ОТ", range: "100м", cost: "300 eb", book: "HotB",
+      desc: "Одноразовый реактивный противотанковый гранатомёт весом 2 кг. Использует систему холодного пуска сжатым воздухом без реактивной струи сзади — безопасен для стрельбы из закрытых помещений!"
+    },
+    {
+      id: "bsw-hvy-hlaw",
+      name: "Тяжёлый одноразовый гранатомёт HLAW (85–105мм)",
+      origName: "Heavy Light Anti-tank Weapon (HLAW)",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-2", skr: "Нет", dos: "Мал",
+      damage: "11d10 ББ КС (рад. 4м)", ammo: "Тяжёлая кумулятивная ракета", mag: "1", sko: "1", nad: "ОТ", range: "100м", cost: "800 eb", book: "HotB",
+      desc: "Утяжелённая (5 кг) версия одноразового гранатомёта калибра 85–105 мм с холодным пуском (можно стрелять из помещений) и сокрушительной кумулятивной боевой частью на 11d10 ББ урона!"
+    },
+    {
+      id: "bsw-hvy-m32agl",
+      name: "Автоматический станковый гранатомёт M-32 AGL",
+      origName: "M-32 Automatic Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Ред",
+      damage: "По типу 40мм гранаты", ammo: "40мм высокоскоростные гранаты", mag: "50", sko: "20", nad: "ОТ", range: "1,600м", cost: "2,500 eb", book: "HotB",
+      desc: "Станковый или турельный автоматический гранатомёт, выплёвывающий 40-мм высокоскоростные гранаты очередями до 20 выстрелов в раунд на дальность до 1.6 км (обычными 40-мм гранатами может стрелять только одиночными)."
+    },
+    {
+      id: "bsw-hvy-m205gl",
+      name: "Подствольный гранатомёт M-205 Grenade Launcher",
+      origName: "M-205 Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+1", skr: "Плащ", dos: "Мал",
+      damage: "По типу 40мм гранаты", ammo: "40мм гранаты", mag: "1", sko: "1", nad: "ОТ", range: "200м", cost: "250 eb", book: "HotB",
+      desc: "Штатный армейский 40-мм однозарядный гранатомёт из полимеров и композитов (используется как подствольный модуль на винтовках или отдельно)."
+    },
+    {
+      id: "bsw-hvy-m212gl",
+      name: "Револьверный гранатомёт M-212 Grenade Launcher",
+      origName: "M-212 Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+1", skr: "Нет", dos: "Мал",
+      damage: "По типу 40мм гранаты", ammo: "40мм гранаты", mag: "8", sko: "2 (1 при выборе)", nad: "ОТ", range: "200м", cost: "500 eb", book: "HotB",
+      desc: "Массивный ручной гранатомёт с 8-зарядным револьверным барабаном. Позволяет выбрать конкретную гранату перед выстрелом (снижает СКО до 1)."
+    },
+    {
+      id: "bsw-hvy-milam3",
+      name: "30-мм противотанковое ружьё Militech AM-3 «Anti-Matter Rifle»",
+      origName: "Militech AM-3 \"Anti-Matter Rifle\"",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0 / +1", skr: "Нет", dos: "Ред",
+      damage: "9d10 (30мм DPU)", ammo: "30мм активно-реактивный уран", mag: "5", sko: "1", nad: "ОБ", range: "1,600м", cost: "6,000 eb", book: "Chr2",
+      desc: "Сверхмощное 30-мм ружьё со снарядами из обеднённого урана с ракетным ускорителем, сокрушающее киборгов, силовую броню и БТРы. Включает смартлинк и прицел 2–10x с ИК и LowLite. Стрельба стоя без линейной рамы «Бета» и выше сбивает стрелка с ног! Из-за разгона ракеты до 160 м урон 1/3 (ТО 0), на 160–800 м урон 1/2 (ТО +1), свыше 800 м — полный урон 9d10."
+    },
+    {
+      id: "bsw-hvy-cowboyu55",
+      name: "Штурмовой гранатомёт Militech «Cowboy» U-55",
+      origName: "Militech \"Cowboy\" U-55 Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "По типу 25мм гранаты", ammo: "25мм гранаты (барабан)", mag: "12", sko: "3 (очередь)", nad: "ОБ", range: "150м", cost: "900 eb", book: "Corp2",
+      desc: "Короткий городской барабанный гранатомёт под 25-мм снаряды, способный стрелять одиночными или залпами по 3 гранаты подряд (например, комбинацией из 1 осколочной, 1 контузионной и 1 зажигательной гранаты в одной очереди!)."
+    },
+    {
+      id: "bsw-hvy-hotshot",
+      name: "ПТУР Militech Hotshot L-ATGM",
+      origName: "Militech Hotshot L-ATGM",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+2", skr: "Нет", dos: "Мал",
+      damage: "12d10 ББ КС (рад. 4м)", ammo: "Управляемая ПТУР (1500 eb)", mag: "1", sko: "1", nad: "ОТ", range: "500м", cost: "2,500 eb", book: "HotB",
+      desc: "Лёгкий противотанковый ракетный комплекс с управлением по проводам, тепловизионным/лазерным наведением и холодным пневмопуском без тепловой засветки позиции."
+    },
+    {
+      id: "bsw-hvy-minigl",
+      name: "Мини-гранатомёт Militech Mini-Grenade Launcher",
+      origName: "Militech Mini-Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-1 (помпа) / 0 (барабан)", skr: "Плащ / Нет", dos: "Обы / Мал",
+      damage: "5d6 HEP / 2d6+1 ОФ / 10 кал.", ammo: "25x70мм мини-гранаты / 10 кал.", mag: "4 (помпа) / 16 (барабан)", sko: "2", nad: "ОБ", range: "150м", cost: "255 eb / 475 eb", book: "Chr1",
+      desc: "Выпускается в двух вариантах: компактный помповый на 4 гранаты (255 eb, СКР: Плащ, также ставится как подствольник) и барабанный на 16 гранат с селектором выбора типа боеприпаса (475 eb). Оба могут стрелять патронами 10-го ружейного калибра."
+    },
+    {
+      id: "bsw-hvy-rpga",
+      name: "РПГ Militech RPG-A Grenade Launcher",
+      origName: "Militech RPG-A Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-2", skr: "Нет", dos: "Ред",
+      damage: "6d10", ammo: "Надмыльная реактивная граната", mag: "1", sko: "1", nad: "ОТ", range: "750м", cost: "1,500 eb", book: "CP20",
+      desc: "Плечевой реактивный противотанковый гранатомёт, массово применявшийся в Центральноамериканских конфликтах."
+    },
+    {
+      id: "bsw-hvy-scorpion16",
+      name: "ПЗРК Militech Scorpion 16 Surface-To-Air Missile",
+      origName: "Militech Scorpion 16 Surface-To-Air Missile",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-1", skr: "Нет", dos: "Мал",
+      damage: "7d10 (рад. 6м)", ammo: "Зенитная ракета с ИК-ГСН", mag: "1", sko: "1", nad: "ОТ", range: "500м", cost: "1,000 eb", book: "CP20",
+      desc: "Третье поколение ПЗРК «Стингер» для уничтожения АВ и вертолётов по принципу «выстрелил и забыл» (тепловое наведение с оптической памятью цели)."
+    },
+    {
+      id: "bsw-hvy-urbanmissile",
+      name: "Пусковая установка микроракет Militech Urban Missile Launcher",
+      origName: "Militech Urban Missile Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+2 (+1 подствол.)", skr: "Плащ", dos: "Мал",
+      damage: "4d6 (рад. 2м)", ammo: "Самонаводящиеся микроракеты", mag: "12 (1 подствол.)", sko: "2 (1)", nad: "ОБ", range: "200м", cost: "900 eb (200 подствол.)", book: "Chr2",
+      desc: "Плечевая магазинная пусковая установка на 12 тепловых самонаводящихся микроракет (способных огибать углы на 90°). Также доступна однозарядная подствольная версия MicroMissile Pod за 200 eb."
+    },
+    {
+      id: "bsw-hvy-emg85",
+      name: "Рельсотрон Rhinemetall EMG-85 Railgun",
+      origName: "Rhinemetall EMG-85 Railgun",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+3", skr: "Нет", dos: "Ред",
+      damage: "5d10+10 (ЭББ: броня x1/4!)", ammo: "15г лексановый гиперзвуковой слиток", mag: "5", sko: "1/2", nad: "ОБ", range: "1,500м", cost: "11,370 eb", book: "Chr2",
+      desc: "Электромагнитная рельсовая пушка на сверхпроводниках (35 кг), разгоняющая 15-граммовый снаряд до 2400 м/с! Экстра-бронебойный эффект (EAP): любая броня цели делится на 4 (x1/4 ОС), прошедший урон делится пополам. Требует ТЕЛО 11+ с гиро-подвесом или ТЕЛО 12+ без подвеса."
+    },
+    {
+      id: "bsw-hvy-wristracate",
+      name: "Наручный ракетомёт Rostovic Wrist Racate",
+      origName: "Rostovic Wrist Racate",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "5d6 (30мм ОФ, рад. 3м)", ammo: "30мм мини-ракеты", mag: "6", sko: "3 (или залп)", nad: "ОБ / НН", range: "250м", cost: "380 eb", book: "Chr1",
+      desc: "Восточноевропейский вращающийся блок из 6 пусковых труб для 30-мм ракет с холодным пневмопуском, надеваемый поверх киберруки или боевой перчатки Battleglove (для живой руки слишком тяжёл)."
+    },
+    {
+      id: "bsw-hvy-cockerill25",
+      name: "25-мм штурмовая пушка Royal Enfield Cockerill",
+      origName: "Royal Enfield Ordnance 25mm Cockerill Assault Cannon",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+1 (-1 от бедра)", skr: "Нет", dos: "Ред",
+      damage: "5d10+10 ББ (25мм)", ammo: "25мм активно-реактивные (AP/HEP/APF)", mag: "12", sko: "1", nad: "ОБ", range: "1,500м", cost: "7,400 eb", book: "UK (Rough Guide)",
+      desc: "Британское ручное противотранспортное орудие (облегчённая версия 30-мм пушки БРМ Scimitar) на активно-реактивных снарядах. Требует мин. ТЕЛО 6 для переноски (с сошек) и ТЕЛО 8+ для стрельбы с бедра."
+    },
+    {
+      id: "bsw-hvy-towat9gl",
+      name: "Револьверный гранатомёт Towa Manufacturing Type-9",
+      origName: "Towa Manufacturing Type-9 Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "По типу 40мм гранаты", ammo: "40мм гранаты", mag: "8", sko: "2", nad: "ОТ", range: "200м", cost: "750 eb", book: "PR (Pacific Rim)",
+      desc: "Японский 8-зарядный гранатомёт с револьверным барабаном, позволяющий свободно выбирать нужный тип гранаты перед выстрелом."
+    },
+    {
+      id: "bsw-hvy-tsunamit17",
+      name: "Противоброневое ружьё Tsunami Arms Type-17",
+      origName: "Tsunami Arms Type-17 Anti-Armor Rifle",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "+1 (+3 смарт)", skr: "Нет", dos: "Ред",
+      damage: "8d10 ББ (20мм AP)", ammo: "20мм бронебойный гильзовый", mag: "12", sko: "1", nad: "ОБ", range: "1,200м", cost: "7,500 eb", book: "PR (Pacific Rim)",
+      desc: "Специальное 20-мм орудие Сил самообороны Японии для уничтожения силовой брони (ACPA) и бронетехники. Оснащено сошками, компьютеризированным прицелом и смартлинком. Для стрельбы без сошек и упора требует ТЕЛО 14+."
+    },
+    {
+      id: "bsw-hvy-tsunamit18",
+      name: "Автоматический гранатомёт Tsunami Arms Type-18 («Pitching Machine»)",
+      origName: "Tsunami Arms Type-18 Automatic Grenade Launcher",
+      category: "Тяжёлое вооружение",
+      typeCode: "ТЯЖ", to: "-1", skr: "Нет", dos: "Мал",
+      damage: "По типу 25мм гранаты", ammo: "25мм гранаты (ранцевый короб)", mag: "30", sko: "10", nad: "ОБ", range: "200м", cost: "2,000 eb", book: "PR (Pacific Rim)",
+      desc: "Ручной автоматический гранатомёт в форм-факторе базуки с гиростабилизатором и 25-килограммовым наспинным ранцем на 30 гранат (СКО 10, даёт штраф -1 РЕФ и -1 ПЕР из-за веса)."
+    },
+
+    // --- ОРУЖИЕ КИБОРГОВ ('BORG WEAPONS, стр. 37-40) ---
+    {
+      id: "bsw-borg-pockettsunami",
+      name: "Киборг-гранатомёт Arasaka «Pocket Tsunami»",
+      origName: "Arasaka \"Pocket Tsunami\" Grenade Launcher",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ТЯЖ", to: "0 (-2 пистолет)", skr: "Плащ", dos: "Мал",
+      damage: "5d6 HE / 5d6 HEP / 3d6+1 ОФ", ammo: "25мм гранаты высокого давления", mag: "6", sko: "1", nad: "ОБ", range: "200м", cost: "1,250 eb", book: "SOF / SOF2",
+      desc: "Массивный 8-килограммовый 6-зарядный револьверный гранатомёт высокого давления для полных киборгов (мин. ТЕЛО 11 при двуручном хвате) или «табельный револьвер» для пилотов силовой брони ACPA (мин. ТЕЛО 23 при стрельбе с одной руки!)."
+    },
+    {
+      id: "bsw-borg-arasakarage",
+      name: "15-мм штурмовой ПП киборгов Arasaka «Rage»",
+      origName: "Arasaka \"Rage\" 15mm Submachinegun",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ТЯЖ", to: "-1 (-2 авто)", skr: "Плащ", dos: "Мал",
+      damage: "4d10+3 ББ (или 3d10 ОФ)", ammo: "15mm Kurz (ББ или фугасный)", mag: "20 (10 / 50)", sko: "1 / 10", nad: "ОТ", range: "100м", cost: "4,500 eb", book: "SOF / SOF2",
+      desc: "Чудовищный 15-мм пистолет-пулемёт весом 8 кг для полных киборгов и силовой брони (требует мин. ТЕЛО 15 или раму «Омега»!). Стреляет бронебойными (4d10+3 ББ) или фугасными (3d10 в радиусе 1 м) снарядами 15mm Kurz."
+    },
+    {
+      id: "bsw-borg-biggov",
+      name: "14-мм пистолет киборгов Magnum Opus «Big Government»",
+      origName: "14mm Handgun - Magnum Opus \"Big Government\"",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "П", to: "0", skr: "Кур", dos: "Мал",
+      damage: "6d6 (14мм)", ammo: "14мм безгильзовый", mag: "13", sko: "2", nad: "ОТ", range: "60м", cost: "2,000 eb", book: "SOF / SOF2",
+      desc: "Крупнокалиберный 14-мм самозарядный пистолет для боевых киборгов с двухрядным магазином на 13 патронов (требует мин. ТЕЛО 12)."
+    },
+    {
+      id: "bsw-borg-12gapistol",
+      name: "Пистолет 12-го калибра для киборгов (12-Gauge «Pistol»)",
+      origName: "12-Gauge \"Pistol\"",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "П", to: "-2", skr: "Кур / Плащ", dos: "Мал",
+      damage: "4d6 (12 кал.)", ammo: "12-й калибр", mag: "9", sko: "2", nad: "ОБ", range: "30м", cost: "1,000 eb", book: "SOF / SOF2",
+      desc: "Самозарядный пистолет под полноценные ружейные патроны 12-го калибра (требует мин. ТЕЛО 12 или киберруку)."
+    },
+    {
+      id: "bsw-borg-556smg",
+      name: "5.56-мм «ПП» киборгов (5.56mm Caseless «SMG»)",
+      origName: "5.56mm Caseless \"SMG\"",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ПП", to: "+1", skr: "Плащ / Нет", dos: "Мал",
+      damage: "5d6 (5.56мм)", ammo: "5.56мм винтовочный безгильз.", mag: "50", sko: "25", nad: "ОТ", range: "200м", cost: "1,200 eb", book: "SOF / SOF2",
+      desc: "Укороченный скорострельный автомат под винтовочный патрон 5.56 мм в габаритах пистолета-пулемёта для киборгов (мин. ТЕЛО 10)."
+    },
+    {
+      id: "bsw-borg-127ar",
+      name: "12.7-мм штурмовая винтовка киборгов (12.7mm «Assault Rifle»)",
+      origName: "12.7mm \"Assault Rifle\"",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ВИН", to: "+1", skr: "Нет", dos: "Мал",
+      damage: "6d10 (12.7мм)", ammo: "12.7мм (.50 BMG)", mag: "50", sko: "10", nad: "ОТ", range: "400м", cost: "2,000 eb", book: "SOF / SOF2",
+      desc: "Автоматическая штурмовая винтовка для полных киборгов под крупнокалиберный пулемётный патрон 12.7 мм с магазином на 50 выстрелов (мин. ТЕЛО 12)."
+    },
+    {
+      id: "bsw-borg-145ar",
+      name: "14.5-мм штурмовая винтовка киборгов (14.5mm «Assault Rifle»)",
+      origName: "14.5mm \"Assault Rifle\"",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ВИН", to: "+1", skr: "Нет", dos: "Мал",
+      damage: "7d10 (14.5мм)", ammo: "14.5мм КПВТ", mag: "50", sko: "10", nad: "ОТ", range: "400м", cost: "2,500 eb", book: "SOF / SOF2",
+      desc: "Тяжёлая штурмовая винтовка боевых киборгов под бронебойный патрон 14.5 мм (мин. ТЕЛО 14)."
+    },
+    {
+      id: "bsw-borg-30mmagl",
+      name: "30-мм ручной автогранатомёт киборгов (30mm HiVel Auto-GL)",
+      origName: "30mm HiVel Caseless Auto-GL",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ТЯЖ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "По типу 30мм гранаты", ammo: "30мм высокоскоростные гранаты", mag: "25", sko: "15", nad: "ОТ", range: "300м", cost: "2,000 eb", book: "SOF / SOF2",
+      desc: "Ручной автоматический 30-мм гранатомёт для полных киборгов (мин. ТЕЛО 12)."
+    },
+    {
+      id: "bsw-borg-hellbringer",
+      name: "Револьвер Magnum Opus «Hellbringer» .666 Magnum",
+      origName: "Magnum Opus \"Hellbringer\" .666 Magnum Revolver",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "П", to: "+1", skr: "Кур / Плащ", dos: "Мал",
+      damage: "7d6+3 (.666 Magnum)", ammo: ".666 Magnum (стальная гильза)", mag: "3", sko: "1", nad: "ОТ", range: "80м", cost: "4,000 eb", book: "SOF / SOF2",
+      desc: "Исполинский переломный револьвер из титано-стального сплава. Барабан вмещает всего 3 патрона калибра .666 Magnum, но каждый выстрел бьёт сильнее слонобойного штуцера (7d6+3!). Требует мин. ТЕЛО 15."
+    },
+    {
+      id: "bsw-borg-malorian3600",
+      name: "Супер-ПП Malorian 3600 Super-SMG",
+      origName: "Malorian 3600 Super-SMG",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ПП", to: "0 (-1 отсечка)", skr: "Плащ", dos: "Мал",
+      damage: "6d6 (14мм)", ammo: "14мм безгильзовый", mag: "20", sko: "1 / 3", nad: "ОТ", range: "150м", cost: "3,000 eb", book: "SOF / SOF2",
+      desc: "Масштабированный под 14-мм патрон Сильверхенда штурмовой пистолет-пулемёт с режимом отсечки по 3 выстрела, способный вскрывать броню MetalGear™ в упор. Требует две киберруки или мин. ТЕЛО 11."
+    },
+    {
+      id: "bsw-borg-hyperhammer",
+      name: "Реактивный молот SlamDance Hyper-Hammer",
+      origName: "SlamDance, Inc. Hyper-Hammer",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ХОЛ", to: "-2", skr: "Плащ (слож.)", dos: "Ред",
+      damage: "9d10 ББ!", ammo: "Ракетное топливо (2 удара)", mag: "2", sko: "1", nad: "ОБ", range: "2м", cost: "2,000 eb", book: "SOF / SOF2",
+      desc: "Цельновольфрамовая кувалда для полных киборгов (мин. ТЕЛО 18!) с ракетным ускорителем в бойке, разгоняющим молот до околозвуковой скорости. Наносит 9d10 ББ урона: полностью игнорирует мягкую броню, а жёсткую делит пополам и сносит с неё 1d6+4 единиц ОС за удар!"
+    },
+    {
+      id: "bsw-borg-helix",
+      name: "Шестиствольный гатлинг-дробовик Tsunami Arms Helix",
+      origName: "Tsunami Arms Helix",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ДРБ", to: "0", skr: "Нет", dos: "Мал",
+      damage: "5d6 (10 кал. #00)", ammo: "10-й калибр (бинарный газ)", mag: "60", sko: "43", nad: "ОТ", range: "60м", cost: "3,000 eb", book: "SOF / SOF2",
+      desc: "Шестиствольный гатлинг-дробовик 10-го калибра весом 15 кг на бинарном газовом топливе, выплёвывающий 43 снаряда за один раунд (1300 выстрелов/мин) с характерным металлическим визгом! Требует мин. ТЕЛО 15."
+    },
+    {
+      id: "bsw-borg-claw",
+      name: "4-калиберный штурмовой дробовик United Armaments CLAW",
+      origName: "United Armaments CLAW",
+      category: "Оружие киборгов ('Borg Weapons)",
+      typeCode: "ДРБ", to: "+1", skr: "Нет", dos: "Ред",
+      damage: "8d6 (картечь) / 9d6+2 (пуля) / 7d10 КС", ammo: "4-й калибр Магнум (23.75мм!)", mag: "28", sko: "14", nad: "ОТ", range: "60м", cost: "1,600 eb", book: "SOF / SOF2",
+      desc: "Монструозный 16-килограммовый буллпап-дробовик 4-го утиного калибра (диаметр ствола 23.75 мм!) со сменным подствольным модулем (СВЧ, огнемёт, 25-мм ГП или микроракеты). Картечь наносит 8d6, пуля — 9d6+2, БОПС — 5d10 ББ, кумулятивный снаряд — 7d10 (1/2 ОС). Штатное оружие киборгов C-SWAT полиции Детройта (мин. ТЕЛО 11)."
+    },
+
+    // --- ГРАНАТЫ, МИНЫ И ВЗРЫВЧАТКА (GRENADES, MINES & EXPLOSIVES, стр. 39-43) ---
+    {
+      id: "bsw-exp-handgrenades",
+      name: "Армейские ручные гранаты (HE / ПТ / Фосфор / Светошум / Сонар)",
+      origName: "Basic Commercial, Corp & Military Grenades",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "0", skr: "Кар", dos: "Мал",
+      damage: "7d6 ОФ (5м) / 5d10 ББ ПТ / 4d6 фосфор", ammo: "Ручная граната", mag: "1", sko: "1", nad: "ОБ", range: "Бросок", cost: "20–40 eb", book: "CP20",
+      desc: "Стандартные гранаты: Осколочно-фугасная (7d6 в радиусе 5 м, 3d6 в 6–10 м), Противотанковая (5d10 ББ КС + 3d6 в 5 м), Белый фосфор (4d6 на 3 раунда в рад. 5 м, сжигает по 2 ОС мягкой брони), Светошумовая (спасбросок Шока -2 и РЕФ 20+ от слепоты) и Акустическая Sonic (40 eb, радиус 6 м)."
+    },
+    {
+      id: "bsw-exp-biotechbomb",
+      name: "Полимерная граната-ловушка Biotech-Askari Motion Restraint",
+      origName: "Biotech-Askari Motion Restraint Bomb",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ЭКЗ", to: "0", skr: "Кар", dos: "Мал",
+      damage: "Парализующая паутина (рад. 1м)", ammo: "Реактивный полимер", mag: "1", sko: "1", nad: "НН", range: "Бросок", cost: "60 eb", book: "Chr1",
+      desc: "Опутывает цель в радиусе 1 м тончайшей полимерной паутиной, которая мгновенно каменеет при любом резком движении (требуется проверка Уклонения 25+ или Силы 30+, либо растворитель за 25 eb)."
+    },
+    {
+      id: "bsw-exp-dutcharmsgpz",
+      name: "Мини-граната DutchArms GPz-78",
+      origName: "DutchArms GPz-78 Mini-Grenade",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "0", skr: "Кар", dos: "Мал",
+      damage: "1d6+3 (диам. 3м)", ammo: "Взрывчатка HDX", mag: "1", sko: "1", nad: "ОТ", range: "Бросок", cost: "40 eb", book: "Chr1",
+      desc: "Крошечная (3.8 см) ручная граната скрытого ношения с взрывчаткой HDX и зоной поражения 3 метра в диаметре."
+    },
+    {
+      id: "bsw-exp-empgrenade",
+      name: "ЭМИ-граната (EMP Grenade)",
+      origName: "EMP Grenade",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ЭКЗ", to: "0", skr: "Кар", dos: "Ред",
+      damage: "Отключение кибернетики (диам. 4–10м)", ammo: "Электромагнитный импульс", mag: "1", sko: "1", nad: "ОБ / НН", range: "Бросок", cost: "200–400 eb", book: "Chr1",
+      desc: "Срабатывает через 5 секунд после взведения, отключая всю неэкранированную электронику и киберимпланты в диаметре 4–10 м (внутренние импланты перезагружаются через 4 мин, киберконечности — через 10 мин, щепки памяти стираются навсегда)."
+    },
+    {
+      id: "bsw-exp-fendz22",
+      name: "Дисковая граната FEN Dz 22 «Saucer Grenade»",
+      origName: "FEN Dz 22 \"Saucer Grenades\"",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "+2 к Атлетике", skr: "Кар", dos: "Мал",
+      damage: "2d6+3 (диам. 15м!)", ammo: "Жидкая взрывчатка + 160 шариков", mag: "1", sko: "1", nad: "ОБ", range: "Бросок", cost: "65 eb", book: "Chr1",
+      desc: "Аэродинамическая граната в форме летающей тарелки («Фрисби смерти», даёт +2 к броску Атлетики) с резиновым ободом для рикошета от стен и зоной разлёта 160 стальных шариков диаметром 15 метров!"
+    },
+    {
+      id: "bsw-exp-scattergren",
+      name: "ИК-дымовая граната Scatter Grenade",
+      origName: "Scatter Grenade",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "0", skr: "Кар", dos: "Обы",
+      damage: "Блокировка зрения и ИК (рад. 5м)", ammo: "Аэрозоль + тепловые частицы", mag: "1", sko: "1", nad: "ОТ", range: "Бросок", cost: "70 eb", book: "Chr2",
+      desc: "Создаёт облако радиусом 5 м на 5 раундов, полностью непроницаемое как для обычного зрения, так и для инфракрасных (IR) и термальных сенсоров."
+    },
+    {
+      id: "bsw-exp-stenchbomb",
+      name: "Зловонная бомба (Stench Bomb) и Красящая граната",
+      origName: "Stench Bomb / Spraypaint Grenade",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ЭКЗ", to: "0", skr: "Кар", dos: "Обы",
+      damage: "Тошнота (СЛ 25+) / Краска (4м)", ammo: "Химикат / Краска", mag: "1", sko: "1", nad: "ОТ", range: "Бросок", cost: "20 eb", book: "Chr2",
+      desc: "Stench Bomb (20 eb) покрывает зону 5x5 м невыносимым смрадом (требуется проверка КРУТ или ТЕЛА 25+ без противогаза/назальных фильтров, иначе бегство). Spraypaint Grenade (20 eb) заливает 4 м яркой краской, ослепляя цель в эпицентре на 1–2 минуты."
+    },
+    {
+      id: "bsw-exp-riflegrenades",
+      name: "Надульные винтовочные и пистолетные гранаты (DCR / Militech)",
+      origName: "DCR Rifle Grenades / Militech 25mm Pistol Grenades",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "-1 (DCR) / -3 (классич.)", skr: "Кар / Нет", dos: "Мал",
+      damage: "8d6 ОФ / 8d10 ББ КС / 5d6 HEP", ammo: "Надульная граната с пулеуловителем", mag: "1", sko: "1/2", nad: "ОТ / ОБ", range: "150м (вин.) / 50м (пист.)", cost: "15–100 eb", book: "Chr1",
+      desc: "С помощью дульного адаптера (200 eb) любая винтовка или пистолет (от 9мм и выше) может выстреливать надульные гранаты с пулеуловителем: фугасные (8d6 в рад. 5м), кумулятивные ПТ (8d10 ББ КС) или пистолетные 25-мм гранаты (HEP 5d6, осколочные 5d6)."
+    },
+    {
+      id: "bsw-exp-mines",
+      name: "Противопехотные и противотанковые мины (AP / AT / Claymore / PDU-3)",
+      origName: "Antipersonnel Mine / Antitank Mine / Claymore / Militech PDU-3",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "0", skr: "Кар / Кур / Плащ", dos: "Мал",
+      damage: "4d10 (ПП) / 6d10 ББ (ПТ) / 2d6+5 (PDU-3)", ammo: "Взрывное устройство", mag: "1", sko: "1", nad: "ОТ / ОБ", range: "Контакт / ИК / Таймер", cost: "150–500 eb", book: "CP20",
+      desc: "Включает: Противопехотную мину M25AP (350 eb, 4d10 в рад. 7м), Противотанковую M26AT (400 eb, 6d10 ББ), Направленную мину «Клеймор» (500 eb, 4d10 в конусе 75м) и Периметральную мину с ИК-датчиком Militech PDU-3 (150 eb, 2d6+5 в диам. 5м)."
+    },
+    {
+      id: "bsw-exp-c6detcard",
+      name: "Пластит C-6 «Flatfire» и Взрыв-карта FEN Dz 25 «Det Card™»",
+      origName: "C-6 \"Flatfire\" Plastic Explosive / FEN Dz 25 \"Det Card\"",
+      category: "Гранаты, мины и взрывчатка",
+      typeCode: "ТЯЖ", to: "0", skr: "Кар", dos: "Мал",
+      damage: "8d10 за кг (C-6) / 1d10 (Det Card)", ammo: "Пластическая взрывчатка", mag: "1", sko: "1", nad: "ОТ / ОБ", range: "Установка", cost: "100 eb/кг (120 eb карта)", book: "Chr1",
+      desc: "Пластит C-6 (100 eb/кг) наносит 8d10 урона в базовом радиусе 5 метров. FEN Det Card™ (120 eb) — пластинка пластита, замаскированная под карточку Trauma Team или прессы: переломите её пополам, и через 20 секунд она взорвётся (1d10 урона, идеальна для вскрытия замков)."
+    },
+
+    // --- СПЕЦИАЛЬНЫЕ БОЕПРИПАСЫ (SPECIAL AMMO, стр. 43-47) ---
+    {
+      id: "bsw-ammo-specialbullets",
+      name: "Спецпатроны: ББ (AP), Двухцелевые (DP), Зажигательные (API), Экспансивные и Флешетты Kendachi",
+      origName: "Special Firearm Ammunition (AP, DP, API, Hollowpoint, Kendachi Frag Flechette)",
+      category: "Боеприпасы и спецпатроны",
+      typeCode: "ПАТР", to: "—", skr: "Кар", dos: "Обы / Ред",
+      damage: "Модификатор урона и пробития", ammo: "Для любого огнестрела", mag: "Коробка 100 шт.", sko: "—", nad: "—", range: "—", cost: "x1.125 – x5 от базовой цены", book: "Chr2",
+      desc: "• Бронебойные (AP, цена x3): ОС брони x1/2, прошедший урон x1/2.\n• Бронебойно-зажигательные (API, цена x4): как AP, плюс 1d6 огненного урона в 1-й раунд и 1d6/2 во 2-й раунд при пробитии.\n• Двухцелевые (Dual-Purpose, цена x4): по броне работают как AP (1/2 ОС и 1/2 урона), а по незащищённой цели наносят x1.5 урона!\n• Экспансивные (Hollowpoint, цена x1.125): броня считается x2 ОС, но пробивший урон x1.5.\n• Разрывные флешетты Kendachi (цена x5, Ред): мягкая броня считается как 1/2 ОС, а урон по плоти проходит ПОЛНЫЙ (без деления!)."
+    },
+    {
+      id: "bsw-ammo-shotgunshells",
+      name: "Спецпатроны для дробовиков (APFSDS, Термит, Slasher, Stundart, HE, Флешетты)",
+      origName: "Special Shotgun & Grenade Ammunition",
+      category: "Боеприпасы и спецпатроны",
+      typeCode: "ПАТР", to: "—", skr: "Кар", dos: "Мал / Ред",
+      damage: "6d6 ББ (БОПС) / 8d6 ББ (Термит) / 4d6 (Мононить)", ammo: "12 / 10 калибр и 25–40мм", mag: "Поштучно / пачки", sko: "—", nad: "—", range: "10–100м", cost: "5–150 eb за выстрел", book: "Chr2",
+      desc: "• APFSDS (10 eb/шт): оперённый подкалиберный снаряд, урон 6d6 ББ на дистанции до 25 м.\n• Thermite (30 eb/шт): струя горящего при 3000°C термита, наносит 8d6 ББ урона!\n• UrbanTech Slasher (75 eb ружейный / 150 eb граната): два грузила, растягивающие в полёте 1–3 метра мононити Kendachi и разрезающие цель пополам (4d6 урона, броня x1/3 ОС)!"
+    }
+  ];
+
+  PACK_5_ITEMS.forEach(newItem => {
+    const exists = extDb.weapons.some(existing =>
+      existing.id === newItem.id ||
+      (existing.name && existing.name.toLowerCase() === newItem.name.toLowerCase()) ||
+      (existing.origName && existing.origName.toLowerCase() === newItem.origName.toLowerCase())
+    );
+    if (!exists) {
+      extDb.weapons.push(newItem);
+    }
+  });
+})();
