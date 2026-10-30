@@ -4792,10 +4792,12 @@
     });
   </script>
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ МОДУЛЬНОЙ ЭКИПИРОВКИ ПЕРСОНАЖЕЙ И БЫСТРОГО СОЗДАНИЯ КАРТОЧЕК       -->
+  <!-- ЕДИНЫЙ МОДУЛЬ: ЭКИПИРОВКА ПЕРСОНАЖЕЙ (С ДИС/НАД) + ГЛАВНАЯ СТРАНИЦА       -->
   <!-- ========================================================================= -->
   <script>
-    // Временное состояние конструктора для списков экипировки персонажа
+    // =========================================================================
+    // ЧАСТЬ 1: МОДУЛЬНАЯ ЭКИПИРОВКА ПЕРСОНАЖЕЙ И КНОПКА БЫСТРОГО СОЗДАНИЯ
+    // =========================================================================
     let charBuilderState = {
       weaponsList: [],
       cyberwareList: [],
@@ -4812,7 +4814,6 @@
         .replace(/>/g, "&gt;");
     }
 
-    // 1. Быстрый переход из любого раздела каталога сразу в конструктор нужного типа
     window.openQuickCreatorForCurrentTab = function(sectionKey) {
       if (!isCurrentUserAdmin()) return;
       const targetSec = sectionKey || activeCatalogTab || "roles";
@@ -4824,7 +4825,6 @@
       window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    // 2. Инициализация массивов экипировки персонажа (с поддержкой старых текстовых записей)
     function initCharBuilderStateFromItem(itemObj) {
       const v = itemObj || {};
 
@@ -4833,7 +4833,7 @@
       } else if (v.charWeapons && String(v.charWeapons).trim() !== "" && v.charWeapons !== "—") {
         charBuilderState.weaponsList = [{
           name: "Основное вооружение",
-          type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", cost: "—",
+          type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", range: "—", nad: "—", cost: "—",
           desc: String(v.charWeapons).trim()
         }];
       } else {
@@ -4854,7 +4854,6 @@
       charBuilderState.gearList = initSimpleList("charGearList", "charGear");
     }
 
-    // Считывание текущих значений из полей перед добавлением/удалением подблока
     function syncCharBuilderStateFromDOM() {
       const wCards = document.querySelectorAll(".char-weapon-builder-item");
       if (wCards.length > 0 || document.getElementById("charWeaponsBuilderList")) {
@@ -4866,6 +4865,8 @@
           damage: el.querySelector('[data-field="damage"]')?.value || "",
           mag: el.querySelector('[data-field="mag"]')?.value || "",
           sko: el.querySelector('[data-field="sko"]')?.value || "",
+          range: el.querySelector('[data-field="range"]')?.value || "",
+          nad: el.querySelector('[data-field="nad"]')?.value || "",
           cost: el.querySelector('[data-field="cost"]')?.value || "",
           desc: el.querySelector('[data-field="desc"]')?.value || ""
         }));
@@ -4886,7 +4887,7 @@
     window.addCharWeaponBlock = function() {
       syncCharBuilderStateFromDOM();
       charBuilderState.weaponsList.push({
-        name: "", type: "", skr: "", to: "", damage: "", mag: "", sko: "", cost: "", desc: ""
+        name: "", type: "", skr: "", to: "", damage: "", mag: "", sko: "", range: "", nad: "", cost: "", desc: ""
       });
       renderCharEquipmentBuilderBoxes();
     };
@@ -4926,37 +4927,45 @@
               <!-- ВЕРХ: Название оружия -->
               <div>
                 <label class="block text-[10px] text-gray-400 uppercase mb-0.5">Название оружия</label>
-                <input type="text" data-field="name" value="${escapeHtmlAttr(w.name)}" placeholder="Например: Militech Arms Avenger / Тяжёлый пистолет..." class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+                <input type="text" data-field="name" value="${escapeHtmlAttr(w.name)}" placeholder="Например: Militech Arms Avenger / Malorian Arms 3516..." class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-2.5 py-1.5 text-xs text-white font-bold outline-none">
               </div>
-              <!-- СЕРЕДИНА: 7 статов (Тип, СКР, ТО, Урон, Магазин, СКО, Цена) -->
-              <div class="grid grid-cols-7 gap-1.5">
+              <!-- СЕРЕДИНА: 9 статов (Тип, СКР, ТО, Урон, МАГ, СКО, ДИС, НАД, Цена) -->
+              <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5">
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Тип</label>
-                  <input type="text" data-field="type" value="${escapeHtmlAttr(w.type)}" placeholder="П / ВИН" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                  <input type="text" data-field="type" value="${escapeHtmlAttr(w.type)}" placeholder="П / ВИН" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1 py-1 text-[11px] text-center text-white outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">СКР</label>
-                  <input type="text" data-field="skr" value="${escapeHtmlAttr(w.skr)}" placeholder="Кар/Кур" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan px-1.5 py-1 text-[11px] text-center text-cp-cyan outline-none">
+                  <input type="text" data-field="skr" value="${escapeHtmlAttr(w.skr)}" placeholder="Кар/Кур" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan px-1 py-1 text-[11px] text-center text-cp-cyan outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">ТО</label>
-                  <input type="text" data-field="to" value="${escapeHtmlAttr(w.to)}" placeholder="+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-cp-yellow outline-none">
+                  <input type="text" data-field="to" value="${escapeHtmlAttr(w.to)}" placeholder="+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1 py-1 text-[11px] text-center text-cp-yellow outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Урон</label>
-                  <input type="text" data-field="damage" value="${escapeHtmlAttr(w.damage)}" placeholder="2d6+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-1.5 py-1 text-[11px] text-center text-cp-red font-bold outline-none">
+                  <input type="text" data-field="damage" value="${escapeHtmlAttr(w.damage)}" placeholder="2d6+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-1 py-1 text-[11px] text-center text-cp-red font-bold outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">МАГ</label>
-                  <input type="text" data-field="mag" value="${escapeHtmlAttr(w.mag)}" placeholder="10" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                  <input type="text" data-field="mag" value="${escapeHtmlAttr(w.mag)}" placeholder="10" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1 py-1 text-[11px] text-center text-white outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">СКО</label>
-                  <input type="text" data-field="sko" value="${escapeHtmlAttr(w.sko)}" placeholder="2" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                  <input type="text" data-field="sko" value="${escapeHtmlAttr(w.sko)}" placeholder="2" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1 py-1 text-[11px] text-center text-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5" title="Дальность / Дистанция">ДИС</label>
+                  <input type="text" data-field="range" value="${escapeHtmlAttr(w.range)}" placeholder="50м" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan px-1 py-1 text-[11px] text-center text-cp-cyan outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5" title="Надёжность (ОТ, ОН, ОБ, НН)">НАД</label>
+                  <input type="text" data-field="nad" value="${escapeHtmlAttr(w.nad)}" placeholder="ОН" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-green px-1 py-1 text-[11px] text-center text-cp-green outline-none">
                 </div>
                 <div>
                   <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Цена</label>
-                  <input type="text" data-field="cost" value="${escapeHtmlAttr(w.cost)}" placeholder="250 eb" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-green px-1.5 py-1 text-[11px] text-center text-cp-green outline-none">
+                  <input type="text" data-field="cost" value="${escapeHtmlAttr(w.cost)}" placeholder="250 eb" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-green px-1 py-1 text-[11px] text-center text-cp-green outline-none">
                 </div>
               </div>
               <!-- НИЗ: Описание оружия -->
@@ -4970,9 +4979,9 @@
       }
 
       const simpleConfigs = [
-        { key: "cyberwareList", border: "border-purple-500/50", color: "text-purple-400", label: "Имплант", namePh: "Кибероптика / Сандевистан / Киберрука...", descPh: "Описание эффекта, установленные опции, ПЧ..." },
-        { key: "armorList", border: "border-cp-yellow/50", color: "text-cp-yellow", label: "Броня", namePh: "Тяжёлая бронекуртка / Кевларовый жилет...", descPh: "ОС (броня), прикрываемые зоны, ЗУ и особенности..." },
-        { key: "gearList", border: "border-cp-green/50", color: "text-cp-green", label: "Предмет", namePh: "Аптечка / Дека / Коммуникатор...", descPh: "Описание снаряжения, количество, игровой эффект..." }
+        { key: "cyberwareList", border: "border-purple-500/50", namePh: "Кибероптика / Сандевистан / Киберрука...", descPh: "Описание эффекта, установленные опции, ПЧ..." },
+        { key: "armorList", border: "border-cp-yellow/50", namePh: "Тяжёлая бронекуртка / Кевларовый жилет...", descPh: "ОС (броня), прикрываемые зоны, ЗУ и особенности..." },
+        { key: "gearList", border: "border-cp-green/50", namePh: "Аптечка / Дека / Коммуникатор...", descPh: "Описание снаряжения, количество, игровой эффект..." }
       ];
 
       simpleConfigs.forEach(cfg => {
@@ -4995,7 +5004,6 @@
       });
     }
 
-    // 3. Расширяем setBuilderType для рендера модульных блоков в разделе Персонажей
     const baseSetBuilderType = setBuilderType;
     window.setBuilderType = function(type, itemToEdit = null) {
       baseSetBuilderType(type, itemToEdit);
@@ -5038,7 +5046,6 @@
           <textarea name="charSkills" rows="2" placeholder="Чувство Боя +8, Пистолеты +7, Винтовки +6, Скрытность +5..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charSkills || ''}</textarea>
         </div>
 
-        <!-- МОДУЛЬНЫЙ СПИСОК ОРУЖИЯ -->
         <div class="bg-cp-panel border border-cp-red/40 p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase text-cp-red">🔫 Вооружение персонажа</span>
@@ -5047,7 +5054,6 @@
           <div id="charWeaponsBuilderList" class="space-y-2.5"></div>
         </div>
 
-        <!-- МОДУЛЬНЫЙ СПИСОК КИБЕРОСНАЩЕНИЯ -->
         <div class="bg-cp-panel border border-purple-500/40 p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase text-purple-400">🦾 Кибероснащение</span>
@@ -5056,7 +5062,6 @@
           <div id="char-cyberwareList-container" class="space-y-2"></div>
         </div>
 
-        <!-- МОДУЛЬНЫЙ СПИСОК БРОНИ -->
         <div class="bg-cp-panel border border-cp-yellow/40 p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase text-cp-yellow">🛡️ Броня</span>
@@ -5065,7 +5070,6 @@
           <div id="char-armorList-container" class="space-y-2"></div>
         </div>
 
-        <!-- МОДУЛЬНЫЙ СПИСОК СНАРЯЖЕНИЯ -->
         <div class="bg-cp-panel border border-cp-green/40 p-3.5 space-y-2.5">
           <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase text-cp-green">🎒 Снаряжение</span>
@@ -5083,7 +5087,6 @@
       renderCharEquipmentBuilderBoxes();
     };
 
-    // 4. Перехватываем сохранение карточки: прикрепляем списки экипировки ДО отправки в облако Supabase
     const baseSaveBuilderItem = saveBuilderItem;
     window.saveBuilderItem = function(e) {
       const wasChar = (activeBuilderType === "characters");
@@ -5091,7 +5094,6 @@
         syncCharBuilderStateFromDOM();
       }
 
-      // Временно блокируем преждевременный пуш в облако внутри базовой функции
       const prevApplyingState = isApplyingRemoteUpdate;
       if (wasChar) isApplyingRemoteUpdate = true;
 
@@ -5112,6 +5114,8 @@
                 damage: dash(w.damage),
                 mag: dash(w.mag),
                 sko: dash(w.sko),
+                range: dash(w.range),
+                nad: dash(w.nad),
                 cost: dash(w.cost),
                 desc: w.desc.trim()
               }));
@@ -5129,7 +5133,6 @@
             savedChar.charArmor = "";
             savedChar.charGear = "";
 
-            // Обновляем JSON-превью в конструкторе и отправляем карточку со всеми пушками в облако ОДНИМ пакетом!
             const previewEl = document.getElementById("builderJsonPreview");
             if (previewEl) {
               previewEl.textContent = JSON.stringify({ ...savedChar, image: savedChar.image ? "[Изображение прикреплено]" : undefined }, null, 2);
@@ -5141,7 +5144,6 @@
       }
     };
 
-    // 5. Добавляем кнопку «➕ Добавить новую карточку» в список карточек каждой вкладки
     const baseRenderCatalog = renderCatalog;
     window.renderCatalog = function() {
       baseRenderCatalog();
@@ -5162,7 +5164,6 @@
       listContainer.prepend(btnWrap);
     };
 
-    // 6. Отрисовка новых модульных блоков оружия, брони, имплантов и снаряжения в карточке Персонажа
     const baseRenderDetailCardForChars = renderDetailCard;
     window.renderDetailCard = function(item) {
       baseRenderDetailCardForChars(item);
@@ -5171,11 +5172,10 @@
       const box = document.getElementById("detailCard");
       if (!box) return;
 
-      // Собираем массив пушек (из нового списка или старого текста)
       const weaponsArr = Array.isArray(item.charWeaponsList) && item.charWeaponsList.length > 0
         ? item.charWeaponsList
         : (item.charWeapons && String(item.charWeapons).trim() !== "" && item.charWeapons !== "—")
-          ? [{ name: "Вооружение", type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", cost: "—", desc: item.charWeapons }]
+          ? [{ name: "Вооружение", type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", range: "—", nad: "—", cost: "—", desc: item.charWeapons }]
           : [];
 
       const resolveSimpleArr = (arrKey, legacyKey, fallbackTitle) => {
@@ -5197,35 +5197,46 @@
             ${weaponsArr.map(w => `
               <div class="bg-cp-panel border border-gray-800 p-3 space-y-2">
                 <!-- Верх: Название над статами -->
-                <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
+                <div class="border-b border-gray-800 pb-1.5">
                   <span class="font-bold text-sm text-white">${dash(w.name)}</span>
-                  <span class="text-xs font-bold text-cp-green">${dash(w.cost)}</span>
                 </div>
-                <!-- Середина: Статы -->
-                <div class="grid grid-cols-6 gap-1.5 text-center">
+                <!-- Середина: Все 9 статов (Тип, СКР, ТО, Урон, МАГ, СКО, ДИС, НАД, Цена) -->
+                <div class="grid grid-cols-3 sm:grid-cols-9 gap-1 text-center">
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">Тип</div>
-                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.type)}</div>
+                    <div class="text-[11px] font-bold text-white mt-0.5">${dash(w.type)}</div>
                   </div>
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">СКР</div>
-                    <div class="text-xs font-bold text-cp-cyan mt-0.5">${dash(w.skr)}</div>
+                    <div class="text-[11px] font-bold text-cp-cyan mt-0.5">${dash(w.skr)}</div>
                   </div>
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">ТО</div>
-                    <div class="text-xs font-bold text-cp-yellow mt-0.5">${dash(w.to)}</div>
+                    <div class="text-[11px] font-bold text-cp-yellow mt-0.5">${dash(w.to)}</div>
                   </div>
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">Урон</div>
-                    <div class="text-xs font-bold text-cp-red mt-0.5">${dash(w.damage)}</div>
+                    <div class="text-[11px] font-bold text-cp-red mt-0.5">${dash(w.damage)}</div>
                   </div>
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">МАГ</div>
-                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.mag)}</div>
+                    <div class="text-[11px] font-bold text-white mt-0.5">${dash(w.mag)}</div>
                   </div>
                   <div class="bg-cp-bg border border-gray-800 p-1.5">
                     <div class="text-[9px] text-gray-400 uppercase">СКО</div>
-                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.sko)}</div>
+                    <div class="text-[11px] font-bold text-white mt-0.5">${dash(w.sko)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">ДИС</div>
+                    <div class="text-[11px] font-bold text-cp-cyan mt-0.5">${dash(w.range)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">НАД</div>
+                    <div class="text-[11px] font-bold text-cp-green mt-0.5">${dash(w.nad)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">Цена</div>
+                    <div class="text-[11px] font-bold text-cp-green mt-0.5">${dash(w.cost)}</div>
                   </div>
                 </div>
                 <!-- Низ: Описание -->
@@ -5274,12 +5285,816 @@
         ${renderSimpleSectionHtml("🎒 Снаряжение", gearArr, "border-cp-green", "text-cp-green")}
       `;
 
-      // Заменяем старый блок списков экипировки в карточке персонажа на наш новый модульный
       const oldListsBlock = box.querySelector(".space-y-3.mb-4");
       if (oldListsBlock) {
         oldListsBlock.replaceWith(customEquipmentContainer);
       }
     };
+
+    // =========================================================================
+    // ЧАСТЬ 2: ГЛАВНАЯ СТРАНИЦА (ОТКРЫВАЕТСЯ ПЕРВОЙ + ТАБЛИЦА БД В ОБЛАКЕ)
+    // =========================================================================
+    let activeHomeSubtab = "news"; // "news" | "rules" | "contacts"
+    let editingHomePostId = null;
+    let editingContactUserId = null;
+    const expandedHomePosts = new Set();
+
+    const DEFAULT_SITE_RULES = [
+      {
+        id: "srule-1",
+        tabType: "rules",
+        title: "1. Уважительное общение и кибер-этика",
+        content: "Терминал DataTerm открыт для всех эджраннеров, рефери и новичков НРИ <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>. В комментариях под карточками и в профилях запрещены прямые оскорбления участников, травля, переходы на личности и агрессивный флуд.\n\nСпоры о трактовке правил и механик <span class=\"text-cp-cyan font-bold\">Friday Night Firefight</span> приветствуются, если они ведутся аргументированно и с уважением к собеседнику.",
+        authorName: "Kisaaj",
+        createdAt: "2026-10-30 12:00 (МСК)",
+        updatedAt: null,
+        sortOrder: 1
+      },
+      {
+        id: "srule-2",
+        tabType: "rules",
+        title: "2. Запрет неодобренных ссылок, спама и рекламы",
+        content: "В комментариях, описаниях публичных профилей и заметках строго запрещена публикация:\n• Фишинговых, вредоносных или подозрительных ссылок;\n• Рекламы сторонних коммерческих ресурсов, магазинов и несогласованных проектов;\n• Ссылок на материалы, нарушающие законодательство.\n\nРазрешены ссылки на проверенные хостинги изображений (<span class=\"text-cp-yellow font-bold\">Imgur, GitHub, Postimages, ВК</span>) для оформления аватарок и иллюстраций карточек.",
+        authorName: "Kisaaj",
+        createdAt: "2026-10-30 12:05 (МСК)",
+        updatedAt: null,
+        sortOrder: 2
+      },
+      {
+        id: "srule-3",
+        tabType: "rules",
+        title: "3. Правила оформления комментариев и Homebrew-материалов",
+        content: "Комментарии под карточками оружия, ролей, имплантов и механик предназначены для:\n• Обсуждения игрового баланса и применения предмета в партиях;\n• Уточнения переводов и ссылок на книги-источники (<span class=\"text-cp-cyan font-bold\">Corebook, Chromebook 1–4, Eurosource Plus, Max Metal</span>);\n• Советов от Рефери и игроков.\n\nПри добавлении авторских карточек администрацией обязательно указывайте плашку <span class=\"text-cp-yellow font-bold\">HOMEBREW</span>.",
+        authorName: "Kisaaj",
+        createdAt: "2026-10-30 12:10 (МСК)",
+        updatedAt: null,
+        sortOrder: 3
+      }
+    ];
+
+    const DEFAULT_HOME_NEWS = [
+      {
+        id: "news-welcome-1",
+        tabType: "news",
+        title: "ДОБРО ПОЖАЛОВАТЬ В СПРАВОЧНИК CYBERPUNK 2020 // ПОМОГАЛКА",
+        content: "Добро пожаловать в интерактивную русскоязычную базу данных по настольной ролевой игре <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>!\n\nЗдесь собраны переведённые и структурированные материалы из основной книги правил и дополнений: роли, оружие, броня, снаряжение, киберимпланты, программы для нетраннинга, транспорт, персонажи и игровые механики.\n\n<h4 class=\"text-cp-yellow font-display font-bold text-sm uppercase mt-2 mb-1\">Что доступно на сайте:</h4>• Умный поиск и фильтрация снаряжения по книгам-источникам, цене, надёжности (НАД) и доступности (ДОС);\n• Личный профиль Эджраннера с закладками «Избранное» и приватным терминалом заметок;\n• Обсуждение любой карточки в реальном времени и система уведомлений.\n\nНажмите на заголовок <b>CYBERPUNK 2020</b> в левом верхнем углу в любой момент, чтобы вернуться на эту главную страницу!",
+        authorName: "Kisaaj",
+        createdAt: "2026-10-30 12:00 (МСК)",
+        updatedAt: null,
+        sortOrder: 0
+      }
+    ];
+
+    // Инициализируем стартовыми данными сразу, чтобы Главная страница никогда не была пустой
+    let HOME_NEWS_LIST = JSON.parse(JSON.stringify(DEFAULT_HOME_NEWS));
+    let HOME_RULES_LIST = JSON.parse(JSON.stringify(DEFAULT_SITE_RULES));
+
+    function ensureHomeDataStructures() {
+      ensureMetaArraysInCategories();
+      if (!CATEGORIES._adminContacts || typeof CATEGORIES._adminContacts !== "object") {
+        CATEGORIES._adminContacts = {
+          "u-root": {
+            roleTitle: "Главный Архитектор и Создатель базы",
+            note: "По вопросам развития проекта, перевода книг Cyberpunk 2020 и сотрудничества.",
+            links: [
+              { label: "Сообщество ВК (Село ДнДшеское)", url: "https://vk.ru/selodnd" }
+            ]
+          }
+        };
+      }
+    }
+
+    function mapRowToHomePost(r) {
+      return {
+        id: r.id,
+        tabType: r.tab_type,
+        title: r.title,
+        content: r.content,
+        authorName: r.author_name || "Администратор",
+        createdAt: r.created_at || "",
+        updatedAt: r.updated_at || null,
+        updatedBy: r.updated_by || null,
+        sortOrder: r.sort_order || 0
+      };
+    }
+
+    function mapHomePostToRow(post) {
+      return {
+        id: post.id,
+        tab_type: post.tabType,
+        title: post.title,
+        content: post.content,
+        author_name: post.authorName,
+        created_at: post.createdAt,
+        updated_at: post.updatedAt || null,
+        updated_by: post.updatedBy || null,
+        sort_order: post.sortOrder || 0
+      };
+    }
+
+    async function fetchHomeContentFromCloud() {
+      if (typeof sbClient === "undefined" || !sbClient) return;
+      try {
+        const { data, error } = await sbClient
+          .from("cp2020_home_content")
+          .select("*")
+          .order("id", { ascending: false });
+
+        if (!error && Array.isArray(data) && data.length > 0) {
+          const newsRows = data.filter(r => r.tab_type === "news");
+          const rulesRows = data.filter(r => r.tab_type === "rules");
+          rulesRows.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+
+          if (newsRows.length > 0) HOME_NEWS_LIST = newsRows.map(mapRowToHomePost);
+          if (rulesRows.length > 0) HOME_RULES_LIST = rulesRows.map(mapRowToHomePost);
+
+          if (activeMainView === "home") {
+            const activeEl = document.activeElement;
+            const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
+            if (!isTyping) renderHomeView();
+          }
+        }
+      } catch (err) {
+        console.warn("Таблица cp2020_home_content пока не создана или недоступна, используются локальные данные:", err);
+      }
+    }
+
+    function injectHomeViewIntoDOM() {
+      if (document.getElementById("view-home")) return;
+      const catalogMain = document.getElementById("view-catalog");
+      if (!catalogMain) return;
+
+      const homeMain = document.createElement("main");
+      homeMain.id = "view-home";
+      homeMain.className = "max-w-[1880px] w-full mx-auto px-6 py-5 flex-1 flex flex-col gap-5";
+      homeMain.innerHTML = `
+        <div class="grid grid-cols-12 gap-6 items-start">
+          <section class="col-span-8 space-y-5" id="homeMainColumn"></section>
+          <aside class="col-span-4 sticky top-20 space-y-5">
+            <div class="bg-cp-panel cp-border p-5 space-y-4">
+              <div class="border-b border-gray-800 pb-3">
+                <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">НАВИГАЦИЯ ТЕРМИНАЛА DATATERM</div>
+                <h2 class="font-display font-black text-base text-white uppercase mt-0.5">🏠 Главная страница</h2>
+              </div>
+              <div class="flex flex-col gap-2.5" id="homeRightNav">
+                <button type="button" onclick="switchHomeSubtab('news')" id="homeNavBtn-news"
+                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="text-base">📰</span>
+                    <div>
+                      <div class="font-display font-bold text-xs uppercase tracking-wider">Новости и обновления</div>
+                      <div class="text-[10px] opacity-75">Журнал разработки и патчноуты базы</div>
+                    </div>
+                  </div>
+                  <span id="homeCnt-news" class="text-xs font-bold px-2 py-0.5 bg-black/40">0</span>
+                </button>
+                <button type="button" onclick="switchHomeSubtab('rules')" id="homeNavBtn-rules"
+                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="text-base">⚖️</span>
+                    <div>
+                      <div class="font-display font-bold text-xs uppercase tracking-wider">Правила сайта</div>
+                      <div class="text-[10px] opacity-75">Кодекс поведения и модерации NetWatch</div>
+                    </div>
+                  </div>
+                  <span id="homeCnt-rules" class="text-xs font-bold px-2 py-0.5 bg-black/40">0</span>
+                </button>
+                <button type="button" onclick="switchHomeSubtab('contacts')" id="homeNavBtn-contacts"
+                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <span class="text-base">📡</span>
+                    <div>
+                      <div class="font-display font-bold text-xs uppercase tracking-wider">Контакты администрации</div>
+                      <div class="text-[10px] opacity-75">Профили админов и ссылки на соцсети</div>
+                    </div>
+                  </div>
+                  <span id="homeCnt-contacts" class="text-xs font-bold px-2 py-0.5 bg-black/40">1</span>
+                </button>
+              </div>
+            </div>
+            <div class="bg-cp-panel cp-border p-5 space-y-3">
+              <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+                <span class="font-display text-xs font-bold uppercase text-cp-yellow">📊 Состояние базы Найт-Сити</span>
+                <span class="text-[10px] text-cp-green font-bold">ONLINE</span>
+              </div>
+              <div id="homeQuickStatsBox" class="grid grid-cols-2 gap-2.5 text-center"></div>
+              <div class="pt-2 border-t border-gray-800/80 text-[11px] text-gray-400 leading-relaxed">
+                Используйте верхнее меню разделов (<b>Роли, Оружие, Броня, Кибероснащение...</b>), чтобы перейти к карточкам справочника.
+              </div>
+            </div>
+          </aside>
+        </div>
+      `;
+      catalogMain.parentNode.insertBefore(homeMain, catalogMain);
+
+      const headerTitle = document.querySelector("header h1");
+      const headerLogo = document.querySelector("header .w-10.h-10.bg-cp-red");
+      if (headerTitle) {
+        headerTitle.classList.add("cursor-pointer", "hover:opacity-80", "transition-opacity");
+        headerTitle.title = "Перейти на Главную страницу";
+        headerTitle.onclick = () => switchMainView("home");
+      }
+      if (headerLogo) {
+        headerLogo.classList.add("cursor-pointer", "hover:scale-105", "transition-transform");
+        headerLogo.title = "Перейти на Главную страницу";
+        headerLogo.onclick = () => switchMainView("home");
+      }
+    }
+
+    const origSwitchMainViewForHome = switchMainView;
+    window.switchMainView = function(view, catalogTab = null) {
+      injectHomeViewIntoDOM();
+      ensureHomeDataStructures();
+
+      if (view === "home") {
+        activeMainView = "home";
+        ["home", "catalog", "rules", "profile", "admin"].forEach(v => {
+          const el = document.getElementById("view-" + v);
+          if (el) el.classList.toggle("hidden", v !== "home");
+        });
+        document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
+          btn.className = "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan transition-all";
+        });
+        renderHomeView();
+        fetchHomeContentFromCloud();
+        return;
+      }
+
+      const homeEl = document.getElementById("view-home");
+      if (homeEl) homeEl.classList.add("hidden");
+      origSwitchMainViewForHome(view, catalogTab);
+    };
+
+    window.switchHomeSubtab = function(subtab) {
+      activeHomeSubtab = subtab;
+      editingHomePostId = null;
+      editingContactUserId = null;
+      renderHomeView();
+    };
+
+    function getPlainTextLength(htmlStr) {
+      if (!htmlStr) return 0;
+      const tmp = document.createElement("div");
+      tmp.innerHTML = htmlStr;
+      return (tmp.textContent || tmp.innerText || "").length;
+    }
+
+    function getTruncatedPreviewHtml(htmlStr, maxChars = 1000) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = htmlStr || "";
+      const plain = tmp.textContent || tmp.innerText || "";
+      if (plain.length <= maxChars) return htmlStr;
+      const escaped = plain.slice(0, maxChars)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return escaped + "…";
+    }
+
+    window.toggleExpandHomePost = function(postId) {
+      if (expandedHomePosts.has(postId)) expandedHomePosts.delete(postId);
+      else expandedHomePosts.add(postId);
+      renderHomeView();
+    };
+
+    window.insertHomeFormatTag = function(openTag, closeTag) {
+      const area = document.getElementById("homeEditorTextarea");
+      if (!area) return;
+      const start = area.selectionStart || 0;
+      const end = area.selectionEnd || 0;
+      const val = area.value;
+      const selected = val.slice(start, end) || "текст";
+      const replacement = openTag + selected + closeTag;
+      area.value = val.slice(0, start) + replacement + val.slice(end);
+      area.focus();
+      area.selectionStart = start + openTag.length;
+      area.selectionEnd = start + openTag.length + selected.length;
+      updateHomeEditorCharCounter();
+    };
+
+    window.updateHomeEditorCharCounter = function() {
+      const area = document.getElementById("homeEditorTextarea");
+      const counterEl = document.getElementById("homeEditorCharCount");
+      if (!area || !counterEl) return;
+      const len = getPlainTextLength(area.value);
+      counterEl.innerHTML = len > 1000
+        ? `Написано символов: <b class="text-cp-yellow">${len}</b> <span class="text-cp-cyan">(будет свёрнуто под кнопку «Развернуть» после 1000 симв.)</span>`
+        : `Написано символов: <b class="text-cp-green">${len}</b> / 1000 до сворачивания`;
+    };
+
+    async function broadcastSiteNotificationToAllUsers(notifType, messageHtml, targetHomeTab) {
+      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
+      const linkObj = { sectionKey: "home", itemId: targetHomeTab };
+
+      const cur = getCurrentUser();
+      if (cur) {
+        NOTIFICATIONS.unshift({
+          id: "ntf-" + Date.now() + "-self",
+          targetUserId: cur.id,
+          type: notifType,
+          text: messageHtml,
+          linkData: linkObj,
+          read: false,
+          createdAt: timeStr
+        });
+        updateNotifBellUI();
+      }
+
+      if (typeof sbClient !== "undefined" && sbClient) {
+        try {
+          const rowsToInsert = USERS.map((u, idx) => ({
+            id: "ntf-" + Date.now() + "-" + idx + "-" + Math.floor(Math.random() * 999),
+            target_user_id: u.id,
+            type: notifType,
+            text: messageHtml,
+            link_data: linkObj,
+            read: false,
+            created_at: timeStr
+          }));
+          if (rowsToInsert.length > 0) {
+            await sbClient.from("cp2020_notifications").insert(rowsToInsert);
+          }
+          if (typeof liveChannel !== "undefined" && liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "site_wide_notif",
+              payload: { sender: CLIENT_TAB_ID, type: notifType, text: messageHtml, linkData: linkObj, createdAt: timeStr }
+            });
+          }
+        } catch (err) {
+          console.error("Ошибка рассылки общего уведомления:", err);
+        }
+      }
+    }
+
+    const origOpenNotifTarget = openNotificationTarget;
+    window.openNotificationTarget = function(notifId) {
+      const n = NOTIFICATIONS.find(x => x.id === notifId);
+      if (n && n.linkData && n.linkData.sectionKey === "home") {
+        closeNotifDropdown();
+        activeHomeSubtab = n.linkData.itemId || "news";
+        switchMainView("home");
+        return;
+      }
+      origOpenNotifTarget(notifId);
+    };
+
+    function logHomePageAdminAction(actionType, subtabName, itemTitle) {
+      ensureMetaArraysInCategories();
+      const u = getCurrentUser();
+      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
+      const entry = {
+        id: "chg-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+        action: actionType,
+        sectionKey: "home",
+        itemId: activeHomeSubtab,
+        itemName: itemTitle || "Запись главной страницы",
+        itemCategory: subtabName,
+        itemBook: "Главная страница",
+        userId: u ? u.id : "u-root",
+        userName: u ? u.displayName : "Администратор",
+        createdAt: timeStr
+      };
+      CATEGORIES._changeLogs.unshift(entry);
+      if (CATEGORIES._changeLogs.length > 250) {
+        CATEGORIES._changeLogs = CATEGORIES._changeLogs.slice(0, 250);
+      }
+      persistDatabase();
+    }
+
+    window.saveHomePostSubmit = async function(e) {
+      e.preventDefault();
+      if (!isCurrentUserAdmin()) return;
+
+      const titleInp = document.getElementById("homeEditorTitle");
+      const contentArea = document.getElementById("homeEditorTextarea");
+      if (!titleInp || !contentArea) return;
+
+      const titleVal = titleInp.value.trim();
+      const contentVal = contentArea.value.trim();
+      if (!titleVal || !contentVal) return;
+
+      const u = getCurrentUser();
+      const authorName = u ? u.displayName : "Администратор";
+      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
+      const isNews = activeHomeSubtab === "news";
+      const tabType = isNews ? "news" : "rules";
+      const sectionTitleRu = isNews ? "📰 Новости" : "⚖️ Правила сайта";
+
+      let postObj = null;
+      let isEdit = false;
+
+      const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
+      if (editingHomePostId) {
+        const found = targetList.find(x => x.id === editingHomePostId);
+        if (found) {
+          found.title = titleVal;
+          found.content = contentVal;
+          found.updatedAt = timeStr;
+          found.updatedBy = authorName;
+          postObj = found;
+          isEdit = true;
+        }
+      }
+
+      if (!isEdit) {
+        postObj = {
+          id: (isNews ? "news-" : "srule-") + Date.now(),
+          tabType,
+          title: titleVal,
+          content: contentVal,
+          authorName,
+          createdAt: timeStr,
+          updatedAt: null,
+          sortOrder: isNews ? 0 : (HOME_RULES_LIST.length + 1)
+        };
+        if (isNews) HOME_NEWS_LIST.unshift(postObj);
+        else HOME_RULES_LIST.push(postObj);
+      }
+
+      editingHomePostId = null;
+      logHomePageAdminAction(isEdit ? "edited" : "created", sectionTitleRu, titleVal);
+      renderHomeView();
+
+      if (typeof sbClient !== "undefined" && sbClient) {
+        try {
+          setCloudStatusBadge("🔄", "Сохранение записи...");
+          const { error } = await sbClient
+            .from("cp2020_home_content")
+            .upsert(mapHomePostToRow(postObj), { onConflict: "id" });
+          if (error) throw error;
+
+          if (typeof liveChannel !== "undefined" && liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "home_content_op",
+              payload: { sender: CLIENT_TAB_ID, action: isEdit ? "update" : "insert", post: postObj }
+            });
+          }
+          setCloudStatusBadge("🟢", "В сети");
+        } catch (err) {
+          console.error("Ошибка сохранения записи главной страницы:", err);
+        }
+      }
+
+      const notifText = isNews
+        ? (isEdit ? `📰 Обновлена новость: «<b>${titleVal}</b>»` : `📰 Опубликована новость: «<b>${titleVal}</b>»`)
+        : (isEdit ? `⚖️ Изменено правило сайта: «<b>${titleVal}</b>»` : `⚖️ Добавлено правило сайта: «<b>${titleVal}</b>»`);
+
+      await broadcastSiteNotificationToAllUsers("rank", notifText, activeHomeSubtab);
+    };
+
+    window.startEditHomePost = function(postId) {
+      if (!isCurrentUserAdmin()) return;
+      editingHomePostId = postId;
+      renderHomeView();
+      setTimeout(() => {
+        const editorBox = document.getElementById("homeAdminEditorBox");
+        if (editorBox) editorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 60);
+    };
+
+    window.cancelEditHomePost = function() {
+      editingHomePostId = null;
+      renderHomeView();
+    };
+
+    window.deleteHomePost = async function(postId) {
+      if (!isCurrentUserAdmin()) return;
+      const isNews = activeHomeSubtab === "news";
+      const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
+      const target = targetList.find(x => x.id === postId);
+      if (!target || !confirm(`Удалить запись «${target.title}»?`)) return;
+
+      if (isNews) HOME_NEWS_LIST = HOME_NEWS_LIST.filter(x => x.id !== postId);
+      else HOME_RULES_LIST = HOME_RULES_LIST.filter(x => x.id !== postId);
+
+      logHomePageAdminAction("deleted", isNews ? "📰 Новости" : "⚖️ Правила сайта", target.title);
+      renderHomeView();
+
+      if (typeof sbClient !== "undefined" && sbClient) {
+        try {
+          await sbClient.from("cp2020_home_content").delete().eq("id", postId);
+          if (typeof liveChannel !== "undefined" && liveChannel) {
+            liveChannel.send({
+              type: "broadcast",
+              event: "home_content_op",
+              payload: { sender: CLIENT_TAB_ID, action: "delete", postId }
+            });
+          }
+        } catch (e) {}
+      }
+    };
+
+    window.startEditAdminContact = function(userId) {
+      const cur = getCurrentUser();
+      if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
+      editingContactUserId = userId;
+      renderHomeView();
+    };
+
+    window.cancelEditAdminContact = function() {
+      editingContactUserId = null;
+      renderHomeView();
+    };
+
+    window.addAdminSocialLinkRow = function() {
+      const list = document.getElementById("adminSocialLinksEditList");
+      if (!list) return;
+      const row = document.createElement("div");
+      row.className = "admin-social-link-row grid grid-cols-12 gap-2 items-center";
+      row.innerHTML = `
+        <input type="text" data-sfield="label" placeholder="Название (VK, Telegram, Discord, Boosty...)" class="col-span-5 bg-cp-bg border border-gray-700 focus:border-cp-cyan px-2.5 py-1.5 text-xs text-white outline-none">
+        <input type="text" data-sfield="url" placeholder="https://t.me/... или ник в Discord" class="col-span-6 bg-cp-bg border border-gray-700 focus:border-cp-yellow px-2.5 py-1.5 text-xs text-white outline-none">
+        <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
+      `;
+      list.appendChild(row);
+    };
+
+    window.saveAdminContactSubmit = function(e, userId) {
+      e.preventDefault();
+      const cur = getCurrentUser();
+      if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
+      ensureHomeDataStructures();
+
+      const roleTitle = document.getElementById("admContactRoleTitle")?.value.trim() || "";
+      const note = document.getElementById("admContactNote")?.value.trim() || "";
+      const rows = document.querySelectorAll("#adminSocialLinksEditList .admin-social-link-row");
+      const links = Array.from(rows).map(r => ({
+        label: r.querySelector('[data-sfield="label"]')?.value.trim() || "",
+        url: r.querySelector('[data-sfield="url"]')?.value.trim() || ""
+      })).filter(l => l.label !== "" || l.url !== "");
+
+      CATEGORIES._adminContacts[userId] = { roleTitle, note, links };
+      editingContactUserId = null;
+
+      const targetAdmin = USERS.find(u => u.id === userId);
+      logHomePageAdminAction("edited", "📡 Контакты", `Обновлены контакты админа ${targetAdmin ? targetAdmin.displayName : userId}`);
+      renderHomeView();
+    };
+
+    function renderHomeView() {
+      injectHomeViewIntoDOM();
+      ensureHomeDataStructures();
+
+      const adminsList = USERS.filter(u => u.role === "ROOT" || u.role === "ADMIN");
+      document.getElementById("homeCnt-news").textContent = HOME_NEWS_LIST.length;
+      document.getElementById("homeCnt-rules").textContent = HOME_RULES_LIST.length;
+      document.getElementById("homeCnt-contacts").textContent = adminsList.length;
+
+      ["news", "rules", "contacts"].forEach(tab => {
+        const btn = document.getElementById("homeNavBtn-" + tab);
+        if (!btn) return;
+        const isCur = activeHomeSubtab === tab;
+        btn.className = isCur
+          ? "w-full text-left px-4 py-3 border transition-all flex items-center justify-between bg-cp-yellow text-black border-cp-yellow shadow-[0_0_15px_rgba(252,238,10,0.25)]"
+          : "w-full text-left px-4 py-3 border border-gray-800 bg-cp-bg text-gray-300 hover:border-cp-cyan transition-all flex items-center justify-between";
+      });
+
+      const totalCards = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
+      const statsEl = document.getElementById("homeQuickStatsBox");
+      if (statsEl) {
+        statsEl.innerHTML = `
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">Всего карточек</div>
+            <div class="text-lg font-display font-black text-cp-yellow mt-0.5">${totalCards}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">Участников</div>
+            <div class="text-lg font-display font-black text-cp-cyan mt-0.5">${USERS.length}</div>
+          </div>
+        `;
+      }
+
+      const mainCol = document.getElementById("homeMainColumn");
+      if (!mainCol) return;
+      const isAdmin = isCurrentUserAdmin();
+
+      if (activeHomeSubtab === "news" || activeHomeSubtab === "rules") {
+        const isNews = activeHomeSubtab === "news";
+        const postsList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
+        const postToEdit = editingHomePostId ? postsList.find(p => p.id === editingHomePostId) : null;
+
+        const headerBannerHtml = isNews
+          ? `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-yellow flex items-center justify-between gap-4"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ИНФОРМАЦИОННЫЙ КАНАЛ NIGHT CITY NETWORK</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📰 Новости и обновления сайта</h2><p class="text-xs text-gray-400 mt-1">Свежие патчноуты, добавленные книги-источники, новые разделы и объявления администрации.</p></div></div>`
+          : `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan flex items-center justify-between gap-4"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ДИРЕКТИВЫ БЕЗОПАСНОСТИ СЕТЕВОГО ДОЗОРА</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">⚖️ Правила сайта и сообщества</h2><p class="text-xs text-gray-400 mt-1">Обязательный свод правил для всех пользователей терминала DataTerm.</p></div></div>`;
+
+        const adminEditorHtml = !isAdmin ? "" : `
+          <div id="homeAdminEditorBox" class="bg-cp-panel cp-border p-5 space-y-3.5 border-t-2 ${postToEdit ? 'border-t-cp-cyan' : 'border-t-cp-yellow'}">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">${postToEdit ? '✏️' : '➕'}</span>
+                <h3 class="font-display text-xs font-bold uppercase ${postToEdit ? 'text-cp-cyan' : 'text-cp-yellow'}">
+                  ${postToEdit ? `Редактирование записи: ${postToEdit.title}` : (isNews ? 'Опубликовать новую новость' : 'Добавить новый блок правил')}
+                </h3>
+              </div>
+              ${postToEdit ? `<button type="button" onclick="cancelEditHomePost()" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 border border-gray-600">✕ Отменить редактирование</button>` : ""}
+            </div>
+            <form onsubmit="saveHomePostSubmit(event)" class="space-y-3">
+              <div>
+                <label class="block text-[11px] text-gray-400 font-bold uppercase mb-1">Заголовок ${isNews ? 'новости' : 'правила'}*:</label>
+                <input type="text" id="homeEditorTitle" required value="${postToEdit ? escapeHtmlAttr(postToEdit.title) : ''}" placeholder="${isNews ? 'Например: Обновление 2.4 — Добавлены все роли из Chromebook!' : 'Например: 4. Правила публикации ссылок и артов'}" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2 text-xs text-white font-bold outline-none">
+              </div>
+              <div class="space-y-1.5">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <label class="text-[11px] text-gray-400 font-bold uppercase">Инструменты форматирования текста:</label>
+                  <span id="homeEditorCharCount" class="text-[11px] text-gray-400">Написано символов: <b class="text-cp-green">0</b> / 1000 до сворачивания</span>
+                </div>
+                <div class="flex flex-wrap items-center gap-1.5 bg-cp-bg border border-gray-800 p-1.5">
+                  <button type="button" onclick="insertHomeFormatTag('<b>', '</b>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold"><b>B</b></button>
+                  <button type="button" onclick="insertHomeFormatTag('<i>', '</i>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic">I</button>
+                  <button type="button" onclick="insertHomeFormatTag('<u>', '</u>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline">U</button>
+                  <span class="text-gray-700 px-1">|</span>
+                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый акцент</button>
+                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан акцент</button>
+                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный акцент</button>
+                  <span class="text-gray-700 px-1">|</span>
+                  <button type="button" onclick="insertHomeFormatTag('<h4 class=&quot;text-cp-yellow font-display font-bold text-sm uppercase mt-2 mb-1&quot;>', '</h4>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px] font-bold">Подзаголовок H4</button>
+                  <button type="button" onclick="insertHomeFormatTag('<blockquote class=&quot;border-l-2 border-cp-cyan pl-3 italic text-gray-300 my-2&quot;>', '</blockquote>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px]">❝ Цитата</button>
+                  <button type="button" onclick="insertHomeFormatTag('• ', '\\n')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px]">• Пункт списка</button>
+                </div>
+                <textarea id="homeEditorTextarea" required rows="6" oninput="updateHomeEditorCharCounter()" placeholder="Введите полный текст... Если объём превысит 1000 символов, на странице он автоматически аккуратно свернётся под кнопку «Развернуть полностью»." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
+              </div>
+              <div class="flex items-center justify-between pt-1">
+                <span class="text-[11px] text-gray-400">🔔 При сохранении всем пользователям придёт уведомление в колокольчик, а запись попадёт в Логи.</span>
+                <button type="submit" class="px-6 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
+                  ${postToEdit ? '💾 Сохранить изменения' : (isNews ? '📢 Опубликовать новость' : '➕ Добавить правило')}
+                </button>
+              </div>
+            </form>
+          </div>
+        `;
+
+        const postsCardsHtml = postsList.length === 0
+          ? `<div class="bg-cp-panel cp-border p-8 text-center text-xs text-gray-500">Записей пока нет.</div>`
+          : postsList.map(post => {
+              const charLen = getPlainTextLength(post.content);
+              const isLong = charLen > 1000;
+              const isExpanded = expandedHomePosts.has(post.id);
+              const displayedContent = (isLong && !isExpanded) ? getTruncatedPreviewHtml(post.content, 1000) : post.content;
+
+              return `
+                <article class="bg-cp-panel cp-border p-6 space-y-3.5 transition-all hover:border-gray-600">
+                  <div class="flex items-start justify-between gap-4 border-b border-gray-800 pb-3">
+                    <div>
+                      <div class="flex items-center gap-2 text-[11px] text-gray-400 mb-1">
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isNews ? 'bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40' : 'bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/40'}">${isNews ? 'НОВОСТЬ' : 'ПРАВИЛО'}</span>
+                        <span>Автор: <b class="text-white">${dash(post.authorName)}</b></span>
+                        <span>• ${dash(post.createdAt)}</span>
+                        ${post.updatedAt ? `<span class="text-cp-cyan">(обновлено: ${post.updatedAt})</span>` : ""}
+                      </div>
+                      <h3 class="font-display text-lg font-black text-white">${post.title}</h3>
+                    </div>
+                    ${isAdmin ? `
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onclick="startEditHomePost('${post.id}')" class="px-3 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
+                        <button type="button" onclick="deleteHomePost('${post.id}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
+                      </div>
+                    ` : ""}
+                  </div>
+                  <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line bg-cp-bg/70 border-l-2 ${isNews ? 'border-cp-yellow' : 'border-cp-cyan'} p-4">${displayedContent}</div>
+                  ${isLong ? `
+                    <div class="pt-1 flex items-center justify-between">
+                      <span class="text-[11px] text-gray-500">Объём текста: ${charLen} симв.</span>
+                      <button type="button" onclick="toggleExpandHomePost('${post.id}')" class="px-4 py-1.5 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/60 text-xs font-bold uppercase transition-colors">
+                        ${isExpanded ? '▲ Свернуть текст' : `▼ Развернуть полностью (${charLen} симв.)`}
+                      </button>
+                    </div>
+                  ` : ""}
+                </article>
+              `;
+            }).join("");
+
+        mainCol.innerHTML = `${headerBannerHtml}${adminEditorHtml}<div class="space-y-4">${postsCardsHtml}</div>`;
+        if (postToEdit) updateHomeEditorCharCounter();
+        return;
+      }
+
+      // Вкладка 3: Контакты администрации
+      const curUser = getCurrentUser();
+      const contactsCardsHtml = adminsList.map(adm => {
+        const isRoot = adm.role === "ROOT";
+        const cInfo = CATEGORIES._adminContacts[adm.id] || { roleTitle: "", note: "", links: [] };
+        const canEditThisContact = Boolean(curUser && (isCurrentUserRoot() || curUser.id === adm.id));
+        const isEditingThis = editingContactUserId === adm.id;
+
+        const avHtml = adm.avatar
+          ? `<img src="${adm.avatar}" onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">`
+          : `<div onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 bg-cp-bg border-2 ${isRoot ? 'border-cp-red text-cp-red' : 'border-cp-cyan text-cp-cyan'} flex items-center justify-center font-display font-black text-xl cursor-pointer shrink-0">${(adm.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
+
+        const linksHtml = (!Array.isArray(cInfo.links) || cInfo.links.length === 0)
+          ? `<span class="text-xs text-gray-500 italic">Ссылки на соцсети пока не указаны</span>`
+          : cInfo.links.map(l => {
+              const isHttp = l.url && (l.url.startsWith("http://") || l.url.startsWith("https://"));
+              return isHttp
+                ? `<a href="${escapeHtmlAttr(l.url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5"><span>🔗</span><span>${l.label || l.url}</span></a>`
+                : `<span class="px-3 py-1.5 bg-cp-bg border border-gray-700 text-xs text-gray-200 inline-flex items-center gap-1.5"><b class="text-cp-yellow">${l.label}:</b> <span>${l.url}</span></span>`;
+            }).join("");
+
+        const editFormHtml = !isEditingThis ? "" : `
+          <form onsubmit="saveAdminContactSubmit(event, '${adm.id}')" class="mt-4 pt-4 border-t border-gray-800 space-y-3 bg-cp-bg/90 p-4 border border-cp-cyan/50">
+            <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройка контактных данных (${adm.displayName})</div>
+            <div class="grid grid-cols-2 gap-3">
+              <div><label class="block text-[11px] text-gray-400 mb-1">Должность / Роль в проекте:</label><input type="text" id="admContactRoleTitle" value="${escapeHtmlAttr(cInfo.roleTitle)}" placeholder="Главный Администратор / Модератор..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
+              <div><label class="block text-[11px] text-gray-400 mb-1">По каким вопросам обращаться:</label><input type="text" id="admContactNote" value="${escapeHtmlAttr(cInfo.note)}" placeholder="Вопросы по сайту, перевод, предложения..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between"><label class="text-[11px] text-cp-yellow font-bold uppercase">Ссылки на соцсети и мессенджеры:</label><button type="button" onclick="addAdminSocialLinkRow()" class="px-2.5 py-1 bg-cp-cyan text-black font-bold text-[11px] uppercase hover:bg-cyan-300">+ Добавить ссылку</button></div>
+              <div id="adminSocialLinksEditList" class="space-y-2">
+                ${(cInfo.links && cInfo.links.length > 0 ? cInfo.links : [{ label: "", url: "" }]).map(l => `
+                  <div class="admin-social-link-row grid grid-cols-12 gap-2 items-center">
+                    <input type="text" data-sfield="label" value="${escapeHtmlAttr(l.label)}" placeholder="Название (VK, Telegram, Discord...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+                    <input type="text" data-sfield="url" value="${escapeHtmlAttr(l.url)}" placeholder="https://... или @username" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+                    <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2"><button type="submit" class="px-5 py-2 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">💾 Сохранить контакты</button><button type="button" onclick="cancelEditAdminContact()" class="px-4 py-2 bg-gray-800 text-gray-300 text-xs font-bold uppercase border border-gray-700">Отмена</button></div>
+          </form>
+        `;
+
+        return `
+          <div class="bg-cp-panel cp-border p-5 space-y-3">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex items-center gap-4">
+                ${avHtml}
+                <div>
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="font-display text-lg font-black text-white hover:text-cp-yellow hover:underline">${adm.displayName}</button>
+                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isRoot ? 'bg-cp-red text-white' : 'bg-cp-cyan text-black'}">${isRoot ? '👑 ГЛАВНЫЙ АДМИН (ROOT)' : '🛡️ АДМИНИСТРАТОР'}</span>
+                  </div>
+                  <div class="text-xs text-cp-yellow font-bold mt-0.5">${cInfo.roleTitle || (isRoot ? "Создатель и Главный Администратор проекта" : "Администратор и модератор справочника")}</div>
+                  <div class="text-xs text-gray-400 mt-1">${cInfo.note || adm.bio || "Связь с администрацией сайта."}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль на сайте</button>
+                ${canEditThisContact ? `<button type="button" onclick="startEditAdminContact('${adm.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Мои ссылки</button>` : ""}
+              </div>
+            </div>
+            <div class="pt-3 border-t border-gray-800 flex items-center flex-wrap gap-2">
+              <span class="text-[11px] font-bold uppercase text-gray-400 mr-1">Соцсети и связь:</span>
+              ${linksHtml}
+            </div>
+            ${editFormHtml}
+          </div>
+        `;
+      }).join("");
+
+      mainCol.innerHTML = `
+        <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-red">
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-red">КОМАНДНЫЙ ЦЕНТР СПРАВОЧНИКА</div>
+          <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📡 Контакты Администрации</h2>
+          <p class="text-xs text-gray-400 mt-1">Список действующих администраторов проекта, их профили на сайте и прямые ссылки для связи.</p>
+        </div>
+        <div class="space-y-4">${contactsCardsHtml}</div>
+      `;
+    }
+
+    const origJumpFromLog = jumpToCardFromChangeLog;
+    window.jumpToCardFromChangeLog = function(sectionKey, itemId) {
+      if (sectionKey === "home") {
+        activeHomeSubtab = itemId || "news";
+        switchMainView("home");
+        return;
+      }
+      origJumpFromLog(sectionKey, itemId);
+    };
+
+    // МГНОВЕННО открываем Главную страницу при загрузке скрипта (и повторно после подключения к облаку)
+    injectHomeViewIntoDOM();
+    ensureHomeDataStructures();
+    switchMainView("home");
+
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        fetchHomeContentFromCloud();
+        if (typeof liveChannel !== "undefined" && liveChannel) {
+          liveChannel
+            .on("broadcast", { event: "home_content_op" }, (msg) => {
+              const p = msg.payload;
+              if (!p || p.sender === CLIENT_TAB_ID) return;
+              fetchHomeContentFromCloud();
+            })
+            .on("broadcast", { event: "site_wide_notif" }, (msg) => {
+              const p = msg.payload;
+              const u = getCurrentUser();
+              if (!p || !u || p.sender === CLIENT_TAB_ID) return;
+              NOTIFICATIONS.unshift({
+                id: "ntf-" + Date.now(),
+                targetUserId: u.id,
+                type: p.type || "rank",
+                text: p.text,
+                linkData: p.linkData,
+                read: false,
+                createdAt: p.createdAt
+              });
+              updateNotifBellUI();
+            });
+        }
+      }, 1000);
+    });
   </script>
 </body>
 </html>
