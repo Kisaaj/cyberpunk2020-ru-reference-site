@@ -1175,16 +1175,33 @@
       }
     }
 
-    function mergeExternalDataIntoMemory(extData) {
+    // Если overwriteExisting = true (данные из облака Supabase или кэша правлений) — они ОБНОВЛЯЮТ карточки.
+    // Если overwriteExisting = false (базовый файл database.js) — он добавляет ТОЛЬКО новые карточки, которых ещё нет по ID!
+    function mergeExternalDataIntoMemory(extData, overwriteExisting = true) {
       if (!extData) return;
       const srcDb = extData.db || extData;
       const srcCats = extData.categories || {};
 
+      // Считываем список удалённых карточек, чтобы удалённые базовые карточки тоже не воскресали
+      const deletedCardsSet = new Set(Array.isArray(CATEGORIES._deletedCardIds) ? CATEGORIES._deletedCardIds : []);
+      if (Array.isArray(srcCats._deletedCardIds)) {
+        srcCats._deletedCardIds.forEach(id => deletedCardsSet.add(id));
+      }
+
       Object.keys(SECTION_LABELS).forEach(sec => {
         if (Array.isArray(srcDb[sec]) && srcDb[sec].length > 0) {
           const mapById = new Map();
-          srcDb[sec].forEach(it => { if (it && it.id) mapById.set(it.id, it); });
-          (DB[sec] || []).forEach(it => { if (it && it.id) mapById.set(it.id, it); });
+          // Сначала кладём то, что уже есть в памяти
+          (DB[sec] || []).forEach(it => {
+            if (it && it.id && !deletedCardsSet.has(it.id)) mapById.set(it.id, it);
+          });
+          // Теперь обрабатываем входящие карточки
+          srcDb[sec].forEach(it => {
+            if (!it || !it.id || deletedCardsSet.has(it.id)) return;
+            if (overwriteExisting || !mapById.has(it.id)) {
+              mapById.set(it.id, it);
+            }
+          });
           DB[sec] = Array.from(mapById.values());
         }
         if (Array.isArray(srcCats[sec])) {
@@ -1198,6 +1215,9 @@
       if (Array.isArray(srcCats._changeLogs)) {
         CATEGORIES._changeLogs = srcCats._changeLogs;
       }
+      if (deletedCardsSet.size > 0) {
+        CATEGORIES._deletedCardIds = Array.from(deletedCardsSet);
+      }
     }
 
     // Флаг: загрузился ли уже список пользователей с сервера (чтобы не разлогинить человека при F5 раньше времени!)
@@ -1205,7 +1225,7 @@
 
     async function initApp() {
       if (window.CP2020_EXTERNAL_DATA) {
-        mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
+        mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA, false);
       }
       loadSavedData();
       ensureMetaArraysInCategories();
@@ -4347,10 +4367,12 @@
 
         if (mainRow && mainRow.db && Object.keys(mainRow.db).length > 0) {
           isApplyingRemoteUpdate = true;
-          mergeExternalDataIntoMemory({ db: mainRow.db, categories: mainRow.categories });
+          // 1. Сначала берём из database.js ТОЛЬКО те новые карточки, которых ещё вообще нет
           if (window.CP2020_EXTERNAL_DATA) {
-            mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
+            mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA, false);
           }
+          // 2. Поверх них с АБСОЛЮТНЫМ ПРИОРИТЕТОМ (true) накладываем базу из облака Supabase со всеми твоими правками!
+          mergeExternalDataIntoMemory({ db: mainRow.db, categories: mainRow.categories }, true);
           ensureMetaArraysInCategories();
           safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
           safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
