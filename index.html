@@ -4347,8 +4347,10 @@
 
         if (mainRow && mainRow.db && Object.keys(mainRow.db).length > 0) {
           isApplyingRemoteUpdate = true;
-          DB = mainRow.db;
-          if (mainRow.categories) CATEGORIES = mainRow.categories;
+          mergeExternalDataIntoMemory({ db: mainRow.db, categories: mainRow.categories });
+          if (window.CP2020_EXTERNAL_DATA) {
+            mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA);
+          }
           ensureMetaArraysInCategories();
           safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
           safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
