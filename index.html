@@ -4791,5 +4791,495 @@
       setTimeout(initGithubVersionWatcher, 1500);
     });
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ МОДУЛЬНОЙ ЭКИПИРОВКИ ПЕРСОНАЖЕЙ И БЫСТРОГО СОЗДАНИЯ КАРТОЧЕК       -->
+  <!-- ========================================================================= -->
+  <script>
+    // Временное состояние конструктора для списков экипировки персонажа
+    let charBuilderState = {
+      weaponsList: [],
+      cyberwareList: [],
+      armorList: [],
+      gearList: []
+    };
+
+    function escapeHtmlAttr(str) {
+      if (str === undefined || str === null) return "";
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    // 1. Быстрый переход из любого раздела каталога сразу в конструктор нужного типа
+    window.openQuickCreatorForCurrentTab = function(sectionKey) {
+      if (!isCurrentUserAdmin()) return;
+      const targetSec = sectionKey || activeCatalogTab || "roles";
+      editingItemId = null;
+      activeBuilderType = targetSec;
+      switchMainView("admin");
+      switchAdminSubtab("builder");
+      setBuilderType(targetSec, null);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    // 2. Инициализация массивов экипировки персонажа (с поддержкой старых текстовых записей)
+    function initCharBuilderStateFromItem(itemObj) {
+      const v = itemObj || {};
+
+      if (Array.isArray(v.charWeaponsList)) {
+        charBuilderState.weaponsList = JSON.parse(JSON.stringify(v.charWeaponsList));
+      } else if (v.charWeapons && String(v.charWeapons).trim() !== "" && v.charWeapons !== "—") {
+        charBuilderState.weaponsList = [{
+          name: "Основное вооружение",
+          type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", cost: "—",
+          desc: String(v.charWeapons).trim()
+        }];
+      } else {
+        charBuilderState.weaponsList = [];
+      }
+
+      const initSimpleList = (arrKey, legacyKey) => {
+        if (Array.isArray(v[arrKey])) {
+          return JSON.parse(JSON.stringify(v[arrKey]));
+        } else if (v[legacyKey] && String(v[legacyKey]).trim() !== "" && v[legacyKey] !== "—") {
+          return [{ name: "Запись", desc: String(v[legacyKey]).trim() }];
+        }
+        return [];
+      };
+
+      charBuilderState.cyberwareList = initSimpleList("charCyberwareList", "charCyberware");
+      charBuilderState.armorList = initSimpleList("charArmorList", "charArmor");
+      charBuilderState.gearList = initSimpleList("charGearList", "charGear");
+    }
+
+    // Считывание текущих значений из полей перед добавлением/удалением подблока
+    function syncCharBuilderStateFromDOM() {
+      const wCards = document.querySelectorAll(".char-weapon-builder-item");
+      if (wCards.length > 0 || document.getElementById("charWeaponsBuilderList")) {
+        charBuilderState.weaponsList = Array.from(wCards).map(el => ({
+          name: el.querySelector('[data-field="name"]')?.value || "",
+          type: el.querySelector('[data-field="type"]')?.value || "",
+          skr: el.querySelector('[data-field="skr"]')?.value || "",
+          to: el.querySelector('[data-field="to"]')?.value || "",
+          damage: el.querySelector('[data-field="damage"]')?.value || "",
+          mag: el.querySelector('[data-field="mag"]')?.value || "",
+          sko: el.querySelector('[data-field="sko"]')?.value || "",
+          cost: el.querySelector('[data-field="cost"]')?.value || "",
+          desc: el.querySelector('[data-field="desc"]')?.value || ""
+        }));
+      }
+
+      ["cyberwareList", "armorList", "gearList"].forEach(listKey => {
+        const container = document.getElementById(`char-${listKey}-container`);
+        if (container) {
+          const items = container.querySelectorAll(".char-simple-builder-item");
+          charBuilderState[listKey] = Array.from(items).map(el => ({
+            name: el.querySelector('[data-field="name"]')?.value || "",
+            desc: el.querySelector('[data-field="desc"]')?.value || ""
+          }));
+        }
+      });
+    }
+
+    window.addCharWeaponBlock = function() {
+      syncCharBuilderStateFromDOM();
+      charBuilderState.weaponsList.push({
+        name: "", type: "", skr: "", to: "", damage: "", mag: "", sko: "", cost: "", desc: ""
+      });
+      renderCharEquipmentBuilderBoxes();
+    };
+
+    window.removeCharWeaponBlock = function(idx) {
+      syncCharBuilderStateFromDOM();
+      charBuilderState.weaponsList.splice(idx, 1);
+      renderCharEquipmentBuilderBoxes();
+    };
+
+    window.addCharSimpleBlock = function(listKey) {
+      syncCharBuilderStateFromDOM();
+      if (!Array.isArray(charBuilderState[listKey])) charBuilderState[listKey] = [];
+      charBuilderState[listKey].push({ name: "", desc: "" });
+      renderCharEquipmentBuilderBoxes();
+    };
+
+    window.removeCharSimpleBlock = function(listKey, idx) {
+      syncCharBuilderStateFromDOM();
+      if (!Array.isArray(charBuilderState[listKey])) return;
+      charBuilderState[listKey].splice(idx, 1);
+      renderCharEquipmentBuilderBoxes();
+    };
+
+    function renderCharEquipmentBuilderBoxes() {
+      const wBox = document.getElementById("charWeaponsBuilderList");
+      if (wBox) {
+        if (charBuilderState.weaponsList.length === 0) {
+          wBox.innerHTML = `<div class="text-[11px] text-gray-500 italic py-2 px-3 bg-black/30 border border-gray-800/80">Оружие не добавлено. Нажмите «+ Добавить пушку», чтобы создать блок оружия.</div>`;
+        } else {
+          wBox.innerHTML = charBuilderState.weaponsList.map((w, idx) => `
+            <div class="char-weapon-builder-item bg-cp-bg border border-cp-red/50 p-3 space-y-2.5 relative">
+              <div class="flex items-center justify-between gap-2 border-b border-gray-800 pb-2">
+                <span class="text-[10px] font-bold uppercase text-cp-red">🔫 Оружие #${idx + 1}</span>
+                <button type="button" onclick="removeCharWeaponBlock(${idx})" class="text-[10px] px-2 py-0.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white font-bold uppercase transition-colors">✕ Удалить</button>
+              </div>
+              <!-- ВЕРХ: Название оружия -->
+              <div>
+                <label class="block text-[10px] text-gray-400 uppercase mb-0.5">Название оружия</label>
+                <input type="text" data-field="name" value="${escapeHtmlAttr(w.name)}" placeholder="Например: Militech Arms Avenger / Тяжёлый пистолет..." class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+              </div>
+              <!-- СЕРЕДИНА: 7 статов (Тип, СКР, ТО, Урон, Магазин, СКО, Цена) -->
+              <div class="grid grid-cols-7 gap-1.5">
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Тип</label>
+                  <input type="text" data-field="type" value="${escapeHtmlAttr(w.type)}" placeholder="П / ВИН" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">СКР</label>
+                  <input type="text" data-field="skr" value="${escapeHtmlAttr(w.skr)}" placeholder="Кар/Кур" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan px-1.5 py-1 text-[11px] text-center text-cp-cyan outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">ТО</label>
+                  <input type="text" data-field="to" value="${escapeHtmlAttr(w.to)}" placeholder="+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-cp-yellow outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Урон</label>
+                  <input type="text" data-field="damage" value="${escapeHtmlAttr(w.damage)}" placeholder="2d6+1" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-1.5 py-1 text-[11px] text-center text-cp-red font-bold outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">МАГ</label>
+                  <input type="text" data-field="mag" value="${escapeHtmlAttr(w.mag)}" placeholder="10" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">СКО</label>
+                  <input type="text" data-field="sko" value="${escapeHtmlAttr(w.sko)}" placeholder="2" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-1.5 py-1 text-[11px] text-center text-white outline-none">
+                </div>
+                <div>
+                  <label class="block text-[9px] text-gray-400 uppercase text-center mb-0.5">Цена</label>
+                  <input type="text" data-field="cost" value="${escapeHtmlAttr(w.cost)}" placeholder="250 eb" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-green px-1.5 py-1 text-[11px] text-center text-cp-green outline-none">
+                </div>
+              </div>
+              <!-- НИЗ: Описание оружия -->
+              <div>
+                <label class="block text-[10px] text-gray-400 uppercase mb-0.5">Описание и модификации</label>
+                <textarea data-field="desc" rows="2" placeholder="Особенности оружия, установленный смартлинк, прицел, тип патронов..." class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red p-2 text-xs text-white outline-none">${w.desc || ""}</textarea>
+              </div>
+            </div>
+          `).join("");
+        }
+      }
+
+      const simpleConfigs = [
+        { key: "cyberwareList", border: "border-purple-500/50", color: "text-purple-400", label: "Имплант", namePh: "Кибероптика / Сандевистан / Киберрука...", descPh: "Описание эффекта, установленные опции, ПЧ..." },
+        { key: "armorList", border: "border-cp-yellow/50", color: "text-cp-yellow", label: "Броня", namePh: "Тяжёлая бронекуртка / Кевларовый жилет...", descPh: "ОС (броня), прикрываемые зоны, ЗУ и особенности..." },
+        { key: "gearList", border: "border-cp-green/50", color: "text-cp-green", label: "Предмет", namePh: "Аптечка / Дека / Коммуникатор...", descPh: "Описание снаряжения, количество, игровой эффект..." }
+      ];
+
+      simpleConfigs.forEach(cfg => {
+        const container = document.getElementById(`char-${cfg.key}-container`);
+        if (!container) return;
+        const arr = charBuilderState[cfg.key] || [];
+        if (arr.length === 0) {
+          container.innerHTML = `<div class="text-[11px] text-gray-500 italic py-2 px-3 bg-black/30 border border-gray-800/80">Список пуст. Нажмите кнопку «+», чтобы добавить блок.</div>`;
+        } else {
+          container.innerHTML = arr.map((item, idx) => `
+            <div class="char-simple-builder-item bg-cp-bg border ${cfg.border} p-3 space-y-2">
+              <div class="flex items-center justify-between gap-2">
+                <input type="text" data-field="name" value="${escapeHtmlAttr(item.name)}" placeholder="${cfg.namePh}" class="flex-1 bg-cp-panel border border-gray-700 focus:border-cp-cyan px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+                <button type="button" onclick="removeCharSimpleBlock('${cfg.key}', ${idx})" class="px-2 py-1 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-[10px] font-bold uppercase shrink-0">✕</button>
+              </div>
+              <textarea data-field="desc" rows="2" placeholder="${cfg.descPh}" class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan p-2 text-xs text-white outline-none">${item.desc || ""}</textarea>
+            </div>
+          `).join("");
+        }
+      });
+    }
+
+    // 3. Расширяем setBuilderType для рендера модульных блоков в разделе Персонажей
+    const baseSetBuilderType = setBuilderType;
+    window.setBuilderType = function(type, itemToEdit = null) {
+      baseSetBuilderType(type, itemToEdit);
+      if (type !== "characters") return;
+
+      initCharBuilderStateFromItem(itemToEdit);
+      const container = document.getElementById("builderFieldsContainer");
+      if (!container) return;
+
+      const v = itemToEdit || {};
+      const cats = getAllCategoriesForSection("characters");
+      const books = getAllBookSources();
+      const fields = SCHEMAS.characters || [];
+
+      const datalistHtml = `
+        <datalist id="dl-builder-cat">${cats.map(c => `<option value="${c}">`).join("")}</datalist>
+        <datalist id="dl-builder-book">${books.map(b => `<option value="${b}">`).join("")}</datalist>
+      `;
+
+      const inputsHtml = fields.map(f => {
+        const val = v[f.k] || "";
+        const listAttr = f.isCat ? 'list="dl-builder-cat"' : f.isBook ? 'list="dl-builder-book"' : '';
+        const labelColor = f.isCat ? 'text-cp-cyan font-bold' : f.isBook ? 'text-cp-yellow font-bold' : 'text-gray-400';
+        return `<div><label class="text-[11px] ${labelColor}">${f.l}</label><input name="${f.k}" ${listAttr} value="${escapeHtmlAttr(val)}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
+      }).join("");
+
+      container.innerHTML = `
+        ${datalistHtml}
+        <div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>
+
+        <div class="bg-cp-panel border border-gray-700 p-3.5 space-y-2">
+          <div class="text-[11px] font-bold text-cp-yellow uppercase">📊 СТАТЫ (Основные характеристики КП2020):</div>
+          <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">
+            ${CHARACTER_STAT_KEYS.map(st => `<div><label class="block text-[10px] text-cp-cyan font-bold text-center mb-1">${st.l}</label><input name="${st.k}" value="${escapeHtmlAttr(v[st.k] || '')}" placeholder="7" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-center text-white font-bold"></div>`).join("")}
+          </div>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-cp-cyan font-bold">🎯 Навыки персонажа</label>
+          <textarea name="charSkills" rows="2" placeholder="Чувство Боя +8, Пистолеты +7, Винтовки +6, Скрытность +5..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.charSkills || ''}</textarea>
+        </div>
+
+        <!-- МОДУЛЬНЫЙ СПИСОК ОРУЖИЯ -->
+        <div class="bg-cp-panel border border-cp-red/40 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-cp-red">🔫 Вооружение персонажа</span>
+            <button type="button" onclick="addCharWeaponBlock()" class="px-3 py-1 bg-cp-red hover:bg-red-600 text-white text-[11px] font-bold uppercase transition-colors">+ Добавить пушку</button>
+          </div>
+          <div id="charWeaponsBuilderList" class="space-y-2.5"></div>
+        </div>
+
+        <!-- МОДУЛЬНЫЙ СПИСОК КИБЕРОСНАЩЕНИЯ -->
+        <div class="bg-cp-panel border border-purple-500/40 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-purple-400">🦾 Кибероснащение</span>
+            <button type="button" onclick="addCharSimpleBlock('cyberwareList')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold uppercase transition-colors">+ Добавить кибероснащение</button>
+          </div>
+          <div id="char-cyberwareList-container" class="space-y-2"></div>
+        </div>
+
+        <!-- МОДУЛЬНЫЙ СПИСОК БРОНИ -->
+        <div class="bg-cp-panel border border-cp-yellow/40 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-cp-yellow">🛡️ Броня</span>
+            <button type="button" onclick="addCharSimpleBlock('armorList')" class="px-3 py-1 bg-cp-yellow hover:bg-yellow-300 text-black text-[11px] font-bold uppercase transition-colors">+ Добавить броню</button>
+          </div>
+          <div id="char-armorList-container" class="space-y-2"></div>
+        </div>
+
+        <!-- МОДУЛЬНЫЙ СПИСОК СНАРЯЖЕНИЯ -->
+        <div class="bg-cp-panel border border-cp-green/40 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-cp-green">🎒 Снаряжение</span>
+            <button type="button" onclick="addCharSimpleBlock('gearList')" class="px-3 py-1 bg-cp-green hover:bg-green-400 text-black text-[11px] font-bold uppercase transition-colors">+ Добавить снаряжение</button>
+          </div>
+          <div id="char-gearList-container" class="space-y-2"></div>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-gray-400">Описание / Биография персонажа (необязательно)</label>
+          <textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea>
+        </div>
+      `;
+
+      renderCharEquipmentBuilderBoxes();
+    };
+
+    // 4. Перехватываем сохранение карточки: прикрепляем списки экипировки ДО отправки в облако Supabase
+    const baseSaveBuilderItem = saveBuilderItem;
+    window.saveBuilderItem = function(e) {
+      const wasChar = (activeBuilderType === "characters");
+      if (wasChar) {
+        syncCharBuilderStateFromDOM();
+      }
+
+      // Временно блокируем преждевременный пуш в облако внутри базовой функции
+      const prevApplyingState = isApplyingRemoteUpdate;
+      if (wasChar) isApplyingRemoteUpdate = true;
+
+      baseSaveBuilderItem(e);
+
+      if (wasChar) {
+        isApplyingRemoteUpdate = prevApplyingState;
+        if (selectedItemId) {
+          const savedChar = (DB.characters || []).find(c => c.id === selectedItemId);
+          if (savedChar) {
+            savedChar.charWeaponsList = charBuilderState.weaponsList
+              .filter(w => w.name.trim() !== "" || w.desc.trim() !== "" || w.damage.trim() !== "")
+              .map(w => ({
+                name: dash(w.name),
+                type: dash(w.type),
+                skr: dash(w.skr),
+                to: dash(w.to),
+                damage: dash(w.damage),
+                mag: dash(w.mag),
+                sko: dash(w.sko),
+                cost: dash(w.cost),
+                desc: w.desc.trim()
+              }));
+
+            const cleanSimple = (arr) => (arr || [])
+              .filter(x => x.name.trim() !== "" || x.desc.trim() !== "")
+              .map(x => ({ name: dash(x.name), desc: x.desc.trim() }));
+
+            savedChar.charCyberwareList = cleanSimple(charBuilderState.cyberwareList);
+            savedChar.charArmorList = cleanSimple(charBuilderState.armorList);
+            savedChar.charGearList = cleanSimple(charBuilderState.gearList);
+
+            savedChar.charWeapons = "";
+            savedChar.charCyberware = "";
+            savedChar.charArmor = "";
+            savedChar.charGear = "";
+
+            // Обновляем JSON-превью в конструкторе и отправляем карточку со всеми пушками в облако ОДНИМ пакетом!
+            const previewEl = document.getElementById("builderJsonPreview");
+            if (previewEl) {
+              previewEl.textContent = JSON.stringify({ ...savedChar, image: savedChar.image ? "[Изображение прикреплено]" : undefined }, null, 2);
+            }
+            persistDatabase();
+            renderCatalog();
+          }
+        }
+      }
+    };
+
+    // 5. Добавляем кнопку «➕ Добавить новую карточку» в список карточек каждой вкладки
+    const baseRenderCatalog = renderCatalog;
+    window.renderCatalog = function() {
+      baseRenderCatalog();
+      if (!isCurrentUserAdmin()) return;
+
+      const listContainer = document.getElementById("catalogList");
+      if (!listContainer || document.getElementById("quickAddCatalogCardBtn")) return;
+
+      const secLabel = SECTION_LABELS[activeCatalogTab] || activeCatalogTab;
+      const btnWrap = document.createElement("div");
+      btnWrap.id = "quickAddCatalogCardBtn";
+      btnWrap.innerHTML = `
+        <button type="button" onclick="openQuickCreatorForCurrentTab('${activeCatalogTab}')"
+          class="w-full py-2.5 px-4 mb-1 bg-cp-yellow/10 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-dashed border-cp-yellow font-display font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(252,238,10,0.12)]">
+          <span>➕ Добавить новую карточку в раздел «${secLabel}»</span>
+        </button>
+      `;
+      listContainer.prepend(btnWrap);
+    };
+
+    // 6. Отрисовка новых модульных блоков оружия, брони, имплантов и снаряжения в карточке Персонажа
+    const baseRenderDetailCardForChars = renderDetailCard;
+    window.renderDetailCard = function(item) {
+      baseRenderDetailCardForChars(item);
+      if (activeCatalogTab !== "characters" || !item) return;
+
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      // Собираем массив пушек (из нового списка или старого текста)
+      const weaponsArr = Array.isArray(item.charWeaponsList) && item.charWeaponsList.length > 0
+        ? item.charWeaponsList
+        : (item.charWeapons && String(item.charWeapons).trim() !== "" && item.charWeapons !== "—")
+          ? [{ name: "Вооружение", type: "—", skr: "—", to: "—", damage: "—", mag: "—", sko: "—", cost: "—", desc: item.charWeapons }]
+          : [];
+
+      const resolveSimpleArr = (arrKey, legacyKey, fallbackTitle) => {
+        if (Array.isArray(item[arrKey]) && item[arrKey].length > 0) return item[arrKey];
+        if (item[legacyKey] && String(item[legacyKey]).trim() !== "" && item[legacyKey] !== "—") {
+          return [{ name: fallbackTitle, desc: item[legacyKey] }];
+        }
+        return [];
+      };
+
+      const cyberArr = resolveSimpleArr("charCyberwareList", "charCyberware", "Кибероснащение");
+      const armorArr = resolveSimpleArr("charArmorList", "charArmor", "Броня");
+      const gearArr = resolveSimpleArr("charGearList", "charGear", "Снаряжение");
+
+      const weaponsHtml = weaponsArr.length === 0 ? "" : `
+        <div class="bg-cp-bg border-l-2 border-cp-red p-3.5 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase text-cp-red tracking-wider">🔫 Вооружение (${weaponsArr.length}):</div>
+          <div class="space-y-2.5">
+            ${weaponsArr.map(w => `
+              <div class="bg-cp-panel border border-gray-800 p-3 space-y-2">
+                <!-- Верх: Название над статами -->
+                <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
+                  <span class="font-bold text-sm text-white">${dash(w.name)}</span>
+                  <span class="text-xs font-bold text-cp-green">${dash(w.cost)}</span>
+                </div>
+                <!-- Середина: Статы -->
+                <div class="grid grid-cols-6 gap-1.5 text-center">
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">Тип</div>
+                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.type)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">СКР</div>
+                    <div class="text-xs font-bold text-cp-cyan mt-0.5">${dash(w.skr)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">ТО</div>
+                    <div class="text-xs font-bold text-cp-yellow mt-0.5">${dash(w.to)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">Урон</div>
+                    <div class="text-xs font-bold text-cp-red mt-0.5">${dash(w.damage)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">МАГ</div>
+                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.mag)}</div>
+                  </div>
+                  <div class="bg-cp-bg border border-gray-800 p-1.5">
+                    <div class="text-[9px] text-gray-400 uppercase">СКО</div>
+                    <div class="text-xs font-bold text-white mt-0.5">${dash(w.sko)}</div>
+                  </div>
+                </div>
+                <!-- Низ: Описание -->
+                ${w.desc && String(w.desc).trim() !== "" && w.desc !== "—" ? `
+                  <div class="text-xs text-gray-300 leading-relaxed whitespace-pre-line pt-1 border-t border-gray-800/80">${w.desc}</div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+
+      const renderSimpleSectionHtml = (title, itemsList, borderCls, titleColorCls) => {
+        if (!itemsList || itemsList.length === 0) return "";
+        return `
+          <div class="bg-cp-bg border-l-2 ${borderCls} p-3.5 space-y-2">
+            <div class="text-[11px] font-bold uppercase ${titleColorCls} tracking-wider">${title} (${itemsList.length}):</div>
+            <div class="grid grid-cols-1 gap-2">
+              ${itemsList.map(it => `
+                <div class="bg-cp-panel border border-gray-800 p-2.5">
+                  <div class="font-bold text-xs text-white">${dash(it.name)}</div>
+                  ${it.desc && String(it.desc).trim() !== "" && it.desc !== "—" ? `
+                    <div class="text-xs text-gray-300 leading-relaxed whitespace-pre-line mt-1 pt-1 border-t border-gray-800/70">${it.desc}</div>
+                  ` : ""}
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      };
+
+      const skillsHtml = (item.charSkills && String(item.charSkills).trim() !== "" && item.charSkills !== "—")
+        ? `<div class="bg-cp-bg border-l-2 border-cp-cyan p-3.5">
+             <div class="text-[11px] font-bold uppercase text-cp-cyan mb-1">🎯 Навыки:</div>
+             <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.charSkills}</div>
+           </div>`
+        : "";
+
+      const customEquipmentContainer = document.createElement("div");
+      customEquipmentContainer.className = "space-y-3 mb-4";
+      customEquipmentContainer.innerHTML = `
+        ${skillsHtml}
+        ${weaponsHtml}
+        ${renderSimpleSectionHtml("🦾 Кибероснащение", cyberArr, "border-purple-500", "text-purple-400")}
+        ${renderSimpleSectionHtml("🛡️ Броня", armorArr, "border-cp-yellow", "text-cp-yellow")}
+        ${renderSimpleSectionHtml("🎒 Снаряжение", gearArr, "border-cp-green", "text-cp-green")}
+      `;
+
+      // Заменяем старый блок списков экипировки в карточке персонажа на наш новый модульный
+      const oldListsBlock = box.querySelector(".space-y-3.mb-4");
+      if (oldListsBlock) {
+        oldListsBlock.replaceWith(customEquipmentContainer);
+      }
+    };
+  </script>
 </body>
 </html>
