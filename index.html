@@ -6478,7 +6478,7 @@
     syncAllRoleSalariesInMemory();
   </script>
   <!-- ========================================================================= -->
-  <!-- МОДУЛЬ ВКЛАДКИ «🏢 КОРПОРАЦИИ» И ВЫБОРА ЛЮБИМОЙ КОРПОРАЦИИ В ПРОФИЛЕ      -->
+  <!-- МОДУЛЬ ВКЛАДКИ «🏢 КОРПОРАЦИИ» (СПИСОК ПОКАЗАТЕЛЕЙ И СОРТИРОВКА ШТАТА)    -->
   <!-- ========================================================================= -->
   <script>
     // 1. Регистрируем раздел corporations в глобальных словарях и схемах конструктора
@@ -6498,7 +6498,7 @@
     }
 
     SCHEMAS.corporations = [
-      { k: "name", l: "Название корпорации (EN)*", ph: "Например: Arasaka / Militech / Biotechnica" },
+      { k: "name", l: "Название корпорации (EN)*", ph: "Например: Arasaka / MiliTech / Biotechnica" },
       { k: "origName", l: "Полное юридическое название (EN)", ph: "Arasaka Corporation" },
       { k: "category", l: "Тип / Сектор корпорации*", isCat: true, ph: "Безопасность и ВПК" },
       { k: "book", l: "Книга-источник*", isBook: true, ph: "CP20 / Corp1" },
@@ -6509,7 +6509,29 @@
       { k: "shareholders", l: "📈 Самые крупные держатели акций", ph: "Сабуро Арасака (48%), Кэй Арасака (23%), Ханако Арасака (9%)" }
     ];
 
-    // Подтягиваем данные корпораций из database.js в существующие объекты памяти (если поля hq/employees потерялись)
+    // Извлечение чистого числа из строк вида "1 612 000 по всему миру" для точной сортировки
+    function parseCorpNumericStat(strVal) {
+      if (!strVal) return 0;
+      const str = String(strVal);
+      // Ищем первую последовательность цифр (включая разделители пробелами, точками или запятыми)
+      const match = str.match(/\d[\d\s.,]*/);
+      if (!match) return 0;
+      const digitsOnly = match[0].replace(/[^\d]/g, "");
+      const num = parseInt(digitsOnly, 10);
+      return isNaN(num) ? 0 : num;
+    }
+
+    // Короткое форматирование показателя для компактного отображения в левом списке
+    function formatShortCorpStat(strVal) {
+      if (!strVal || strVal === "—") return "—";
+      const str = String(strVal).trim();
+      const match = str.match(/^\d[\d\s.,]*/);
+      if (match && match[0].trim().length >= 3) {
+        return match[0].trim();
+      }
+      return str.length > 22 ? str.slice(0, 20) + "…" : str;
+    }
+
     function syncCorporationsDataFromExternal() {
       if (typeof DB === "undefined") return;
       if (!Array.isArray(DB.corporations)) DB.corporations = [];
@@ -6523,13 +6545,11 @@
         if (!existing) {
           DB.corporations.push(JSON.parse(JSON.stringify(extItem)));
         } else {
-          // Если в карточке почему-то пустые поля hq / employees / soldiers / operatives / shareholders — заполняем из эталона
           if (!existing.hq || existing.hq === "—") existing.hq = extItem.hq;
           if (!existing.employees || existing.employees === "—") existing.employees = extItem.employees;
           if (!existing.soldiers || existing.soldiers === "—") existing.soldiers = extItem.soldiers;
           if (!existing.operatives || existing.operatives === "—") existing.operatives = extItem.operatives;
           if (!existing.shareholders || existing.shareholders === "—") existing.shareholders = extItem.shareholders;
-          // Обновляем русское имя со скобками на чистое английское
           if (existing.name && existing.name.includes("(") && existing.name.endsWith(")")) {
             existing.name = extItem.name;
           }
@@ -6537,7 +6557,7 @@
       });
     }
 
-    // 2. Встраиваем кнопку «🏢 Корпорации» (без счётчика 0!) в главное меню и в переключатель Конструктора
+    // 2. Встраиваем кнопку «🏢 Корпорации» в главное меню и в Конструктор
     function injectCorporationsNavButtons() {
       const mainNav = document.getElementById("mainNav");
       if (mainNav && !mainNav.querySelector('[data-tab="corporations"]')) {
@@ -6564,7 +6584,43 @@
       }
     }
 
-    // 3. Хранение и извлечение «Любимой корпорации» пользователя
+    // 3. Управление выпадающим списком сортировки (#sortSelect) для вкладки Корпораций
+    let cachedDefaultSortOptionsHtml = null;
+
+    function updateSortDropdownForCurrentTab() {
+      const sortSel = document.getElementById("sortSelect");
+      if (!sortSel) return;
+
+      if (!cachedDefaultSortOptionsHtml && sortSel.getAttribute("data-mode") !== "corporations") {
+        cachedDefaultSortOptionsHtml = sortSel.innerHTML;
+      }
+
+      if (activeCatalogTab === "corporations") {
+        if (sortSel.getAttribute("data-mode") !== "corporations") {
+          sortSel.setAttribute("data-mode", "corporations");
+          sortSel.innerHTML = `
+            <option value="default">Сортировка: По умолчанию</option>
+            <option value="name_asc">По названию (A–Z)</option>
+            <option value="name_desc">По названию (Z–A)</option>
+            <option value="emp_desc">👥 Сотрудники: от большего к меньшему (↓)</option>
+            <option value="emp_asc">👥 Сотрудники: от меньшего к большему (↑)</option>
+            <option value="sol_desc">🪖 Солдаты: от большего к меньшему (↓)</option>
+            <option value="sol_asc">🪖 Солдаты: от меньшего к большему (↑)</option>
+            <option value="ops_desc">🕶️ Оперативники: от большего к меньшему (↓)</option>
+            <option value="ops_asc">🕶️ Оперативники: от меньшего к большему (↑)</option>
+          `;
+          sortSel.value = "default";
+        }
+      } else {
+        if (sortSel.getAttribute("data-mode") === "corporations" && cachedDefaultSortOptionsHtml) {
+          sortSel.setAttribute("data-mode", "default");
+          sortSel.innerHTML = cachedDefaultSortOptionsHtml;
+          sortSel.value = "default";
+        }
+      }
+    }
+
+    // 4. Хранение и извлечение «Любимой корпорации» пользователя
     function getUserFavCorp(userObj) {
       if (!userObj) return "Независимый (Без корпорации)";
       if (userObj.favCorp && String(userObj.favCorp).trim() !== "") return userObj.favCorp;
@@ -6604,28 +6660,88 @@
       return origFindItemAcross(itemId);
     };
 
-    // 4. Отрисовка списка Корпораций слева (УБИРАЕМ зелёный прочерк цены справа, оставляем только Название и Тип!)
+    // 5. Чистая отрисовка списка Корпораций слева (без зелёной чёрточки цены и с выравниванием статов по правому краю)
     const prevRenderCatalogForCorps = window.renderCatalog;
     window.renderCatalog = function() {
       syncCorporationsDataFromExternal();
       injectCorporationsNavButtons();
+      updateSortDropdownForCurrentTab();
+
+      // Сначала запускаем базовый рендер (он обновит счётчики, фильтры категорий и выбранную карточку)
       prevRenderCatalogForCorps();
 
       if (activeCatalogTab !== "corporations") return;
       const listContainer = document.getElementById("catalogList");
       if (!listContainer) return;
 
-      // Находим все карточки в левом списке и удаляем у них правый блок с зелёной чёрточкой ("—")
-      const cards = listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]");
-      cards.forEach(cardEl => {
-        const rightCol = cardEl.querySelector(".text-right");
-        if (rightCol) {
-          rightCol.remove();
+      const sortVal = document.getElementById("sortSelect")?.value || "default";
+      const cards = Array.from(listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]"));
+
+      const cardDataPairs = cards.map(cardEl => {
+        const match = (cardEl.getAttribute("onclick") || "").match(/selectCatalogItem\('([^']+)'\)/);
+        const corpId = match ? match[1] : null;
+        const corpItem = corpId ? (DB.corporations || []).find(c => c.id === corpId) : null;
+
+        if (corpItem) {
+          const isSelected = (selectedItemId === corpItem.id);
+          // Задаём чистый горизонтальный flex-контейнер с выравниванием между левой и правой частью
+          cardEl.className = `p-3.5 border cursor-pointer transition-all flex items-center justify-between gap-4 ${
+            isSelected
+              ? "bg-cp-panel border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.18)]"
+              : "bg-cp-panel/70 border-gray-800 hover:border-cp-cyan"
+          }`;
+
+          // Полностью заменяем внутренний HTML карточки списка: слева название и тип, СПРАВА — штаб и численность!
+          cardEl.innerHTML = `
+            <!-- ЛЕВАЯ ЧАСТЬ: Название и Категория -->
+            <div class="min-w-0 flex-1">
+              <div class="font-display font-bold text-sm text-white truncate">${dash(corpItem.name)}</div>
+              ${corpItem.origName && corpItem.origName !== corpItem.name ? `
+                <div class="text-[11px] text-gray-400 truncate">${corpItem.origName}</div>
+              ` : ""}
+              <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                <span class="px-2 py-0.5 text-[10px] font-bold uppercase bg-cp-bg border border-gray-700 text-cp-cyan">${dash(corpItem.category)}</span>
+                ${corpItem.book ? `<span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-yellow/15 text-cp-yellow border border-cp-yellow/40">${corpItem.book}</span>` : ""}
+              </div>
+            </div>
+
+            <!-- ПРАВАЯ ЧАСТЬ: Штаб, Сотрудники, Солдаты и Оперативники (выровнено по правому краю) -->
+            <div class="text-right shrink-0 space-y-0.5 text-[11px] leading-tight border-l border-gray-800/90 pl-3">
+              <div class="text-gray-400">
+                Штаб: <span class="text-cp-yellow font-bold">${dash(corpItem.hq)}</span>
+              </div>
+              <div class="text-gray-400">
+                Сотрудники: <span class="text-cp-cyan font-bold">${formatShortCorpStat(corpItem.employees)}</span>
+              </div>
+              <div class="text-gray-400">
+                Солдаты: <span class="text-cp-red font-bold">${formatShortCorpStat(corpItem.soldiers)}</span>
+              </div>
+              <div class="text-gray-400">
+                Оперативники: <span class="text-purple-400 font-bold">${formatShortCorpStat(corpItem.operatives)}</span>
+              </div>
+            </div>
+          `;
         }
+
+        return { el: cardEl, item: corpItem };
       });
+
+      // Сортируем карточки по Сотрудникам, Солдатам или Оперативникам, если выбрано в списке
+      if (sortVal.startsWith("emp_") || sortVal.startsWith("sol_") || sortVal.startsWith("ops_")) {
+        const isAsc = sortVal.endsWith("_asc");
+        const fieldKey = sortVal.startsWith("emp_") ? "employees" : sortVal.startsWith("sol_") ? "soldiers" : "operatives";
+
+        cardDataPairs.sort((a, b) => {
+          const valA = a.item ? parseCorpNumericStat(a.item[fieldKey]) : 0;
+          const valB = b.item ? parseCorpNumericStat(b.item[fieldKey]) : 0;
+          return isAsc ? (valA - valB) : (valB - valA);
+        });
+
+        cardDataPairs.forEach(pair => listContainer.appendChild(pair.el));
+      }
     };
 
-    // 5. Отрисовка детальной карточки Корпорации справа (надёжная вставка всех 5 блоков перед описанием)
+    // 6. Отрисовка детальной карточки Корпорации справа
     const prevRenderDetailForCorps = window.renderDetailCard;
     window.renderDetailCard = function(item) {
       syncCorporationsDataFromExternal();
@@ -6635,7 +6751,6 @@
       const box = document.getElementById("detailCard");
       if (!box) return;
 
-      // Удаляем старый блок, если он уже есть, чтобы не дублировать
       const existingBlock = document.getElementById("corpCustomStatsBlock");
       if (existingBlock) existingBlock.remove();
 
@@ -6667,10 +6782,8 @@
         </div>
       `;
 
-      // Находим в карточке шапку (первый блок с нижней границей border-b) или блок описания и вставляем прямо между ними
       const headerEl = box.querySelector(".border-b.border-gray-800");
       if (headerEl) {
-        // Если сразу после шапки идёт картинка — ставим после картинки, иначе сразу после шапки
         const nextEl = headerEl.nextElementSibling;
         if (nextEl && nextEl.querySelector && nextEl.querySelector("img")) {
           nextEl.insertAdjacentElement("afterend", corpStatsWrap);
@@ -6682,7 +6795,7 @@
       }
     };
 
-    // 6. Интегрируем выбор и показ «Любимой корпорации» в Профиль, Регистрацию и Публичный профиль
+    // 7. Интегрируем выбор и показ «Любимой корпорации» в Профиль, Регистрацию и Публичный профиль
     function injectFavCorpIntoProfileDOM() {
       const regRoleSel = document.getElementById("regFavRole");
       if (regRoleSel && regRoleSel.parentElement && !document.getElementById("regFavCorp")) {
@@ -7128,7 +7241,7 @@
     };
 
     // Отрисовка списка слева (без зелёного ценника) и детальной карточки справа
-    const origRenderCatalogBorg = renderCatalog;
+    const origRenderCatalogBorg = window.renderCatalog;
     window.renderCatalog = function() {
       injectBorgNavButtons();
       origRenderCatalogBorg();
@@ -7139,8 +7252,30 @@
 
       const cards = listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]");
       cards.forEach(cardEl => {
-        const rightCol = cardEl.querySelector(".text-right");
-        if (rightCol) rightCol.remove();
+        const match = (cardEl.getAttribute("onclick") || "").match(/selectCatalogItem\('([^']+)'\)/);
+        const borgItem = match ? (DB.borging || []).find(b => b.id === match[1]) : null;
+        if (!borgItem) return;
+
+        const isSelected = (selectedItemId === borgItem.id);
+        cardEl.className = `p-3.5 border cursor-pointer transition-all flex items-center justify-between gap-4 ${
+          isSelected
+            ? "bg-cp-panel border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.18)]"
+            : "bg-cp-panel/70 border-gray-800 hover:border-cp-cyan"
+        }`;
+        cardEl.innerHTML = `
+          <div class="min-w-0 flex-1">
+            <div class="font-display font-bold text-sm text-white truncate">${dash(borgItem.name)}</div>
+            <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <span class="px-2 py-0.5 text-[10px] font-bold uppercase bg-cp-bg border border-gray-700 text-cp-cyan">${dash(borgItem.borgType || borgItem.category)}</span>
+              ${borgItem.manufacturer ? `<span class="px-2 py-0.5 text-[10px] font-bold bg-purple-900/30 text-purple-300 border border-purple-500/40">${borgItem.manufacturer}</span>` : ""}
+              ${borgItem.book ? `<span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-yellow/15 text-cp-yellow border border-cp-yellow/40">${borgItem.book}</span>` : ""}
+            </div>
+          </div>
+          <div class="text-right shrink-0 space-y-0.5 text-xs">
+            <div class="font-bold text-cp-green">${dash(borgItem.cost)}</div>
+            <div class="text-[11px] text-cp-red font-bold">ПЧ: ${dash(borgItem.hc)}</div>
+          </div>
+        `;
       });
     };
 
