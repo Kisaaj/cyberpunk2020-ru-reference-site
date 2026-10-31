@@ -6477,5 +6477,333 @@
     // Синхронизируем зарплаты сразу при загрузке
     syncAllRoleSalariesInMemory();
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ВКЛАДКИ «🏢 КОРПОРАЦИИ» И ВЫБОРА ЛЮБИМОЙ КОРПОРАЦИИ В ПРОФИЛЕ      -->
+  <!-- ========================================================================= -->
+  <script>
+    // 1. Регистрируем раздел corporations в глобальных словарях и схемах конструктора
+    SECTION_LABELS.corporations = "🏢 Корпорации";
+
+    if (!Array.isArray(DB.corporations)) DB.corporations = [];
+    if (!Array.isArray(CATEGORIES.corporations) || CATEGORIES.corporations.length === 0) {
+      CATEGORIES.corporations = [
+        "Безопасность и ВПК",
+        "Промышленность и кибернетика",
+        "Биотехнологии и фармацевтика",
+        "Топливо и агропром",
+        "Инфокомп и микроэлектроника",
+        "Медиа и связь",
+        "Финансы и орбитальные корпорации"
+      ];
+    }
+
+    SCHEMAS.corporations = [
+      { k: "name", l: "Название корпорации (EN)*", ph: "Например: Arasaka / Militech / Biotechnica" },
+      { k: "origName", l: "Полное юридическое название (EN)", ph: "Arasaka Corporation" },
+      { k: "category", l: "Тип / Сектор корпорации*", isCat: true, ph: "Безопасность и ВПК" },
+      { k: "book", l: "Книга-источник*", isBook: true, ph: "CP20 / Corp1" },
+      { k: "hq", l: "📍 Штаб-квартира", ph: "Токио, Япония" },
+      { k: "employees", l: "👥 Число сотрудников", ph: "1 000 000 по всему миру" },
+      { k: "soldiers", l: "🪖 Число солдат (войска)", ph: "250 000 (охранные и ударные части)" },
+      { k: "operatives", l: "🕶️ Число оперативников", ph: "20 000 тайных агентов и Соло" },
+      { k: "shareholders", l: "📈 Самые крупные держатели акций", ph: "Сабуро Арасака (48%), Кэй Арасака (23%), Ханако Арасака (9%)" }
+    ];
+
+    // Подтягиваем данные корпораций из database.js в существующие объекты памяти (если поля hq/employees потерялись)
+    function syncCorporationsDataFromExternal() {
+      if (typeof DB === "undefined") return;
+      if (!Array.isArray(DB.corporations)) DB.corporations = [];
+
+      const extCorps = (window.CP2020_EXTERNAL_DATA && window.CP2020_EXTERNAL_DATA.db && Array.isArray(window.CP2020_EXTERNAL_DATA.db.corporations))
+        ? window.CP2020_EXTERNAL_DATA.db.corporations
+        : [];
+
+      extCorps.forEach(extItem => {
+        const existing = DB.corporations.find(c => c && c.id === extItem.id);
+        if (!existing) {
+          DB.corporations.push(JSON.parse(JSON.stringify(extItem)));
+        } else {
+          // Если в карточке почему-то пустые поля hq / employees / soldiers / operatives / shareholders — заполняем из эталона
+          if (!existing.hq || existing.hq === "—") existing.hq = extItem.hq;
+          if (!existing.employees || existing.employees === "—") existing.employees = extItem.employees;
+          if (!existing.soldiers || existing.soldiers === "—") existing.soldiers = extItem.soldiers;
+          if (!existing.operatives || existing.operatives === "—") existing.operatives = extItem.operatives;
+          if (!existing.shareholders || existing.shareholders === "—") existing.shareholders = extItem.shareholders;
+          // Обновляем русское имя со скобками на чистое английское
+          if (existing.name && existing.name.includes("(") && existing.name.endsWith(")")) {
+            existing.name = extItem.name;
+          }
+        }
+      });
+    }
+
+    // 2. Встраиваем кнопку «🏢 Корпорации» (без счётчика 0!) в главное меню и в переключатель Конструктора
+    function injectCorporationsNavButtons() {
+      const mainNav = document.getElementById("mainNav");
+      if (mainNav && !mainNav.querySelector('[data-tab="corporations"]')) {
+        const navBtn = document.createElement("button");
+        navBtn.setAttribute("data-tab", "corporations");
+        navBtn.onclick = () => switchMainView("catalog", "corporations");
+        navBtn.className = "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan transition-all";
+        navBtn.innerHTML = `🏢 Корпорации`;
+
+        const rulesBtn = document.getElementById("nav-rules");
+        if (rulesBtn) mainNav.insertBefore(navBtn, rulesBtn);
+        else mainNav.appendChild(navBtn);
+      }
+
+      const builderTypeExample = document.querySelector('.builder-type-btn[data-btype="characters"]');
+      if (builderTypeExample && builderTypeExample.parentElement && !document.querySelector('.builder-type-btn[data-btype="corporations"]')) {
+        const bBtn = document.createElement("button");
+        bBtn.type = "button";
+        bBtn.setAttribute("data-btype", "corporations");
+        bBtn.onclick = () => setBuilderType("corporations");
+        bBtn.className = "builder-type-btn px-3 py-1.5 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300";
+        bBtn.innerHTML = "🏢 Корпорация";
+        builderTypeExample.parentElement.appendChild(bBtn);
+      }
+    }
+
+    // 3. Хранение и извлечение «Любимой корпорации» пользователя
+    function getUserFavCorp(userObj) {
+      if (!userObj) return "Независимый (Без корпорации)";
+      if (userObj.favCorp && String(userObj.favCorp).trim() !== "") return userObj.favCorp;
+      if (Array.isArray(userObj.favorites)) {
+        const marker = userObj.favorites.find(x => typeof x === "string" && x.startsWith("__CORP__:"));
+        if (marker) {
+          userObj.favCorp = marker.slice(9);
+          return userObj.favCorp;
+        }
+      }
+      return "Независимый (Без корпорации)";
+    }
+
+    function setUserFavCorp(userObj, corpName) {
+      if (!userObj) return;
+      const cleanCorp = (corpName || "").trim() || "Независимый (Без корпорации)";
+      userObj.favCorp = cleanCorp;
+      if (!Array.isArray(userObj.favorites)) userObj.favorites = [];
+      userObj.favorites = userObj.favorites.filter(x => !(typeof x === "string" && x.startsWith("__CORP__:")));
+      userObj.favorites.push("__CORP__:" + cleanCorp);
+    }
+
+    function getAvailableCorporationNamesList() {
+      syncCorporationsDataFromExternal();
+      const list = ["Независимый (Без корпорации)"];
+      (DB.corporations || []).forEach(c => {
+        if (c && c.name && !list.includes(c.name)) {
+          list.push(c.name);
+        }
+      });
+      return list;
+    }
+
+    const origFindItemAcross = findItemAcrossAllSections;
+    window.findItemAcrossAllSections = function(itemId) {
+      if (typeof itemId === "string" && itemId.startsWith("__CORP__:")) return null;
+      return origFindItemAcross(itemId);
+    };
+
+    // 4. Отрисовка списка Корпораций слева (УБИРАЕМ зелёный прочерк цены справа, оставляем только Название и Тип!)
+    const prevRenderCatalogForCorps = window.renderCatalog;
+    window.renderCatalog = function() {
+      syncCorporationsDataFromExternal();
+      injectCorporationsNavButtons();
+      prevRenderCatalogForCorps();
+
+      if (activeCatalogTab !== "corporations") return;
+      const listContainer = document.getElementById("catalogList");
+      if (!listContainer) return;
+
+      // Находим все карточки в левом списке и удаляем у них правый блок с зелёной чёрточкой ("—")
+      const cards = listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]");
+      cards.forEach(cardEl => {
+        const rightCol = cardEl.querySelector(".text-right");
+        if (rightCol) {
+          rightCol.remove();
+        }
+      });
+    };
+
+    // 5. Отрисовка детальной карточки Корпорации справа (надёжная вставка всех 5 блоков перед описанием)
+    const prevRenderDetailForCorps = window.renderDetailCard;
+    window.renderDetailCard = function(item) {
+      syncCorporationsDataFromExternal();
+      prevRenderDetailForCorps(item);
+      if (activeCatalogTab !== "corporations" || !item) return;
+
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      // Удаляем старый блок, если он уже есть, чтобы не дублировать
+      const existingBlock = document.getElementById("corpCustomStatsBlock");
+      if (existingBlock) existingBlock.remove();
+
+      const corpStatsWrap = document.createElement("div");
+      corpStatsWrap.id = "corpCustomStatsBlock";
+      corpStatsWrap.className = "space-y-3 mb-4";
+      corpStatsWrap.innerHTML = `
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">📍 Штаб-квартира</div>
+            <div class="text-sm font-display font-bold text-cp-yellow mt-1">${dash(item.hq)}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">👥 Число сотрудников</div>
+            <div class="text-sm font-display font-bold text-cp-cyan mt-1">${dash(item.employees)}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">🪖 Число солдат (войска)</div>
+            <div class="text-sm font-display font-bold text-cp-red mt-1">${dash(item.soldiers)}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">🕶️ Число оперативников</div>
+            <div class="text-sm font-display font-bold text-purple-400 mt-1">${dash(item.operatives)}</div>
+          </div>
+        </div>
+        <div class="bg-cp-bg border-l-2 border-cp-green p-3.5">
+          <div class="text-[10px] font-bold uppercase text-cp-green tracking-wider mb-1">📈 Самые крупные держатели акций:</div>
+          <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line font-semibold">${dash(item.shareholders)}</div>
+        </div>
+      `;
+
+      // Находим в карточке шапку (первый блок с нижней границей border-b) или блок описания и вставляем прямо между ними
+      const headerEl = box.querySelector(".border-b.border-gray-800");
+      if (headerEl) {
+        // Если сразу после шапки идёт картинка — ставим после картинки, иначе сразу после шапки
+        const nextEl = headerEl.nextElementSibling;
+        if (nextEl && nextEl.querySelector && nextEl.querySelector("img")) {
+          nextEl.insertAdjacentElement("afterend", corpStatsWrap);
+        } else {
+          headerEl.insertAdjacentElement("afterend", corpStatsWrap);
+        }
+      } else {
+        box.prepend(corpStatsWrap);
+      }
+    };
+
+    // 6. Интегрируем выбор и показ «Любимой корпорации» в Профиль, Регистрацию и Публичный профиль
+    function injectFavCorpIntoProfileDOM() {
+      const regRoleSel = document.getElementById("regFavRole");
+      if (regRoleSel && regRoleSel.parentElement && !document.getElementById("regFavCorp")) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `
+          <label class="block text-xs text-gray-400 uppercase mb-1">🏢 Любимая корпорация</label>
+          <select id="regFavCorp" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-xs text-white outline-none"></select>
+        `;
+        regRoleSel.parentElement.insertAdjacentElement("afterend", wrap);
+      }
+
+      const editRoleSel = document.getElementById("editProfFavRole");
+      if (editRoleSel && editRoleSel.parentElement && !document.getElementById("editProfFavCorp")) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `
+          <label class="block text-xs text-gray-400 uppercase mb-1">🏢 Любимая корпорация</label>
+          <select id="editProfFavCorp" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none"></select>
+        `;
+        editRoleSel.parentElement.insertAdjacentElement("afterend", wrap);
+      }
+
+      const favRoleBadge = document.getElementById("profileFavRoleText");
+      if (favRoleBadge && favRoleBadge.parentElement && !document.getElementById("profileFavCorpBadge")) {
+        const corpBadge = document.createElement("div");
+        corpBadge.id = "profileFavCorpBadge";
+        corpBadge.className = "text-xs text-gray-400 mt-1";
+        corpBadge.innerHTML = `Корпорация: <span id="profileFavCorpText" class="text-cp-yellow font-bold">Независимый (Без корпорации)</span>`;
+        favRoleBadge.parentElement.insertAdjacentElement("afterend", corpBadge);
+      }
+
+      const corpNames = getAvailableCorporationNamesList();
+      const optionsHtml = corpNames.map(c => `<option value="${escapeHtmlAttr(c)}">${c}</option>`).join("");
+
+      const regCorpSel = document.getElementById("regFavCorp");
+      if (regCorpSel) {
+        const prevVal = regCorpSel.value;
+        regCorpSel.innerHTML = optionsHtml;
+        if (prevVal && corpNames.includes(prevVal)) regCorpSel.value = prevVal;
+      }
+
+      const editCorpSel = document.getElementById("editProfFavCorp");
+      if (editCorpSel) {
+        editCorpSel.innerHTML = optionsHtml;
+      }
+    }
+
+    const prevRenderProfileViewForCorps = renderProfileView;
+    window.renderProfileView = function() {
+      injectFavCorpIntoProfileDOM();
+      prevRenderProfileViewForCorps();
+
+      const u = getCurrentUser();
+      if (!u) return;
+
+      const userCorp = getUserFavCorp(u);
+      const corpTextEl = document.getElementById("profileFavCorpText");
+      if (corpTextEl) corpTextEl.textContent = userCorp;
+
+      const editCorpSel = document.getElementById("editProfFavCorp");
+      if (editCorpSel) {
+        const corpNames = getAvailableCorporationNamesList();
+        if (!corpNames.includes(userCorp)) {
+          editCorpSel.innerHTML += `<option value="${escapeHtmlAttr(userCorp)}">${userCorp}</option>`;
+        }
+        editCorpSel.value = userCorp;
+      }
+    };
+
+    const prevSaveUserProfileForCorps = window.saveUserProfileChanges;
+    window.saveUserProfileChanges = async function(e) {
+      const u = getCurrentUser();
+      const editCorpSel = document.getElementById("editProfFavCorp");
+      if (u && editCorpSel) {
+        setUserFavCorp(u, editCorpSel.value);
+      }
+      await prevSaveUserProfileForCorps(e);
+      const corpTextEl = document.getElementById("profileFavCorpText");
+      if (corpTextEl && u) corpTextEl.textContent = getUserFavCorp(u);
+    };
+
+    const prevHandleRegisterForCorps = window.handleRegisterSubmit;
+    window.handleRegisterSubmit = async function(e) {
+      const regCorpVal = document.getElementById("regFavCorp")?.value || "Независимый (Без корпорации)";
+      await prevHandleRegisterForCorps(e);
+      const u = getCurrentUser();
+      if (u) {
+        setUserFavCorp(u, regCorpVal);
+        if (typeof saveSingleUserToCloud === "function") {
+          await saveSingleUserToCloud(u);
+        }
+        renderProfileView();
+      }
+    };
+
+    const prevOpenPublicProfileForCorps = openPublicProfileModal;
+    window.openPublicProfileModal = function(userId) {
+      prevOpenPublicProfileForCorps(userId);
+      const target = USERS.find(u => u.id === userId);
+      if (!target) return;
+
+      const modalRoleEl = document.getElementById("pubProfFavRole");
+      if (!modalRoleEl || !modalRoleEl.parentElement) return;
+
+      let pubCorpWrap = document.getElementById("pubProfFavCorpWrap");
+      if (!pubCorpWrap) {
+        pubCorpWrap = document.createElement("div");
+        pubCorpWrap.id = "pubProfFavCorpWrap";
+        pubCorpWrap.className = "text-xs text-gray-400 mt-0.5";
+        modalRoleEl.parentElement.insertAdjacentElement("afterend", pubCorpWrap);
+      }
+      pubCorpWrap.innerHTML = `Любимая корпорация: <span class="text-cp-yellow font-bold">🏢 ${getUserFavCorp(target)}</span>`;
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      syncCorporationsDataFromExternal();
+      injectCorporationsNavButtons();
+      injectFavCorpIntoProfileDOM();
+    });
+    syncCorporationsDataFromExternal();
+    injectCorporationsNavButtons();
+    injectFavCorpIntoProfileDOM();
+  </script>
 </body>
 </html>
