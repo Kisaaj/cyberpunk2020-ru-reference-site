@@ -7752,5 +7752,490 @@
       injectWeaponAmmoLegendFormula();
     });
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ МУЛЬТИ-ГАЛЕРЕИ ИЗОБРАЖЕНИЙ В КАРТОЧКАХ И КОНСТРУКТОРЕ              -->
+  <!-- ========================================================================= -->
+  <script>
+    // Временный массив картинок текущей редактируемой карточки в Конструкторе
+    let builderGalleryImages = [];
+    // Состояние полноэкранного лайтбокса для просмотра картинок из сетки
+    let lightboxGalleryState = { images: [], currentIndex: 0, title: "" };
+
+    // Извлекает массив всех картинок карточки (совместимо со старым одиночным полем item.image)
+    function getItemImagesArray(item) {
+      if (!item) return [];
+      const result = [];
+      if (Array.isArray(item.images)) {
+        item.images.forEach(src => {
+          if (typeof src === "string" && src.trim() !== "") {
+            result.push(src.trim());
+          }
+        });
+      }
+      if (typeof item.image === "string" && item.image.trim() !== "") {
+        const single = item.image.trim();
+        if (!result.includes(single)) {
+          result.unshift(single);
+        }
+      }
+      return result;
+    }
+
+    // Сжатие загружаемого с ПК изображения через Canvas (чтобы несколько картинок легко влезали в БД и облако)
+    function compressUploadedImageFile(file, maxWidth = 1100, quality = 0.82) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          const dataUrl = ev.target.result;
+          // Если это GIF или SVG — оставляем как есть, чтобы не потерять анимацию/прозрачность
+          if (file.type === "image/gif" || file.type === "image/svg+xml") {
+            resolve(dataUrl);
+            return;
+          }
+          const img = new Image();
+          img.onload = function() {
+            let w = img.width;
+            let h = img.height;
+            if (w > maxWidth) {
+              h = Math.round((h * maxWidth) / w);
+              w = maxWidth;
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(img, 0, 0, w, h);
+            // Сохраняем PNG если нужна прозрачность, иначе компактный WEBP/JPEG
+            const outType = file.type === "image/png" ? "image/webp" : "image/jpeg";
+            resolve(canvas.toDataURL(outType, quality));
+          };
+          img.onerror = () => resolve(dataUrl);
+          img.src = dataUrl;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Добавление картинки по URL в Конструкторе
+    window.addBuilderImageUrl = function() {
+      const urlInp = document.getElementById("builderMultiImageUrlInput");
+      if (!urlInp) return;
+      const val = urlInp.value.trim();
+      if (!val) return;
+
+      if (!builderGalleryImages.includes(val)) {
+        builderGalleryImages.push(val);
+      }
+      urlInp.value = "";
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Добавление одного или сразу нескольких файлов с компьютера в Конструкторе
+    window.handleBuilderMultiFilesSelect = async function(inputEl) {
+      if (!inputEl || !inputEl.files || inputEl.files.length === 0) return;
+      const files = Array.from(inputEl.files);
+
+      for (const file of files) {
+        if (!file.type.startsWith("image/")) continue;
+        try {
+          const dataUrl = await compressUploadedImageFile(file);
+          if (dataUrl && !builderGalleryImages.includes(dataUrl)) {
+            builderGalleryImages.push(dataUrl);
+          }
+        } catch (err) {
+          console.error("Ошибка чтения файла изображения:", err);
+        }
+      }
+
+      inputEl.value = "";
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Удаление конкретной отдельной картинки в Конструкторе по её индексу
+    window.removeBuilderGalleryImageAt = function(idx) {
+      if (idx < 0 || idx >= builderGalleryImages.length) return;
+      builderGalleryImages.splice(idx, 1);
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Перемещение картинки влево/вправо в Конструкторе (смена порядка в сетке)
+    window.moveBuilderGalleryImage = function(idx, dir) {
+      const targetIdx = idx + dir;
+      if (targetIdx < 0 || targetIdx >= builderGalleryImages.length) return;
+      const temp = builderGalleryImages[idx];
+      builderGalleryImages[idx] = builderGalleryImages[targetIdx];
+      builderGalleryImages[targetIdx] = temp;
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Полная очистка всех картинок карточки в Конструкторе
+    window.clearAllBuilderGalleryImages = function() {
+      if (builderGalleryImages.length === 0) return;
+      if (!confirm("Удалить все прикреплённые к этой карточке изображения?")) return;
+      builderGalleryImages = [];
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Синхронизируем первую картинку со штатной переменной builderUploadedImageData для полной совместимости
+    function syncBuilderLegacyImageState() {
+      const firstImg = builderGalleryImages[0] || "";
+      if (typeof builderUploadedImageData !== "undefined") {
+        builderUploadedImageData = firstImg;
+      }
+      const oldUrlInp = document.getElementById("builderImageUrl");
+      if (oldUrlInp) {
+        oldUrlInp.value = firstImg.startsWith("data:") ? "" : firstImg;
+      }
+    }
+
+    // Отрисовка сетки загруженных картинок внутри Конструктора (с кнопкой удаления каждой отдельной картинки)
+    function renderBuilderGalleryPreviewGrid() {
+      const gridEl = document.getElementById("builderMultiGalleryGrid");
+      const countEl = document.getElementById("builderMultiGalleryCount");
+      const clearAllBtn = document.getElementById("builderMultiClearAllBtn");
+      if (!gridEl) return;
+
+      if (countEl) countEl.textContent = builderGalleryImages.length;
+      if (clearAllBtn) clearAllBtn.classList.toggle("hidden", builderGalleryImages.length <= 1);
+
+      if (builderGalleryImages.length === 0) {
+        gridEl.innerHTML = `
+          <div class="col-span-full py-4 px-3 text-center text-[11px] text-gray-500 border border-dashed border-gray-800 bg-black/20">
+            Изображения не прикреплены. Вставьте ссылку и нажмите «+ Добавить URL» или выберите файлы с компьютера.
+          </div>
+        `;
+        return;
+      }
+
+      gridEl.innerHTML = builderGalleryImages.map((src, idx) => {
+        const isData = src.startsWith("data:");
+        const shortLabel = isData ? "Загруженный файл" : (src.length > 28 ? src.slice(0, 25) + "…" : src);
+        return `
+          <div class="bg-cp-panel border border-gray-700 p-2 flex flex-col justify-between gap-2 relative group overflow-hidden">
+            <div class="flex items-center justify-between gap-1 text-[10px] text-gray-400 border-b border-gray-800 pb-1">
+              <span class="font-bold ${idx === 0 ? 'text-cp-yellow' : 'text-cp-cyan'}">
+                #${idx + 1} ${idx === 0 ? '(Главная)' : ''}
+              </span>
+              <div class="flex items-center gap-1">
+                ${idx > 0 ? `<button type="button" onclick="moveBuilderGalleryImage(${idx}, -1)" title="Сдвинуть влево" class="px-1.5 py-0.5 bg-gray-800 hover:bg-cp-cyan hover:text-black text-gray-300 font-bold">◀</button>` : ""}
+                ${idx < builderGalleryImages.length - 1 ? `<button type="button" onclick="moveBuilderGalleryImage(${idx}, 1)" title="Сдвинуть вправо" class="px-1.5 py-0.5 bg-gray-800 hover:bg-cp-cyan hover:text-black text-gray-300 font-bold">▶</button>` : ""}
+                <button type="button" onclick="removeBuilderGalleryImageAt(${idx})" title="Удалить эту картинку"
+                  class="px-2 py-0.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white font-bold uppercase transition-colors">
+                  ✕ Удалить
+                </button>
+              </div>
+            </div>
+            <div class="w-full h-32 bg-black/50 flex items-center justify-center overflow-hidden border border-gray-800/80">
+              <img src="${escapeHtmlAttr(src)}" alt="Preview ${idx + 1}" class="max-w-full max-h-full object-contain">
+            </div>
+            <div class="text-[10px] text-gray-500 truncate" title="${escapeHtmlAttr(isData ? 'Локальный файл (Base64)' : src)}">
+              ${escapeHtmlAttr(shortLabel)}
+            </div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    // Встраиваем панель мульти-загрузки картинок в Конструктор вместо старого одиночного поля
+    function injectMultiImageUploaderIntoBuilder() {
+      const oldUrlInp = document.getElementById("builderImageUrl");
+      if (!oldUrlInp) return;
+
+      // Находим родительский контейнер старого блока загрузки одной картинки и скрываем его внутренности
+      const oldContainer = oldUrlInp.closest(".bg-cp-bg.border.border-gray-700") || oldUrlInp.parentElement.parentElement;
+      if (!oldContainer) return;
+
+      if (!document.getElementById("builderMultiImagePanel")) {
+        // Скрываем старые дочерние элементы внутри контейнера, но оставляем их в DOM, чтобы старый код не выдавал ошибок
+        Array.from(oldContainer.children).forEach(ch => ch.classList.add("hidden"));
+
+        const multiPanel = document.createElement("div");
+        multiPanel.id = "builderMultiImagePanel";
+        multiPanel.className = "space-y-3";
+        multiPanel.innerHTML = `
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <label class="block text-xs font-bold uppercase text-cp-cyan">
+                🖼️ Галерея изображений карточки (<span id="builderMultiGalleryCount" class="text-cp-yellow">0</span>)
+              </label>
+              <div class="text-[10px] text-gray-400">Можно добавить несколько картинок (по URL или файлами с ПК). Они отобразятся сеткой.</div>
+            </div>
+            <button type="button" id="builderMultiClearAllBtn" onclick="clearAllBuilderGalleryImages()"
+              class="hidden px-2.5 py-1 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-[10px] font-bold uppercase transition-colors">
+              🗑️ Очистить все
+            </button>
+          </div>
+
+          <!-- Панель добавления новой картинки (по ссылке или выбором нескольких файлов) -->
+          <div class="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+            <div class="sm:col-span-8 flex gap-1.5">
+              <input type="text" id="builderMultiImageUrlInput"
+                placeholder="Вставьте URL картинки (https://...) и нажмите «+ Добавить URL»"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();addBuilderImageUrl();}"
+                class="flex-1 bg-cp-panel border border-gray-700 focus:border-cp-cyan px-3 py-1.5 text-xs text-white outline-none">
+              <button type="button" onclick="addBuilderImageUrl()"
+                class="px-3 py-1.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold text-xs uppercase shrink-0 transition-colors">
+                + Добавить URL
+              </button>
+            </div>
+            <label class="sm:col-span-4 px-3 py-1.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-bold text-xs uppercase cursor-pointer text-center transition-colors">
+              📁 Загрузить файл(ы) с ПК
+              <input type="file" id="builderMultiFileInput" accept="image/*" multiple class="hidden"
+                onchange="handleBuilderMultiFilesSelect(this)">
+            </label>
+          </div>
+
+          <!-- Сетка предпросмотра с возможностью удаления каждой отдельной картинки -->
+          <div id="builderMultiGalleryGrid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1"></div>
+        `;
+        oldContainer.appendChild(multiPanel);
+      }
+    }
+
+    // 1. Перехватываем открытие Конструктора (setBuilderType) и загружаем в него все картинки карточки
+    const prevSetBuilderTypeMultiImg = window.setBuilderType;
+    window.setBuilderType = function(type, itemToEdit = null) {
+      prevSetBuilderTypeMultiImg(type, itemToEdit);
+      injectMultiImageUploaderIntoBuilder();
+
+      builderGalleryImages = getItemImagesArray(itemToEdit);
+      syncBuilderLegacyImageState();
+      renderBuilderGalleryPreviewGrid();
+    };
+
+    // Перехватываем кнопку «Сбросить форму» в Конструкторе
+    const prevResetBuilderFormMultiImg = window.resetBuilderForm;
+    if (typeof prevResetBuilderFormMultiImg === "function") {
+      window.resetBuilderForm = function() {
+        builderGalleryImages = [];
+        prevResetBuilderFormMultiImg();
+        renderBuilderGalleryPreviewGrid();
+      };
+    }
+
+    // 2. Перехватываем сохранение карточки в Конструкторе (saveBuilderItem) и записываем массив item.images
+    const prevSaveBuilderItemMultiImg = window.saveBuilderItem;
+    window.saveBuilderItem = function(e) {
+      // Если пользователь вставил ссылку в поле URL, но забыл нажать "+ Добавить URL" — заботливо подхватываем её перед сохранением
+      const pendingUrlInp = document.getElementById("builderMultiImageUrlInput");
+      if (pendingUrlInp && pendingUrlInp.value.trim() !== "") {
+        const pendingVal = pendingUrlInp.value.trim();
+        if (!builderGalleryImages.includes(pendingVal)) {
+          builderGalleryImages.push(pendingVal);
+        }
+        pendingUrlInp.value = "";
+      }
+
+      syncBuilderLegacyImageState();
+      const savedImagesSnapshot = [...builderGalleryImages];
+      const targetSection = activeBuilderType;
+
+      const prevApplying = isApplyingRemoteUpdate;
+      isApplyingRemoteUpdate = true;
+
+      prevSaveBuilderItemMultiImg(e);
+
+      isApplyingRemoteUpdate = prevApplying;
+
+      if (selectedItemId && DB[targetSection]) {
+        const savedItem = DB[targetSection].find(it => it && it.id === selectedItemId);
+        if (savedItem) {
+          savedItem.images = savedImagesSnapshot;
+          savedItem.image = savedImagesSnapshot[0] || "";
+
+          const previewEl = document.getElementById("builderJsonPreview");
+          if (previewEl) {
+            previewEl.textContent = JSON.stringify({
+              ...savedItem,
+              image: savedItem.image ? "[Изображение #1]" : undefined,
+              images: savedItem.images && savedItem.images.length > 0 ? `[Галерея: ${savedItem.images.length} изобр.]` : undefined
+            }, null, 2);
+          }
+
+          persistDatabase();
+          renderCatalog();
+          renderDetailCard(savedItem);
+        }
+      }
+    };
+
+    // 3. Лайтбокс для удобного увеличения любой картинки из сетки по клику
+    function ensureGalleryLightboxModal() {
+      if (document.getElementById("cardGalleryLightboxModal")) return;
+      const modal = document.createElement("div");
+      modal.id = "cardGalleryLightboxModal";
+      modal.className = "hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 select-none";
+      modal.onclick = function(ev) {
+        if (ev.target === modal) closeCardGalleryLightbox();
+      };
+      modal.innerHTML = `
+        <div class="max-w-5xl w-full bg-cp-panel cp-border p-4 flex flex-col gap-3 max-h-[92vh]">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-xs font-display font-bold uppercase text-cp-yellow truncate" id="lightboxGalleryTitle">Иллюстрация</span>
+              <span class="text-xs font-bold text-cp-cyan px-2 py-0.5 bg-cp-bg border border-gray-700" id="lightboxGalleryCounter">1 / 1</span>
+            </div>
+            <button type="button" onclick="closeCardGalleryLightbox()" class="px-3 py-1 bg-cp-red hover:bg-red-600 text-white font-bold text-xs uppercase">✕ Закрыть (Esc)</button>
+          </div>
+          <div class="relative flex-1 flex items-center justify-center bg-black/60 border border-gray-800 overflow-hidden min-h-[300px] max-h-[75vh]">
+            <button type="button" id="lightboxPrevBtn" onclick="stepCardGalleryLightbox(-1)"
+              class="px-3.5 py-6 bg-black/70 hover:bg-cp-yellow text-white hover:text-black font-bold text-lg border border-gray-700 transition-colors z-10 ml-2">
+              ◀
+            </button>
+            <div class="flex-1 h-full flex items-center justify-center p-2 overflow-hidden">
+              <img id="lightboxGalleryImg" src="" alt="Full view" class="max-w-full max-h-[70vh] object-contain">
+            </div>
+            <button type="button" id="lightboxNextBtn" onclick="stepCardGalleryLightbox(1)"
+              class="px-3.5 py-6 bg-black/70 hover:bg-cp-yellow text-white hover:text-black font-bold text-lg border border-gray-700 transition-colors z-10 mr-2">
+              ▶
+            </button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      window.addEventListener("keydown", (ev) => {
+        const m = document.getElementById("cardGalleryLightboxModal");
+        if (!m || m.classList.contains("hidden")) return;
+        if (ev.key === "Escape") closeCardGalleryLightbox();
+        else if (ev.key === "ArrowLeft") stepCardGalleryLightbox(-1);
+        else if (ev.key === "ArrowRight") stepCardGalleryLightbox(1);
+      });
+    }
+
+    window.openCardGalleryLightbox = function(itemId, startIndex = 0) {
+      ensureGalleryLightboxModal();
+      const found = findItemAcrossAllSections(itemId);
+      const item = found ? found.item : (DB[activeCatalogTab] || []).find(x => x && x.id === itemId);
+      if (!item) return;
+
+      const imgs = getItemImagesArray(item);
+      if (imgs.length === 0) return;
+
+      lightboxGalleryState.images = imgs;
+      lightboxGalleryState.currentIndex = Math.max(0, Math.min(startIndex, imgs.length - 1));
+      lightboxGalleryState.title = item.name || "Иллюстрация";
+      updateCardGalleryLightboxUI();
+
+      document.getElementById("cardGalleryLightboxModal").classList.remove("hidden");
+    };
+
+    window.stepCardGalleryLightbox = function(delta) {
+      const len = lightboxGalleryState.images.length;
+      if (len <= 1) return;
+      lightboxGalleryState.currentIndex = (lightboxGalleryState.currentIndex + delta + len) % len;
+      updateCardGalleryLightboxUI();
+    };
+
+    window.closeCardGalleryLightbox = function() {
+      const m = document.getElementById("cardGalleryLightboxModal");
+      if (m) m.classList.add("hidden");
+    };
+
+    function updateCardGalleryLightboxUI() {
+      const imgs = lightboxGalleryState.images;
+      const idx = lightboxGalleryState.currentIndex;
+      const imgEl = document.getElementById("lightboxGalleryImg");
+      const titleEl = document.getElementById("lightboxGalleryTitle");
+      const counterEl = document.getElementById("lightboxGalleryCounter");
+      const prevBtn = document.getElementById("lightboxPrevBtn");
+      const nextBtn = document.getElementById("lightboxNextBtn");
+
+      if (imgEl) imgEl.src = imgs[idx] || "";
+      if (titleEl) titleEl.textContent = lightboxGalleryState.title;
+      if (counterEl) counterEl.textContent = `${idx + 1} / ${imgs.length}`;
+      if (prevBtn) prevBtn.classList.toggle("invisible", imgs.length <= 1);
+      if (nextBtn) nextBtn.classList.toggle("invisible", imgs.length <= 1);
+    }
+
+    // 4. Отрисовка сетки изображений внутри детальной карточки каталога (строго в рамках карточки!)
+    const prevRenderDetailCardMultiImg = window.renderDetailCard;
+    window.renderDetailCard = function(item) {
+      // Синхронизируем поле item.image с первым элементом массива item.images перед базовым рендером
+      const imgs = getItemImagesArray(item);
+      if (item && imgs.length > 0 && !item.image) {
+        item.image = imgs[0];
+      }
+
+      prevRenderDetailCardMultiImg(item);
+      if (!item) return;
+
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      // Удаляем старый одиночный блок картинки, если он был создан базовым рендерером
+      const oldSingleImg = box.querySelector("img");
+      let insertAnchor = box.querySelector(".border-b.border-gray-800");
+      if (oldSingleImg) {
+        const oldWrapper = oldSingleImg.parentElement;
+        if (oldWrapper && oldWrapper !== box) {
+          insertAnchor = oldWrapper.previousElementSibling || insertAnchor;
+          oldWrapper.remove();
+        } else {
+          oldSingleImg.remove();
+        }
+      }
+
+      const oldGallery = document.getElementById("detailCardMultiImageGallery");
+      if (oldGallery) oldGallery.remove();
+
+      if (imgs.length === 0) return;
+
+      const galleryWrap = document.createElement("div");
+      galleryWrap.id = "detailCardMultiImageGallery";
+      galleryWrap.className = "mb-4 w-full max-w-full overflow-hidden";
+
+      if (imgs.length === 1) {
+        // Если картинка одна — аккуратный контейнер с ограничением по высоте и ширине карточки
+        galleryWrap.innerHTML = `
+          <div onclick="openCardGalleryLightbox('${item.id}', 0)"
+            class="w-full max-h-80 bg-cp-bg border border-gray-800 hover:border-cp-cyan p-2 flex items-center justify-center overflow-hidden cursor-zoom-in transition-colors group">
+            <img src="${escapeHtmlAttr(imgs[0])}" alt="${escapeHtmlAttr(item.name || '')}"
+              class="max-w-full max-h-72 w-auto h-auto object-contain transition-transform duration-200 group-hover:scale-[1.02]">
+          </div>
+        `;
+      } else {
+        // Если картинок несколько — строгая адаптивная сетка внутри карточки (2 колонки, при нечётном числе последняя или первая не вылезает)
+        const gridColsCls = imgs.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-2";
+        galleryWrap.innerHTML = `
+          <div class="bg-cp-bg/70 border border-gray-800 p-2.5 space-y-2 w-full max-w-full overflow-hidden">
+            <div class="flex items-center justify-between text-[10px] text-gray-400 uppercase px-0.5">
+              <span class="font-bold text-cp-cyan">🖼️ Иллюстрации карточки (${imgs.length})</span>
+              <span>Нажмите на изображение для увеличения</span>
+            </div>
+            <div class="grid ${gridColsCls} gap-2.5 w-full">
+              ${imgs.map((src, idx) => `
+                <div onclick="openCardGalleryLightbox('${item.id}', ${idx})"
+                  class="w-full h-48 bg-cp-panel border border-gray-800 hover:border-cp-yellow p-1.5 flex items-center justify-center overflow-hidden cursor-zoom-in relative group transition-all">
+                  <img src="${escapeHtmlAttr(src)}" alt="${escapeHtmlAttr((item.name || '') + ' #' + (idx + 1))}"
+                    class="max-w-full max-h-full w-auto h-auto object-contain transition-transform duration-200 group-hover:scale-105">
+                  <span class="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-black/75 border border-gray-700 text-[9px] font-bold text-gray-300">
+                    #${idx + 1}
+                  </span>
+                </div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+
+      if (insertAnchor) {
+        insertAnchor.insertAdjacentElement("afterend", galleryWrap);
+      } else {
+        box.prepend(galleryWrap);
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      injectMultiImageUploaderIntoBuilder();
+    });
+    injectMultiImageUploaderIntoBuilder();
+  </script>
 </body>
 </html>
