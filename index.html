@@ -6805,5 +6805,481 @@
     injectCorporationsNavButtons();
     injectFavCorpIntoProfileDOM();
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ВКЛАДКИ «🦾 БОРГИРОВАНИЕ» (ПОЛНОЕ И ЭКЗОТИЧЕСКОЕ БОРГИРОВАНИЕ)       -->
+  <!-- ========================================================================= -->
+  <script>
+    SECTION_LABELS.borging = "🦾 Боргирование";
+
+    if (!Array.isArray(DB.borging)) DB.borging = [];
+    if (!Array.isArray(CATEGORIES.borging) || CATEGORIES.corporations.length === 0) {
+      CATEGORIES.borging = [
+        "Полное боргирование (Full Body Conversion)",
+        "Частичное боргирование",
+        "Экзотическое боргирование (Exotics)",
+        "ACPA / Тяжёлая силовая броня"
+      ];
+    }
+
+    SCHEMAS.borging = [
+      { k: "name", l: "Название модели боргирования*", ph: "Например: IEC Dragoon / Arasaka Shinratsu..." },
+      { k: "borgType", l: "Тип боргирования*", ph: "Полное боргирование / Экзотическое" },
+      { k: "manufacturer", l: "Производитель (IEC, Arasaka, Militech...)*", ph: "IEC" },
+      { k: "hc", l: "Потеря человечности (ПЧ)*", ph: "3d6+4 или 4d6" },
+      { k: "cost", l: "Стоимость боргирования*", ph: "120 000 eb" },
+      { k: "category", l: "Категория*", isCat: true, ph: "Полное боргирование (Full Body Conversion)" },
+      { k: "book", l: "Книга-источник*", isBook: true, ph: "Solo of Fortune 2 / Chromebook 2" }
+    ];
+
+    // Временное состояние для динамических списков кибероснащения внутри боргирования
+    let borgBuilderCyberwareList = [];
+
+    function initBorgBuilderState(itemObj) {
+      const v = itemObj || {};
+      if (Array.isArray(v.cyberwareList)) {
+        borgBuilderCyberwareList = JSON.parse(JSON.stringify(v.cyberwareList));
+      } else if (v.cyberware && String(v.cyberware).trim() !== "" && v.cyberware !== "—") {
+        borgBuilderCyberwareList = [{ name: "Встроенное оснащение", desc: String(v.cyberware).trim() }];
+      } else {
+        borgBuilderCyberwareList = [];
+      }
+    }
+
+    function syncBorgBuilderFromDOM() {
+      const container = document.getElementById("borg-cyberware-container");
+      if (!container) return;
+      const rows = container.querySelectorAll(".borg-cyber-builder-item");
+      borgBuilderCyberwareList = Array.from(rows).map(el => ({
+        name: el.querySelector('[data-field="name"]')?.value || "",
+        desc: el.querySelector('[data-field="desc"]')?.value || ""
+      }));
+    }
+
+    window.addBorgCyberwareBlock = function() {
+      syncBorgBuilderFromDOM();
+      borgBuilderCyberwareList.push({ name: "", desc: "" });
+      renderBorgCyberwareBuilderList();
+    };
+
+    window.removeBorgCyberwareBlock = function(idx) {
+      syncBorgBuilderFromDOM();
+      borgBuilderCyberwareList.splice(idx, 1);
+      renderBorgCyberwareBuilderList();
+    };
+
+    function renderBorgCyberwareBuilderList() {
+      const container = document.getElementById("borg-cyberware-container");
+      if (!container) return;
+      if (borgBuilderCyberwareList.length === 0) {
+        container.innerHTML = `<div class="text-[11px] text-gray-500 italic py-2 px-3 bg-black/30 border border-gray-800">Оснащение не добавлено. Нажмите «+ Добавить имплант».</div>`;
+        return;
+      }
+      container.innerHTML = borgBuilderCyberwareList.map((item, idx) => `
+        <div class="borg-cyber-builder-item bg-cp-bg border border-purple-500/50 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <input type="text" data-field="name" value="${escapeHtmlAttr(item.name)}" placeholder="Название импланта / подсистемы..." class="flex-1 bg-cp-panel border border-gray-700 focus:border-purple-400 px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+            <button type="button" onclick="removeBorgCyberwareBlock(${idx})" class="px-2 py-1 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-[10px] font-bold uppercase">✕</button>
+          </div>
+          <textarea data-field="desc" rows="2" placeholder="Описание, ПЧ, особенности работы..." class="w-full bg-cp-panel border border-gray-700 focus:border-purple-400 p-2 text-xs text-white outline-none">${item.desc || ""}</textarea>
+        </div>
+      `).join("");
+    }
+
+    // Встраиваем вкладку «🦾 Боргирование» в навигацию и Конструктор
+    function injectBorgNavButtons() {
+      const mainNav = document.getElementById("mainNav");
+      if (mainNav && !mainNav.querySelector('[data-tab="borging"]')) {
+        const navBtn = document.createElement("button");
+        navBtn.setAttribute("data-tab", "borging");
+        navBtn.onclick = () => switchMainView("catalog", "borging");
+        navBtn.className = "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan transition-all";
+        navBtn.innerHTML = `🦾 Боргирование`;
+        const rulesBtn = document.getElementById("nav-rules");
+        if (rulesBtn) mainNav.insertBefore(navBtn, rulesBtn);
+        else mainNav.appendChild(navBtn);
+      }
+
+      const builderTypeExample = document.querySelector('.builder-type-btn[data-btype="characters"]');
+      if (builderTypeExample && builderTypeExample.parentElement && !document.querySelector('.builder-type-btn[data-btype="borging"]')) {
+        const bBtn = document.createElement("button");
+        bBtn.type = "button";
+        bBtn.setAttribute("data-btype", "borging");
+        bBtn.onclick = () => setBuilderType("borging");
+        bBtn.className = "builder-type-btn px-3 py-1.5 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300";
+        bBtn.innerHTML = "🦾 Боргирование";
+        builderTypeExample.parentElement.appendChild(bBtn);
+      }
+    }
+
+    // Расширяем setBuilderType для раздела боргирования
+    const origSetBuilderTypeBorg = setBuilderType;
+    window.setBuilderType = function(type, itemToEdit = null) {
+      origSetBuilderTypeBorg(type, itemToEdit);
+      if (type !== "borging") return;
+
+      initBorgBuilderState(itemToEdit);
+      const container = document.getElementById("builderFieldsContainer");
+      if (!container) return;
+
+      const v = itemToEdit || {};
+      const cats = getAllCategoriesForSection("borging");
+      const books = getAllBookSources();
+      const fields = SCHEMAS.borging || [];
+
+      const datalistHtml = `
+        <datalist id="dl-builder-cat">${cats.map(c => `<option value="${c}">`).join("")}</datalist>
+        <datalist id="dl-builder-book">${books.map(b => `<option value="${b}">`).join("")}</datalist>
+      `;
+
+      const inputsHtml = fields.map(f => {
+        const val = v[f.k] || "";
+        const listAttr = f.isCat ? 'list="dl-builder-cat"' : f.isBook ? 'list="dl-builder-book"' : '';
+        const labelColor = f.isCat ? 'text-cp-cyan font-bold' : f.isBook ? 'text-cp-yellow font-bold' : 'text-gray-400';
+        return `<div><label class="text-[11px] ${labelColor}">${f.l}</label><input name="${f.k}" ${listAttr} value="${escapeHtmlAttr(val)}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
+      }).join("");
+
+      // Шаблоны полей для таблиц статов и структуры тела
+      const st = v.borgStats || {};
+      const str = v.borgStructure || {};
+
+      container.innerHTML = `
+        ${datalistHtml}
+        <div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>
+
+        <!-- ТАБЛИЦА 1: ФИЗИЧЕСКИЕ СТАТЫ -->
+        <div class="bg-cp-panel border border-cp-yellow/50 p-3.5 space-y-3">
+          <div class="text-xs font-bold uppercase text-cp-yellow">📊 Физические статы киборга</div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div><label class="block text-[10px] text-gray-400 uppercase">РЕФ (Рефлексы)</label><input name="b_ref" value="${escapeHtmlAttr(st.ref || '')}" placeholder="10" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-white font-bold"></div>
+            <div><label class="block text-[10px] text-gray-400 uppercase">ПРВЛ (Привлекательность)</label><input name="b_cool" value="${escapeHtmlAttr(st.cool || '')}" placeholder="2" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-white font-bold"></div>
+            <div><label class="block text-[10px] text-gray-400 uppercase">ПЕР (MA)</label><input name="b_ma" value="${escapeHtmlAttr(st.ma || '')}" placeholder="12" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-white font-bold"></div>
+            <div><label class="block text-[10px] text-gray-400 uppercase">ТЕЛО </label><input name="b_body" value="${escapeHtmlAttr(st.body || '')}" placeholder="15" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-white font-bold"></div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-gray-800">
+            <div><label class="block text-[10px] text-cp-cyan uppercase">М/Ход</label><input name="b_m_m" value="${escapeHtmlAttr(st.m_m || '')}" placeholder="12" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-cyan font-bold"></div>
+            <div><label class="block text-[10px] text-cp-cyan uppercase">КМ/Ч</label><input name="b_m_kmh" value="${escapeHtmlAttr(st.m_kmh || '')}" placeholder="45" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-cyan font-bold"></div>
+            <div><label class="block text-[10px] text-cp-cyan uppercase">Прыжок вверх (м)</label><input name="b_jump_up" value="${escapeHtmlAttr(st.jump_up || '')}" placeholder="3" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-cyan font-bold"></div>
+            <div><label class="block text-[10px] text-cp-cyan uppercase">Прыжок вдаль (м)</label><input name="b_jump_long" value="${escapeHtmlAttr(st.jump_long || '')}" placeholder="6" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-cyan font-bold"></div>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-gray-800">
+            <div><label class="block text-[10px] text-cp-green uppercase">Поднимает (кг)</label><input name="b_lift" value="${escapeHtmlAttr(st.lift || '')}" placeholder="600" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-green font-bold"></div>
+            <div><label class="block text-[10px] text-cp-green uppercase">Кидает (м)</label><input name="b_throw" value="${escapeHtmlAttr(st.throw || '')}" placeholder="15" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-green font-bold"></div>
+            <div><label class="block text-[10px] text-cp-red uppercase">Модификатор урона</label><input name="b_dmg_mod" value="${escapeHtmlAttr(st.dmg_mod || '')}" placeholder="+4d6" class="w-full bg-cp-bg border border-gray-700 p-1.5 text-xs text-cp-red font-bold"></div>
+            <div><label class="block text-[10px] text-cp-yellow uppercase">Ближний бой (Удар / Пинок)</label><div class="flex gap-1"><input name="b_punch" value="${escapeHtmlAttr(st.punch || '')}" placeholder="4d6" class="w-1/2 bg-cp-bg border border-gray-700 p-1.5 text-xs text-center text-white"><input name="b_kick" value="${escapeHtmlAttr(st.kick || '')}" placeholder="6d6" class="w-1/2 bg-cp-bg border border-gray-700 p-1.5 text-xs text-center text-white"></div></div>
+          </div>
+        </div>
+
+        <!-- ТАБЛИЦА 2: ФИЗИЧЕСКАЯ СТРУКТУРА (ЛОКАЦИИ) -->
+        <div class="bg-cp-panel border border-cp-cyan/50 p-3.5 space-y-3">
+          <div class="text-xs font-bold uppercase text-cp-cyan">🛡️ Физическая структура (Локации боргирования)</div>
+          
+          <!-- Голова -->
+          <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+            <div class="text-[11px] font-bold text-white uppercase">🧠 Голова</div>
+            <div class="grid grid-cols-4 gap-2">
+              <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_head_sp" value="${escapeHtmlAttr(str.head_sp || '')}" placeholder="25" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+              <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_head_ost" value="${escapeHtmlAttr(str.head_ost || '' )}" placeholder="45" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+              <div><label class="block text-[9px] text-gray-400 uppercase">Оптика</label><input name="s_head_opt" value="${escapeHtmlAttr(str.head_opt || '')}" placeholder="Термоглаз, зум" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+              <div><label class="block text-[9px] text-gray-400 uppercase">Аудио</label><input name="s_head_aud" value="${escapeHtmlAttr(str.head_aud || '')}" placeholder="Усилитель" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+            </div>
+          </div>
+
+          <!-- Торс -->
+          <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+            <div class="text-[11px] font-bold text-white uppercase">🦾 Торс</div>
+            <div class="grid grid-cols-3 gap-2">
+              <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_torso_sp" value="${escapeHtmlAttr(str.torso_sp || '')}" placeholder="30" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+              <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_torso_ost" value="${escapeHtmlAttr(str.torso_ost || '')}" placeholder="70" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+              <div><label class="block text-[9px] text-gray-400 uppercase">Опции / Броня</label><input name="s_torso_opt" value="${escapeHtmlAttr(str.torso_opt || '')}" placeholder="Реактор, зашита" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+            </div>
+          </div>
+
+          <!-- Руки (Правая и Левая) -->
+          <div class="grid grid-cols-2 gap-2">
+            <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+              <div class="text-[11px] font-bold text-white uppercase">🦾 Правая рука</div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_rarm_sp" value="${escapeHtmlAttr(str.rarm_sp || '')}" placeholder="25" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_rarm_ost" value="${escapeHtmlAttr(str.rarm_ost || '')}" placeholder="35" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">Опции</label><input name="s_rarm_opt" value="${escapeHtmlAttr(str.rarm_opt || '')}" placeholder="Оруж. кисть" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+              </div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+              <div class="text-[11px] font-bold text-white uppercase">🦾 Левая рука</div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_larm_sp" value="${escapeHtmlAttr(str.larm_sp || '')}" placeholder="25" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_larm_ost" value="${escapeHtmlAttr(str.larm_ost || '')}" placeholder="35" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">Опции</label><input name="s_larm_opt" value="${escapeHtmlAttr(str.larm_opt || '')}" placeholder="Щит" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Ноги (Правая и Левая) -->
+          <div class="grid grid-cols-2 gap-2">
+            <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+              <div class="text-[11px] font-bold text-white uppercase">🦿 Правая нога</div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_rleg_sp" value="${escapeHtmlAttr(str.rleg_sp || '')}" placeholder="25" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_rleg_ost" value="${escapeHtmlAttr(str.rleg_ost || '')}" placeholder="40" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">Опции</label><input name="s_rleg_opt" value="${escapeHtmlAttr(str.rleg_opt || '')}" placeholder="Прыжк. усил." class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+              </div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2.5 space-y-2">
+              <div class="text-[11px] font-bold text-white uppercase">🦿 Левая нога</div>
+              <div class="grid grid-cols-3 gap-1.5">
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОС</label><input name="s_lleg_sp" value="${escapeHtmlAttr(str.lleg_sp || '')}" placeholder="25" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-yellow"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">ОСТ</label><input name="s_lleg_ost" value="${escapeHtmlAttr(str.lleg_ost || '')}" placeholder="40" class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-center text-cp-red"></div>
+                <div><label class="block text-[9px] text-gray-400 uppercase">Опции</label><input name="s_lleg_opt" value="${escapeHtmlAttr(str.lleg_opt || '')}" placeholder="Прыжк. усил." class="w-full bg-cp-panel border border-gray-700 p-1 text-xs text-white"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- КИБЕРОСНАЩЕНИЕ БОРГИРОВАНИЯ -->
+        <div class="bg-cp-panel border border-purple-500/40 p-3.5 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase text-purple-400">🦾 Кибероснащение боргирования</span>
+            <button type="button" onclick="addBorgCyberwareBlock()" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white text-[11px] font-bold uppercase">+ Добавить имплант</button>
+          </div>
+          <div id="borg-cyberware-container" class="space-y-2"></div>
+        </div>
+
+        <div>
+          <label class="text-[11px] text-gray-400">Описание / Особенности боргирования</label>
+          <textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea>
+        </div>
+      `;
+
+      renderBorgCyberwareBuilderList();
+    };
+
+    // Перехватываем сохранение карточки боргирования
+    const origSaveBuilderItemBorg = saveBuilderItem;
+    window.saveBuilderItem = function(e) {
+      const wasBorg = (activeBuilderType === "borging");
+      if (wasBorg) syncBorgBuilderFromDOM();
+
+      const prevApplying = isApplyingRemoteUpdate;
+      if (wasBorg) isApplyingRemoteUpdate = true;
+
+      origSaveBuilderItemBorg(e);
+
+      if (wasBorg) {
+        isApplyingRemoteUpdate = prevApplying;
+        if (selectedItemId) {
+          const savedBorg = (DB.borging || []).find(b => b.id === selectedItemId);
+          if (savedBorg) {
+            // Собираем статы
+            savedBorg.borgStats = {
+              ref: document.querySelector('input[name="b_ref"]')?.value || "",
+              cool: document.querySelector('input[name="b_cool"]')?.value || "",
+              ma: document.querySelector('input[name="b_ma"]')?.value || "",
+              body: document.querySelector('input[name="b_body"]')?.value || "",
+              m_m: document.querySelector('input[name="b_m_m"]')?.value || "",
+              m_kmh: document.querySelector('input[name="b_m_kmh"]')?.value || "",
+              jump_up: document.querySelector('input[name="b_jump_up"]')?.value || "",
+              jump_long: document.querySelector('input[name="b_jump_long"]')?.value || "",
+              lift: document.querySelector('input[name="b_lift"]')?.value || "",
+              throw: document.querySelector('input[name="b_throw"]')?.value || "",
+              dmg_mod: document.querySelector('input[name="b_dmg_mod"]')?.value || "",
+              punch: document.querySelector('input[name="b_punch"]')?.value || "",
+              kick: document.querySelector('input[name="b_kick"]')?.value || ""
+            };
+
+            // Собираем структуру тела
+            savedBorg.borgStructure = {
+              head_sp: document.querySelector('input[name="s_head_sp"]')?.value || "",
+              head_ost: document.querySelector('input[name="s_head_ost"]')?.value || "",
+              head_opt: document.querySelector('input[name="s_head_opt"]')?.value || "",
+              head_aud: document.querySelector('input[name="s_head_aud"]')?.value || "",
+
+              torso_sp: document.querySelector('input[name="s_torso_sp"]')?.value || "",
+              torso_ost: document.querySelector('input[name="s_torso_ost"]')?.value || "",
+              torso_opt: document.querySelector('input[name="s_torso_opt"]')?.value || "",
+
+              rarm_sp: document.querySelector('input[name="s_rarm_sp"]')?.value || "",
+              rarm_ost: document.querySelector('input[name="s_rarm_ost"]')?.value || "",
+              rarm_opt: document.querySelector('input[name="s_rarm_opt"]')?.value || "",
+
+              larm_sp: document.querySelector('input[name="s_larm_sp"]')?.value || "",
+              larm_ost: document.querySelector('input[name="s_larm_ost"]')?.value || "",
+              larm_opt: document.querySelector('input[name="s_larm_opt"]')?.value || "",
+
+              rleg_sp: document.querySelector('input[name="s_rleg_sp"]')?.value || "",
+              rleg_ost: document.querySelector('input[name="s_rleg_ost"]')?.value || "",
+              rleg_opt: document.querySelector('input[name="s_rleg_opt"]')?.value || "",
+
+              lleg_sp: document.querySelector('input[name="s_lleg_sp"]')?.value || "",
+              lleg_ost: document.querySelector('input[name="s_lleg_ost"]')?.value || "",
+              lleg_opt: document.querySelector('input[name="s_lleg_opt"]')?.value || ""
+            };
+
+            // Собираем кибероснащение
+            savedBorg.cyberwareList = borgBuilderCyberwareList
+              .filter(x => x.name.trim() !== "" || x.desc.trim() !== "")
+              .map(x => ({ name: dash(x.name), desc: x.desc.trim() }));
+            savedBorg.cyberware = "";
+
+            persistDatabase();
+            renderCatalog();
+          }
+        }
+      }
+    };
+
+    // Отрисовка списка слева (без зелёного ценника) и детальной карточки справа
+    const origRenderCatalogBorg = renderCatalog;
+    window.renderCatalog = function() {
+      injectBorgNavButtons();
+      origRenderCatalogBorg();
+
+      if (activeCatalogTab !== "borging") return;
+      const listContainer = document.getElementById("catalogList");
+      if (!listContainer) return;
+
+      const cards = listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]");
+      cards.forEach(cardEl => {
+        const rightCol = cardEl.querySelector(".text-right");
+        if (rightCol) rightCol.remove();
+      });
+    };
+
+    const origRenderDetailBorg = renderDetailCard;
+    window.renderDetailCard = function(item) {
+      origRenderDetailBorg(item);
+      if (activeCatalogTab !== "borging" || !item) return;
+
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      const st = item.borgStats || {};
+      const str = item.borgStructure || {};
+      const cyberArr = Array.isArray(item.cyberwareList) ? item.cyberwareList : [];
+
+      // Блок 1: Шапка уже рендерится базовой функцией (Название, ПЧ, Тип, Производитель, Цена)
+      // Блок 2: Таблицы (Статы и Физическая структура)
+      const tablesHtml = `
+        <div class="space-y-4 mb-4" id="borgCustomTablesBlock">
+          <!-- ТАБЛИЦА СТАТОВ -->
+          <div class="bg-cp-bg border-l-2 border-cp-yellow p-3.5 space-y-2">
+            <div class="text-[11px] font-bold uppercase text-cp-yellow tracking-wider">📊 Физические статы:</div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Рефлексы</div><div class="font-bold text-white mt-0.5">${dash(st.ref)}</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Привлекательность</div><div class="font-bold text-white mt-0.5">${dash(st.cool)}</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Передвижение</div><div class="font-bold text-white mt-0.5">${dash(st.ma)}</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Тело</div><div class="font-bold text-white mt-0.5">${dash(st.body)}</div></div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs pt-1">
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">М/Ход</div><div class="font-bold text-cp-cyan mt-0.5">${dash(st.m_m)} м</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Скорость</div><div class="font-bold text-cp-cyan mt-0.5">${dash(st.m_kmh)} км/ч</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Прыжок вверх</div><div class="font-bold text-cp-cyan mt-0.5">${dash(st.jump_up)} м</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Прыжок вдаль</div><div class="font-bold text-cp-cyan mt-0.5">${dash(st.jump_long)} м</div></div>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs pt-1">
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Поднимает / Кидает</div><div class="font-bold text-cp-green mt-0.5">${dash(st.lift)} кг / ${dash(st.throw)} м</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Модификатор урона</div><div class="font-bold text-cp-red mt-0.5">${dash(st.dmg_mod)}</div></div>
+              <div class="bg-cp-panel border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">Ближний бой (Удар / Пинок)</div><div class="font-bold text-white mt-0.5">${dash(st.punch)} / ${dash(st.kick)}</div></div>
+            </div>
+          </div>
+
+          <!-- ТАБЛИЦА СТРУКТУРЫ ТЕЛА -->
+          <div class="bg-cp-bg border-l-2 border-cp-cyan p-3.5 space-y-2.5">
+            <div class="text-[11px] font-bold uppercase text-cp-cyan tracking-wider">🛡️ Физическая структура:</div>
+            
+            <!-- Голова -->
+            <div class="bg-cp-panel border border-gray-800 p-2.5 text-xs space-y-1">
+              <div class="font-bold text-white uppercase text-[10px]">🧠 Голова</div>
+              <div class="grid grid-cols-4 gap-2 text-center">
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.head_sp)}</div></div>
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.head_ost)}</div></div>
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Оптика</div><div class="font-bold text-white">${dash(str.head_opt)}</div></div>
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Аудио</div><div class="font-bold text-white">${dash(str.head_aud)}</div></div>
+              </div>
+            </div>
+
+            <!-- Торс -->
+            <div class="bg-cp-panel border border-gray-800 p-2.5 text-xs space-y-1">
+              <div class="font-bold text-white uppercase text-[10px]">🦾 Торс</div>
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.torso_sp)}</div></div>
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.torso_ost)}</div></div>
+                <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Опции</div><div class="font-bold text-white">${dash(str.torso_opt)}</div></div>
+              </div>
+            </div>
+
+            <!-- Руки и Ноги -->
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-cp-panel border border-gray-800 p-2 space-y-1">
+                <div class="font-bold text-white uppercase text-[9px]">🦾 Правая рука</div>
+                <div class="grid grid-cols-3 gap-1 text-center">
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.rarm_sp)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.rarm_ost)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">Опции</div><div class="font-bold text-white">${dash(str.rarm_opt)}</div></div>
+                </div>
+              </div>
+              <div class="bg-cp-panel border border-gray-800 p-2 space-y-1">
+                <div class="font-bold text-white uppercase text-[9px]">🦾 Левая рука</div>
+                <div class="grid grid-cols-3 gap-1 text-center">
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.larm_sp)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.larm_ost)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">Опции</div><div class="font-bold text-white">${dash(str.larm_opt)}</div></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div class="bg-cp-panel border border-gray-800 p-2 space-y-1">
+                <div class="font-bold text-white uppercase text-[9px]">🦿 Правая нога</div>
+                <div class="grid grid-cols-3 gap-1 text-center">
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.rleg_sp)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.rleg_ost)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">Опции</div><div class="font-bold text-white">${dash(str.rleg_opt)}</div></div>
+                </div>
+              </div>
+              <div class="bg-cp-panel border border-gray-800 p-2 space-y-1">
+                <div class="font-bold text-white uppercase text-[9px]">🦿 Левая нога</div>
+                <div class="grid grid-cols-3 gap-1 text-center">
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОС</div><div class="font-bold text-cp-yellow">${dash(str.lleg_sp)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">ОСТ</div><div class="font-bold text-cp-red">${dash(str.lleg_ost)}</div></div>
+                  <div class="bg-cp-bg p-1"><div class="text-[8px] text-gray-400">Опции</div><div class="font-bold text-white">${dash(str.lleg_opt)}</div></div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      `;
+
+      // Блок 3: Кибероснащение
+      const cyberHtml = cyberArr.length === 0 ? "" : `
+        <div class="bg-cp-bg border-l-2 border-purple-500 p-3.5 space-y-2 mb-4" id="borgCustomCyberBlock">
+          <div class="text-[11px] font-bold uppercase text-purple-400 tracking-wider">🦾 Кибероснащение боргирования (${cyberArr.length}):</div>
+          <div class="grid grid-cols-1 gap-2">
+            ${cyberArr.map(it => `
+              <div class="bg-cp-panel border border-gray-800 p-2.5">
+                <div class="font-bold text-xs text-white">${dash(it.name)}</div>
+                ${it.desc && String(it.desc).trim() !== "" && it.desc !== "—" ? `
+                  <div class="text-xs text-gray-300 leading-relaxed whitespace-pre-line mt-1 pt-1 border-t border-gray-800/70">${it.desc}</div>
+                ` : ""}
+              </div>
+            `).join("")}
+          </div>
+        </div>
+      `;
+
+      // Вставляем таблицы и кибероснащение в правильном порядке
+      const descBlock = box.querySelector(".bg-cp-bg\\/90.border-l-2.border-cp-cyan.p-4") || box.querySelector(".bg-cp-bg.border-l-2");
+      if (descBlock) {
+        if (!document.getElementById("borgCustomTablesBlock")) {
+          descBlock.insertAdjacentHTML("beforebegin", tablesHtml + cyberHtml);
+        }
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      injectBorgNavButtons();
+    });
+    injectBorgNavButtons();
+  </script>
 </body>
 </html>
