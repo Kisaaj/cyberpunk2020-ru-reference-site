@@ -7416,5 +7416,341 @@
     });
     injectBorgNavButtons();
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ТИПА ПАТРОНОВ (ГИЛЬЗОВОЕ / БЕЗГИЛЬЗОВОЕ) И АВТОРАСЧЁТА МАГАЗИНА    -->
+  <!-- ========================================================================= -->
+  <script>
+    // 1. Вычисляем максимальную ёмкость магазина из строки поля МАГ (mag)
+    function parseMaxMagazineCapacity(magRaw) {
+      if (magRaw === undefined || magRaw === null) return null;
+      const str = String(magRaw).trim();
+      if (!str || str === "-" || str === "—" || str.toUpperCase() === "NA" || str.toUpperCase() === "N/A") {
+        return null;
+      }
+
+      // Проверяем запись вида "35x2" или "2x45" (спаренные магазины)
+      const multMatch = str.match(/(\d+)\s*[xх×*]\s*(\d+)/i);
+      if (multMatch) {
+        const a = parseInt(multMatch[1], 10);
+        const b = parseInt(multMatch[2], 10);
+        if (!isNaN(a) && !isNaN(b) && a * b > 0) return a * b;
+      }
+
+      // Ищем все числа в строке магазина и берём максимальное
+      const numbers = str.match(/\d+/g);
+      if (!numbers || numbers.length === 0) return null;
+
+      const parsedNums = numbers.map(n => parseInt(n, 10)).filter(n => !isNaN(n) && n > 0);
+      if (parsedNums.length === 0) return null;
+
+      return Math.max(...parsedNums);
+    }
+
+    // 2. Вычисляем стоимость дополнительного магазина (округление вниз Math.floor)
+    function calculateWeaponMagCost(weaponItem) {
+      if (!weaponItem) return null;
+      const casing = weaponItem.ammoCasing; // "caseless" | "cased" | ""
+      if (casing !== "caseless" && casing !== "cased") return null;
+
+      const maxMag = parseMaxMagazineCapacity(weaponItem.mag);
+      if (!maxMag || maxMag <= 0) return null;
+
+      const multiplier = (casing === "caseless") ? 0.5 : 1;
+      const totalEb = Math.floor(maxMag * multiplier);
+      return {
+        costEb: totalEb,
+        maxMag: maxMag,
+        multiplier: multiplier,
+        casing: casing
+      };
+    }
+
+    // 3. Взаимоисключающее переключение галочек прямо в открытой карточке оружия
+    window.handleQuickWeaponCasingChange = function(weaponId, clickedType, isChecked) {
+      if (!isCurrentUserAdmin()) return;
+      const weapon = (DB.weapons || []).find(w => w && w.id === weaponId);
+      if (!weapon) return;
+
+      const cbCaseless = document.getElementById("quickCbCaseless-" + weaponId);
+      const cbCased = document.getElementById("quickCbCased-" + weaponId);
+
+      if (clickedType === "caseless") {
+        if (isChecked) {
+          if (cbCased) cbCased.checked = false;
+          weapon.ammoCasing = "caseless";
+        } else {
+          weapon.ammoCasing = "";
+        }
+      } else if (clickedType === "cased") {
+        if (isChecked) {
+          if (cbCaseless) cbCaseless.checked = false;
+          weapon.ammoCasing = "cased";
+        } else {
+          weapon.ammoCasing = "";
+        }
+      }
+
+      if (typeof logAdminCardChange === "function") {
+        logAdminCardChange("edited", "weapons", weapon);
+      }
+      persistDatabase();
+      renderDetailCard(weapon);
+    };
+
+    // 4. Взаимоисключающее переключение галочек внутри Конструктора
+    window.handleBuilderCasingCheckbox = function(clickedType) {
+      const cbCaseless = document.getElementById("builderCbCaseless");
+      const cbCased = document.getElementById("builderCbCased");
+      const hiddenInp = document.getElementById("builderAmmoCasingInput");
+      if (!cbCaseless || !cbCased || !hiddenInp) return;
+
+      if (clickedType === "caseless") {
+        if (cbCaseless.checked) {
+          cbCased.checked = false; // Автоматически снимаем галочку с «Гильзовое»
+          hiddenInp.value = "caseless";
+        } else {
+          hiddenInp.value = "";
+        }
+      } else if (clickedType === "cased") {
+        if (cbCased.checked) {
+          cbCaseless.checked = false; // Автоматически снимаем галочку с «Безгильзовое»
+          hiddenInp.value = "cased";
+        } else {
+          hiddenInp.value = "";
+        }
+      }
+    };
+
+    // 5. Добавляем строку с расчётными формулами боеприпасов в верхнюю плашку расшифровок
+    function injectWeaponAmmoLegendFormula() {
+      const existingRow = document.getElementById("weaponAmmoFormulaLegendRow");
+      if (activeCatalogTab !== "weapons") {
+        if (existingRow) existingRow.classList.add("hidden");
+        return;
+      }
+
+      const catalogView = document.getElementById("view-catalog");
+      if (!catalogView) return;
+
+      let legendBox = document.getElementById("weaponsLegendBox");
+      if (!legendBox) {
+        const candidates = catalogView.querySelectorAll("div, section");
+        for (const el of candidates) {
+          const txt = el.textContent || "";
+          if (txt.includes("ДОС") && txt.includes("МАГ") && txt.includes("СКО") && el.children.length <= 15) {
+            legendBox = el;
+            break;
+          }
+        }
+      }
+
+      if (legendBox && !existingRow) {
+        const formulaRow = document.createElement("div");
+        formulaRow.id = "weaponAmmoFormulaLegendRow";
+        formulaRow.className = "mt-2 pt-2 border-t border-gray-800/90 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-300";
+        formulaRow.innerHTML = `
+          <span class="font-display font-bold uppercase text-cp-yellow">💥 Боеприпасы:</span>
+          <span><b class="text-cp-cyan">Безгильзовое</b> = 0.5 eb</span>
+          <span class="text-gray-600">|</span>
+          <span><b class="text-cp-yellow">Гильзовое</b> = 1 eb</span>
+          <span class="text-gray-600">|</span>
+          <span><b class="text-cp-red">Тяжёлое</b> = 2–3 eb</span>
+          <span class="text-gray-600">|</span>
+          <span class="text-gray-400">Доп. магазин = <b>Макс. МАГ × цена пули</b> (округление вниз)</span>
+        `;
+        legendBox.appendChild(formulaRow);
+      } else if (existingRow) {
+        existingRow.classList.remove("hidden");
+      }
+    }
+
+    // 6. Встраиваем галочки «Безгильзовое» / «Гильзовое» в Конструктор оружия
+    const prevSetBuilderTypeAmmo = window.setBuilderType;
+    window.setBuilderType = function(type, itemToEdit = null) {
+      prevSetBuilderTypeAmmo(type, itemToEdit);
+      if (type !== "weapons") return;
+
+      const container = document.getElementById("builderFieldsContainer");
+      if (!container) return;
+
+      const oldBox = document.getElementById("builderWeaponCasingBox");
+      if (oldBox) oldBox.remove();
+
+      // Для нового оружия по умолчанию "caseless", для уже существующего — его сохранённое значение
+      const initialCasing = itemToEdit
+        ? (itemToEdit.ammoCasing || "")
+        : "caseless";
+
+      const casingBox = document.createElement("div");
+      casingBox.id = "builderWeaponCasingBox";
+      casingBox.className = "bg-cp-panel border border-cp-cyan/40 p-3 flex flex-wrap items-center justify-between gap-3";
+      casingBox.innerHTML = `
+        <div>
+          <div class="text-xs font-bold uppercase text-cp-cyan">🔫 Тип боеприпасов (для авторасчёта цены магазина)</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">При выборе одной галочки вторая автоматически снимается. Можно снять обе.</div>
+        </div>
+        <div class="flex items-center gap-5">
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-gray-200 hover:text-cp-cyan">
+            <input type="checkbox" id="builderCbCaseless" ${initialCasing === "caseless" ? "checked" : ""}
+              onchange="handleBuilderCasingCheckbox('caseless')"
+              class="w-4 h-4 accent-cyan-400 cursor-pointer">
+            <span>Безгильзовое (0.5 eb)</span>
+          </label>
+          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-gray-200 hover:text-cp-yellow">
+            <input type="checkbox" id="builderCbCased" ${initialCasing === "cased" ? "checked" : ""}
+              onchange="handleBuilderCasingCheckbox('cased')"
+              class="w-4 h-4 accent-yellow-400 cursor-pointer">
+            <span>Гильзовое (1 eb)</span>
+          </label>
+          <input type="hidden" name="ammoCasing" id="builderAmmoCasingInput" value="${escapeHtmlAttr(initialCasing)}">
+        </div>
+      `;
+
+      container.prepend(casingBox);
+    };
+
+    const prevSaveBuilderItemAmmo = window.saveBuilderItem;
+    window.saveBuilderItem = function(e) {
+      const wasWeapon = (activeBuilderType === "weapons");
+      const chosenCasing = document.getElementById("builderAmmoCasingInput")?.value || "";
+
+      const prevApplying = isApplyingRemoteUpdate;
+      if (wasWeapon) isApplyingRemoteUpdate = true;
+
+      prevSaveBuilderItemAmmo(e);
+
+      if (wasWeapon) {
+        isApplyingRemoteUpdate = prevApplying;
+        if (selectedItemId) {
+          const savedWeapon = (DB.weapons || []).find(w => w && w.id === selectedItemId);
+          if (savedWeapon) {
+            savedWeapon.ammoCasing = chosenCasing;
+            persistDatabase();
+            renderCatalog();
+            renderDetailCard(savedWeapon);
+          }
+        }
+      }
+    };
+
+    // 7. Отрисовка галочек в карточке оружия и полноразмерное разделение блока Цены на 2 равные половины
+    const prevRenderCatalogAmmo = window.renderCatalog;
+    window.renderCatalog = function() {
+      prevRenderCatalogAmmo();
+      injectWeaponAmmoLegendFormula();
+    };
+
+    const prevRenderDetailCardAmmo = window.renderDetailCard;
+    window.renderDetailCard = function(item) {
+      prevRenderDetailCardAmmo(item);
+      if (activeCatalogTab !== "weapons" || !item) return;
+
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      const isAdmin = isCurrentUserAdmin();
+      const casing = item.ammoCasing || ""; // "caseless" | "cased" | ""
+      const magCalc = calculateWeaponMagCost(item);
+
+      // А) Добавляем настоящие взаимоисключающие чекбоксы прямо в карточку оружия (по аналогии с Homebrew / Именное)
+      const headerEl = box.querySelector(".border-b.border-gray-800");
+      if (headerEl) {
+        const oldBar = document.getElementById("weaponCasingQuickBar");
+        if (oldBar) oldBar.remove();
+
+        const quickBar = document.createElement("div");
+        quickBar.id = "weaponCasingQuickBar";
+        quickBar.className = "mt-2.5 pt-2.5 border-t border-gray-800/80 flex flex-wrap items-center justify-between gap-3";
+
+        if (isAdmin) {
+          const isCaseless = (casing === "caseless");
+          const isCased = (casing === "cased");
+          quickBar.innerHTML = `
+            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Боеприпас (авторасчёт магазина):</span>
+            <div class="flex items-center gap-4">
+              <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 border text-[11px] font-bold uppercase transition-all ${
+                isCaseless
+                  ? "bg-cp-cyan/20 text-cp-cyan border-cp-cyan shadow-[0_0_8px_rgba(0,240,255,0.2)]"
+                  : "bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-cyan/60"
+              }">
+                <input type="checkbox" id="quickCbCaseless-${item.id}" ${isCaseless ? "checked" : ""}
+                  onchange="handleQuickWeaponCasingChange('${item.id}', 'caseless', this.checked)"
+                  class="w-3.5 h-3.5 accent-cyan-400 cursor-pointer">
+                <span>Безгильзовое (0.5 eb)</span>
+              </label>
+              <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 border text-[11px] font-bold uppercase transition-all ${
+                isCased
+                  ? "bg-cp-yellow/20 text-cp-yellow border-cp-yellow shadow-[0_0_8px_rgba(252,238,10,0.2)]"
+                  : "bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow/60"
+              }">
+                <input type="checkbox" id="quickCbCased-${item.id}" ${isCased ? "checked" : ""}
+                  onchange="handleQuickWeaponCasingChange('${item.id}', 'cased', this.checked)"
+                  class="w-3.5 h-3.5 accent-yellow-400 cursor-pointer">
+                <span>Гильзовое (1 eb)</span>
+              </label>
+            </div>
+          `;
+          headerEl.appendChild(quickBar);
+        } else if (casing === "caseless" || casing === "cased") {
+          quickBar.innerHTML = `
+            <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Тип боеприпаса:</span>
+            <span class="px-2.5 py-0.5 text-[10px] font-bold uppercase border ${
+              casing === "caseless"
+                ? "bg-cp-cyan/15 text-cp-cyan border-cp-cyan/50"
+                : "bg-cp-yellow/15 text-cp-yellow border-cp-yellow/50"
+            }">
+              ${casing === "caseless" ? "🔹 Безгильзовое (0.5 eb)" : "🔸 Гильзовое (1 eb)"}
+            </span>
+          `;
+          headerEl.appendChild(quickBar);
+        }
+      }
+
+      // Б) Находим базовый блок цены оружия в карточке и делим его ровно на две половины его собственной ширины
+      let priceBlock = null;
+      const allBlocks = box.querySelectorAll("div");
+      for (const el of allBlocks) {
+        if (el.children.length === 2) {
+          const firstTxt = (el.children[0].textContent || "").trim().toLowerCase();
+          if (firstTxt === "цена" || firstTxt === "стоимость" || firstTxt === "цена (eb)") {
+            priceBlock = el;
+            break;
+          }
+        }
+      }
+
+      if (priceBlock) {
+        // Сохраняем все исходные классы позиционирования и ширины (например col-span-2 / col-span-full),
+        // чтобы внешний размер блока оставался точно таким же, как у базового ценника
+        const baseSpanClasses = Array.from(priceBlock.classList).filter(c => c.startsWith("col-span-")).join(" ");
+
+        if (magCalc) {
+          // Если галочка включена и магазин числовой — делим базовый блок цены ровно на 2 равные половины
+          priceBlock.className = `${baseSpanClasses} grid grid-cols-2 bg-cp-bg border border-gray-800 divide-x divide-gray-800 text-center overflow-hidden`.trim();
+          priceBlock.innerHTML = `
+            <div class="p-2.5 flex flex-col justify-center">
+              <div class="text-[10px] text-gray-400 uppercase">Цена оружия</div>
+              <div class="text-sm font-display font-bold text-cp-green mt-0.5">${dash(item.cost)}</div>
+            </div>
+            <div class="p-2.5 flex flex-col justify-center bg-cp-green/5" title="Авторасчёт: ${magCalc.maxMag} патр. × ${magCalc.multiplier} eb">
+              <div class="text-[10px] text-cp-cyan uppercase">Цена магазина</div>
+              <div class="text-sm font-display font-bold text-cp-green mt-0.5">${magCalc.costEb} eb</div>
+            </div>
+          `;
+        } else {
+          // Если галочки сняты или у оружия нет магазина — единый широкий блок цены во всю величину
+          priceBlock.className = `${baseSpanClasses} bg-cp-bg border border-gray-800 p-2.5 text-center`.trim();
+          priceBlock.innerHTML = `
+            <div class="text-[10px] text-gray-400 uppercase">Цена</div>
+            <div class="text-sm font-display font-bold text-cp-green mt-0.5">${dash(item.cost)}</div>
+          `;
+        }
+      }
+    };
+
+    window.addEventListener("DOMContentLoaded", () => {
+      injectWeaponAmmoLegendFormula();
+    });
+  </script>
 </body>
 </html>
