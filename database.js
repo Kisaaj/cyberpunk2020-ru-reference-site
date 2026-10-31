@@ -4008,3 +4008,615 @@ window.CP2020_EXTERNAL_DATA = {
     }
   });
 })();
+// ============================================================================
+// ДОПОЛНЕНИЕ БАЗЫ БРОНИ В DATABASE.JS (БЕЗ ПЕРЕЗАПИСИ СУЩЕСТВУЮЩИХ КАРТОЧЕК)
+// Полный свод брони: Corebook, Chromebook 1–4, Protect & Serve, Corpbooks, HotB
+// ============================================================================
+(function appendArmorPack1() {
+  if (!window.CP2020_EXTERNAL_DATA) return;
+  const extDb = window.CP2020_EXTERNAL_DATA.db;
+  const extCats = window.CP2020_EXTERNAL_DATA.categories;
+  if (!Array.isArray(extDb.armor)) extDb.armor = [];
+  if (!Array.isArray(extCats.armor)) extCats.armor = [];
+
+  const armorCategories = [
+    "Лёгкая и скрытая броня",
+    "Бронекуртки и плащи",
+    "Брендовая бронеодежда (Fashionware)",
+    "Полицейская и корпоративная броня",
+    "Тяжёлая и армейская броня",
+    "Шлемы, щиты и модули"
+  ];
+  armorCategories.forEach(c => {
+    if (!extCats.armor.includes(c)) extCats.armor.push(c);
+  });
+
+  const ARMOR_PACK_ITEMS = [
+    // --- 1. БАЗОВАЯ И ЛЁГКАЯ БРОНЯ (COREBOOK & CHROMEBOOKS) ---
+    {
+      id: "arm-heavy-leather",
+      name: "Толстая кожаная куртка (Heavy Leather Jacket)",
+      origName: "Heavy Leather Jacket",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Торс, Руки",
+      sp: "4",
+      ev: "0",
+      cost: "50 eb",
+      book: "CP20",
+      desc: "Плотная куртка из натуральной или синтетической дорожной кожи, популярная у байкеров, рокеров и кочевников. Мягкая броня: защищает от порезов, осколков и скользящих ударов, совершенно не сковывая движений."
+    },
+    {
+      id: "arm-heavy-leather-pants",
+      name: "Плотные кожаные штаны (Heavy Leather Pants)",
+      origName: "Heavy Leather Pants",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Ноги",
+      sp: "4",
+      ev: "0",
+      cost: "50–100 eb",
+      book: "CP20",
+      desc: "Тяжёлые мотоциклетные штаны из толстой кожи. Мягкая броня (ОС 4), защищающая ноги от асфальтовой болезни и мелких осколков."
+    },
+    {
+      id: "arm-kevlar-tshirt",
+      name: "Кевларовая футболка / майка (Kevlar T-Shirt / Vest)",
+      origName: "Kevlar T-Shirt",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Торс",
+      sp: "10",
+      ev: "0",
+      cost: "90 eb",
+      book: "CP20",
+      desc: "Тонкая облегающая майка или скрытый жилет из баллистического волокна Kevlar. Мягкая броня. Практически незаметна под любой обычной рубашкой или пиджаком и способна остановить пулю лёгкого пистолета."
+    },
+    {
+      id: "arm-armored-stockings",
+      name: "Бронированные чулки / колготки (Duraweave Armored Stockings)",
+      origName: "Armored Stockings",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Ноги",
+      sp: "6",
+      ev: "0",
+      cost: "110 eb",
+      book: "Chr2",
+      desc: "Эластичные чулки из баллистического микроволокна Duraweave, визуально неотличимые от обычных модельных чулок или колготок. Обеспечивают скрытую мягкую защиту ног (ОС 6) без какого-либо штрафа к подвижности."
+    },
+    {
+      id: "arm-cballistic-mesh",
+      name: "Баллистическая сетка C-Ballistic Mesh",
+      origName: "C-Ballistic Mesh",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Торс, Руки, Ноги",
+      sp: "15",
+      ev: "0",
+      cost: "250 eb",
+      book: "Interface",
+      desc: "Высокотехнологичное облегающее трико из композитной баллистической сетки. Мягкая броня (ОС 15), разработанная для ношения под верхней одеждой или поверх тонкого нательного белья."
+    },
+    {
+      id: "arm-gibson-sneaksuit",
+      name: "Стелс-комбинезон Gibson Battlegear «Sneak Suit»",
+      origName: "Gibson Battlegear \"Sneak Suit\"",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Торс, Руки, Ноги, Голова (капюшон)",
+      sp: "10",
+      ev: "0",
+      cost: "560 eb",
+      book: "Chr2",
+      desc: "Самый популярный тактический стелс-костюм в мире. Чёрный светопоглощающий облегающий комбинезон с капюшоном из материала PhotoCarbon™ и ультралёгкого трёхнитевого плетения (мягкая броня ОС 10). Даёт врагам штраф -4 к проверкам Внимательности/Заметности (Awareness/Notice) при попытке обнаружить владельца в темноте."
+    },
+    {
+      id: "arm-gibson-sneak-vest",
+      name: "Стелс-бронежилет Gibson Battlegear «Sneak Suit» Flak Vest",
+      origName: "Gibson Battlegear \"Sneak Suit\" Flak Vest",
+      category: "Лёгкая и скрытая броня",
+      coverage: "Торс",
+      sp: "16",
+      ev: "1",
+      cost: "375 eb",
+      book: "Chr2",
+      desc: "Дополнительный тактический жилет из светопоглощающего материала PhotoCarbon™, созданный специально для ношения поверх стелс-комбинезона Sneak Suit. Сохраняет маскировочные свойства костюма (-4 к обнаружению в тени)."
+    },
+
+    // --- 2. БРОНЕКУРТКИ И ПЛАЩИ (ARMOR JACKETS & COATS) ---
+    {
+      id: "arm-light-jacket",
+      name: "Лёгкая бронекуртка (Light Armor Jacket)",
+      origName: "Light Armor Jacket",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки",
+      sp: "14",
+      ev: "0",
+      cost: "150 eb",
+      book: "CP20",
+      desc: "Персональная защита для стильных жителей опасных кварталов. Мягкая кевларовая подкладка вшита внутрь обычной уличной ветровки, джинсовки или бомбера, поэтому со стороны куртка не выглядит как армейская броня и не даёт штрафа ЗУ."
+    },
+    {
+      id: "arm-med-jacket",
+      name: "Средняя бронекуртка (Medium Armor Jacket)",
+      origName: "Medium Armor Jacket",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки",
+      sp: "18",
+      ev: "1",
+      cost: "200 eb",
+      book: "CP20",
+      desc: "Классический уличный «Арморджек» — стандартная экипировка наёмников-Соло, кочевников и уличных самураев Найт-Сити. Сочетает многослойный кевлар с амортизирующими вставками на плечах и груди (ОС 18, ЗУ 1)."
+    },
+    {
+      id: "arm-heavy-jacket",
+      name: "Тяжёлая бронекуртка (Heavy Armor Jacket)",
+      origName: "Heavy Armor Jacket",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки",
+      sp: "20",
+      ev: "2",
+      cost: "250 eb",
+      book: "CP20",
+      desc: "Массивная штурмовая куртка с вшитыми композитными пластинами и высоким воротником. Обеспечивает защиту на уровне армейского бронежилета (ОС 20), но заметно сковывает движения (ЗУ 2) и привлекает внимание в корпоративных зонах."
+    },
+    {
+      id: "arm-uniware-trench",
+      name: "Бронированный плащ Uniware Armor Trenchcoat",
+      origName: "Uniware Armor Trenchcoat",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки, Ноги",
+      sp: "18",
+      ev: "0",
+      cost: "300 eb",
+      book: "Chr1",
+      desc: "Настоящий хит среди эджраннеров от бренда Uniware: длинный стильный плащ-тренчкот из баллистического плетения, прикрывающий сразу торс, руки и ноги с защитой ОС 18 и без штрафа к ЗУ! Идеален для скрытого ношения длинноствольного оружия под полой."
+    },
+    {
+      id: "arm-uniware-jacket",
+      name: "Бронекуртка Uniware Armor Jacket",
+      origName: "Uniware Armor Jacket",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки",
+      sp: "14",
+      ev: "0",
+      cost: "200 eb",
+      book: "Chr1",
+      desc: "Практичная повседневная куртка из баллистического нейлона от корпорации Uniware. Обеспечивает надёжную защиту торса и рук (ОС 14) и отлично вписывается в городской деловой или уличный стиль."
+    },
+    {
+      id: "arm-plastech-duster",
+      name: "Бронированный пыльник Plastech Duster",
+      origName: "Plastech Duster",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки, Ноги",
+      sp: "18",
+      ev: "0",
+      cost: "350 eb",
+      book: "Chr4",
+      desc: "Длинный дорожный плащ-пыльник из прорезиненного баллистического полимера Plastech. Защищает всё тело кроме головы (ОС 18), не промокает под кислотными дождями и даёт +1 к проверкам Гардероба и Стиля (Wardrobe & Style)."
+    },
+    {
+      id: "arm-soviet-greatcoat",
+      name: "Советская бронированная шинель (Soviet Military Armored Greatcoat)",
+      origName: "Soviet Military Armored Greatcoat",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки, Ноги",
+      sp: "14",
+      ev: "1",
+      cost: "250 eb",
+      book: "Corp3",
+      desc: "Тяжёлая двубортная армейская шинель Советских Вооружённых Сил и подразделений «СовНефти» с вшитым баллистическим подбоем и утеплителем. Защищает торс, руки и ноги от пуль и суровых морозов."
+    },
+    {
+      id: "arm-ir-combat-cloak",
+      name: "ИК-маскировочный плащ Gibson Battlegear IR Combat Cloak",
+      origName: "Gibson Battlegear IR Combat Cloak",
+      category: "Бронекуртки и плащи",
+      coverage: "Торс, Руки, Ноги",
+      sp: "0 (Термомаскировка)",
+      ev: "2",
+      cost: "450 eb",
+      book: "Chr1",
+      desc: "Свободный плащ-макинтош весом 2 кг для ночных спецопераций. Поглощает инфракрасное излучение тела и сбрасывает тепло случайными пятнами, разрушая силуэт человека: даёт врагам с тепловизорами и ИК-оптикой штраф -5 к проверкам Заметности (Awareness/Notice)."
+    },
+
+    // --- 3. БРЕНДОВАЯ БРОНЕОДЕЖДА (FASHIONWARE, CHROMEBOOK 1–4) ---
+    {
+      id: "arm-gibson-jeans",
+      name: "Бронированные джинсы Gibson Battlegear Jeans",
+      origName: "Gibson Battlegear Jeans",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Ноги",
+      sp: "16",
+      ev: "0",
+      cost: "70 eb",
+      book: "Chr1",
+      desc: "Классические синие или чёрные джинсы с вплетённой кевларовой нитью от знаменитого бренда уличной тактической одежды Gibson Battlegear. Мягкая защита ног ОС 16 без потери подвижности — выбор №1 для любого уличного панка."
+    },
+    {
+      id: "arm-gibson-denim",
+      name: "Джинсовая бронекуртка Gibson Battlegear Denim Jacket",
+      origName: "Gibson Battlegear Denim Jacket",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки",
+      sp: "14",
+      ev: "0",
+      cost: "150 eb",
+      book: "Chr1",
+      desc: "Стильная джинсовая куртка с баллистической подкладкой от Gibson Battlegear. Идеально сочетается с бронированными джинсами той же марки."
+    },
+    {
+      id: "arm-gibson-greaves",
+      name: "Бронированные поножи Gibson Battlegear Greaves",
+      origName: "Gibson Battlegear Greaves",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Ноги",
+      sp: "20",
+      ev: "0",
+      cost: "150 eb",
+      book: "Chr4",
+      desc: "Ударопрочные накладные щитки-поножи на голени и колени от Gibson Battlegear, обеспечивающие мощную защиту ног (ОС 20)."
+    },
+    {
+      id: "arm-takanaka-cloak",
+      name: "Представительский бронеплащ Takanaka Exec Line Opera Cloak",
+      origName: "Takanaka Exec Line Armored Opera Cloak",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки",
+      sp: "16",
+      ev: "0",
+      cost: "1,200 eb",
+      book: "Chr1",
+      desc: "Роскошная вечерняя накидка высшего корпоративного класса от японского дома моды Takanaka. Скрывает внутри тончайшее пуленепробиваемое плетение с защитой ОС 16."
+    },
+    {
+      id: "arm-eji-cloak",
+      name: "Световой бронеплащ Eji of Japan Armored Cloak",
+      origName: "Eji Armored Cloak with Light Panels",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки, Ноги",
+      sp: "14",
+      ev: "0",
+      cost: "650 eb",
+      book: "Chr1",
+      desc: "Авангардный плащ японского дизайнера Eji со встроенными программируемыми световыми панелями и мягкой баллистической защитой всего тела (ОС 14)."
+    },
+    {
+      id: "arm-flein-suit",
+      name: "Деловой бронекостюм Flein Duraweave Suit",
+      origName: "Flein Duraweave Suit",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки, Ноги",
+      sp: "10",
+      ev: "0",
+      cost: "500 eb",
+      book: "Chr4",
+      desc: "Элегантный деловой костюм строгого кроя из пулестойкой ткани Duraweave. Обеспечивает защиту ОС 10 и даёт бонус +2 к навыку Гардероба и Стиля."
+    },
+    {
+      id: "arm-ruftread-jacket",
+      name: "Куртка Ruf Tread Kevlon & Polylog Jacket",
+      origName: "Ruf Tread Kevlon & Polylog Jacket",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки",
+      sp: "18",
+      ev: "1",
+      cost: "280 eb",
+      book: "Chr4",
+      desc: "Прочная внедорожная бронекуртка из комбинированного волокна Kevlon и Polylog, созданная для суровых условий Пустошей и Боевой Зоны."
+    },
+    {
+      id: "arm-ruftread-boots",
+      name: "Бронированные ботинки Ruf Tread Boots",
+      origName: "Ruf Tread Boots",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Ноги (стопы и голени)",
+      sp: "20",
+      ev: "0",
+      cost: "120 eb",
+      book: "Chr4",
+      desc: "Тяжёлые армейские и туристические берцы со стальными стаканами и кевларовыми голенищами, дающие защиту ОС 20."
+    },
+    {
+      id: "arm-discovery-taser",
+      name: "Шоковая бронеодежда линейки Discovery Line (Taser Clothing)",
+      origName: "Discovery Line Armored Jacket / Jumpsuit",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки (и Ноги в комбезе)",
+      sp: "6",
+      ev: "0",
+      cost: "450–650 eb",
+      book: "Interface",
+      desc: "Одежда для самообороны со вплетённой электрошоковой сеткой (от 3 до 6 зарядов) и лёгким баллистическим подбоем (ОС 6). Любой, кто схватит владельца в рукопашной, получает мощный разряд тока (проверка ТЕЛА со сложностью 25+ от оглушения!)."
+    },
+    {
+      id: "arm-lano-coveralls",
+      name: "Бронированный комбинезон «Lano» Coveralls",
+      origName: "'Lano' Armored Coveralls",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "Торс, Руки, Ноги",
+      sp: "14",
+      ev: "2",
+      cost: "1,600 eb",
+      book: "Chr3",
+      desc: "Защитный тактический и технический комбинезон полного покрытия из огнеупорного баллистического композита."
+    },
+    {
+      id: "arm-salamander-fire",
+      name: "Огнеупорная одежда Savagery «Salamander Line»",
+      origName: "Savagery's Salamander Line Fireproof Clothing",
+      category: "Брендовая бронеодежда (Fashionware)",
+      coverage: "По предмету одежды",
+      sp: "20 (только от огня!)",
+      ev: "0",
+      cost: "110–250 eb",
+      book: "Chr1",
+      desc: "Линейка негорючих курток, брюк и головных уборов. Не защищает от пуль, но даёт 20 единиц ОС против любого огненного, термитного и плазменного урона."
+    },
+
+    // --- 4. ПОЛИЦЕЙСКАЯ И КОРПОРАТИВНАЯ БРОНЯ (PROTECT & SERVE / CORPBOOKS) ---
+    {
+      id: "arm-flak-vest",
+      name: "Армейский бронежилет (Flak Vest)",
+      origName: "Flak Vest",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс",
+      sp: "20",
+      ev: "1",
+      cost: "200 eb",
+      book: "CP20",
+      desc: "Стандартный бронежилет патрульной полиции, корпоративной охраны и армейской пехоты с жёсткими баллистическими пластинами. Надёжно держит очереди из ПП и автоматные пули на излёте."
+    },
+    {
+      id: "arm-flak-pants",
+      name: "Бронированные штаны (Flak Pants)",
+      origName: "Flak Pants",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Ноги",
+      sp: "20",
+      ev: "1",
+      cost: "200 eb",
+      book: "CP20",
+      desc: "Тяжёлые тактические брюки с баллистическими пакетами и наколенниками, используемые бойцами SWAT и корпоративным спецназом в паре с бронежилетом Flak Vest."
+    },
+    {
+      id: "arm-ncpd-patrol",
+      name: "Патрульная броня полиции (NCPD Patrol Armor)",
+      origName: "Patrol Armor",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс (20), Ноги (18), Руки (15)",
+      sp: "20 / 18 / 15",
+      ev: "2",
+      cost: "900 eb",
+      book: "PAC",
+      desc: "Стандартный защитный комплект уличного офицера полиции из книги Protect & Serve. Обеспечивает дифференцированную защиту: ОС 20 на торсе, ОС 18 на ногах и ОС 15 на руках. С дополнительными бронепластинами из сплава (Alloy Plates) защита возрастает до ОС 25 (торс) / 23 (ноги) / 20 (руки)."
+    },
+    {
+      id: "arm-ncpd-riot",
+      name: "Полицейский комплект подавления бунтов (Police Riot Armor)",
+      origName: "Police Riot Armor Ensemble",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс (30), Ноги (18), Руки (15), Стопы (12)",
+      sp: "30 (торс) / 18 / 15",
+      ev: "3",
+      cost: "1,400 eb",
+      book: "PAC",
+      desc: "Штурмовой комплект полиции для разгона массовых беспорядков в Боевой Зоне: включает сверхтяжёлый жилет (ОС 30), армированные наручи (ОС 15), кевларовые брюки (ОС 18), бронеботинки (ОС 12) и обтекаемый шлем."
+    },
+    {
+      id: "arm-militech-m78",
+      name: "Бронекуртка Militech M-78 RPA Jacket",
+      origName: "Militech M-78 Revised Personal Armor Jacket",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс, Руки",
+      sp: "14",
+      ev: "1",
+      cost: "300 eb",
+      book: "Corp2",
+      desc: "Модернизированная форменная бронекуртка корпорации Militech и ЧВК «Лазарь» с карманами под разгрузку и креплениями для рации."
+    },
+    {
+      id: "arm-militech-mirage",
+      name: "Камуфляжный жилет Militech M73 «Mirage Gear» Flak Vest",
+      origName: "M73 \"Mirage Gear\" Environmental Assimilation System Flak Vest",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс",
+      sp: "18",
+      ev: "1",
+      cost: "850 eb",
+      book: "Corp2",
+      desc: "Высокотехнологичный бронежилет спецназа Militech с активным хамелеоновым покрытием «Мираж», подстраивающим цвет и рисунок камуфляжа под окружающую местность."
+    },
+    {
+      id: "arm-netrunner-suit",
+      name: "Боевой нейрокостюм Net-Runner™ Cybermodem Utility Suit",
+      origName: "Net-Runner Cybermodem Utility Suit",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Торс, Руки, Ноги",
+      sp: "12",
+      ev: "0",
+      cost: "6,300 eb (с кибердекой!)",
+      book: "Chr1",
+      desc: "Многослойный кевларовый комбинезон (ОС 12, доступен вариант со стелс-тканью Sneaksuit) для боевых нетраннеров-штурмовиков. В воротник, наручи и пояс уже встроена полноценная портативная кибердека (Память 20 MU, Скорость +2, Стены данных +4), биомонитор, широкополосная рация и оптоволоконная разводка (общий вес 3.25 кг)."
+    },
+    {
+      id: "arm-medical-armor",
+      name: "Полевой бронескафандр медика (Medical Armor / Trauma Suit)",
+      origName: "Medical Armor",
+      category: "Полицейская и корпоративная броня",
+      coverage: "Всё тело",
+      sp: "20",
+      ev: "3",
+      cost: "3,400 eb",
+      book: "HotB",
+      desc: "Тяжёлый бронированный костюм полевого хирурга и боевых эвакуационных групп со встроенными медицинскими сенсорами, стерилизаторами и диагностическим компьютером. Защищает всё тело на ОС 20 и даёт бонус +2 ко всем проверкам Медтехники и Первой помощи!"
+    },
+
+    // --- 5. ТЯЖЁЛАЯ И АРМЕЙСКАЯ БРОНЯ (HEAVY & MILITARY ARMOR) ---
+    {
+      id: "arm-doorgunner-vest",
+      name: "Жилет бортстрелка (Door Gunner's Vest)",
+      origName: "Door Gunner's Vest",
+      category: "Тяжёлая и армейская броня",
+      coverage: "Торс",
+      sp: "25",
+      ev: "3",
+      cost: "250 eb",
+      book: "CP20",
+      desc: "Сверхтяжёлый керамико-металлический панцирь, созданный для защиты бортстрелков АВ-4 и вертолётов от крупнокалиберного огня с земли. Даёт сокрушительную защиту торса (ОС 25, жёсткая броня), но сильно сковывает подвижность (ЗУ 3)."
+    },
+    {
+      id: "arm-metalgear",
+      name: "Секционная броня MetalGear™",
+      origName: "MetalGear",
+      category: "Тяжёлая и армейская броня",
+      coverage: "Все зоны (Голова, Торс, Руки, Ноги)",
+      sp: "25",
+      ev: "2",
+      cost: "600 eb",
+      book: "CP20",
+      desc: "Легендарная модульная жёсткая броня из ламинированных углеродно-бериллиевых волокон на пластиковой основе. Состоит из 4 секций-створок (шлем, кираса, наручи и поножи), полностью закрывающих всё тело с ОС 25 при общем весе всего 2.2 кг! Снижает электрический урон на 50%. Появление в MetalGear™ на городских улицах мгновенно привлекает внимание полиции и Max-Tac."
+    },
+    {
+      id: "arm-mil-assault",
+      name: "Армейская штурмовая броня (Military Assault Armor)",
+      origName: "Military Assault Armor",
+      category: "Тяжёлая и армейская броня",
+      coverage: "Все зоны (Голова, Торс, Руки, Ноги)",
+      sp: "28",
+      ev: "2",
+      cost: "2,000 eb",
+      book: "HotB",
+      desc: "Полноценный герметичный штурмовой бронекостюм регулярной армии США из книги Home of the Brave. Обеспечивает защиту ОС 28 по всему телу, включает полную защиту от радиационного, химического и бактериологического оружия (NBC), встроенный противогаз, военную рацию и баллон с воздухом."
+    },
+    {
+      id: "arm-ema1-softshell",
+      name: "Экзо-бронекостюм EMA-1 SoftShell",
+      origName: "EMA-1 SoftShell",
+      category: "Тяжёлая и армейская броня",
+      coverage: "Все зоны",
+      sp: "25",
+      ev: "0",
+      cost: "8,500 eb",
+      book: "FS (Shockwave)",
+      desc: "Сверхсовременный штурмовой бронекостюм Четвёртой Корпоративной войны со встроенным моторизованным экзо-каркасом (автономность батареи 48 часов), который полностью компенсирует вес брони (ОС 25 при ЗУ 0!) и усиливает физические возможности бойца."
+    },
+    {
+      id: "arm-blackjack-stealth",
+      name: "Диверсионный бронескафандр Blackjack Stealth Armor",
+      origName: "Blackjack Stealth Armor",
+      category: "Тяжёлая и армейская броня",
+      coverage: "Все зоны (герметичный)",
+      sp: "16",
+      ev: "2",
+      cost: "10,000 eb",
+      book: "FS (Shockwave)",
+      desc: "Элитный диверсионный костюм спецназа Четвёртой Корпоративной войны: даёт +3 к навыку Скрытности (Stealth), на 90% невидим для радаров, имеет 4-часовую замкнутую систему жизнеобеспечения и встроенный в шлем оптический комплекс (Low-Lite, защита от вспышек Anti-Dazzle, прицел Targeting Scope и инфо-строка Times Square Plus)."
+    },
+
+    // --- 6. ШЛЕМЫ, ЩИТЫ И БРОНЕМОДУЛИ (HELMETS, SHIELDS & INSERTS) ---
+    {
+      id: "arm-steel-helmet",
+      name: "Стальной шлем (Steel Helmet)",
+      origName: "Steel Helmet",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова",
+      sp: "14",
+      ev: "0",
+      cost: "20 eb",
+      book: "CP20",
+      desc: "Базовый армейский стальной или композитный шлем без забрала. Доступная и надёжная жёсткая защита головы (ОС 14) для большинства уличных перестрелок."
+    },
+    {
+      id: "arm-nylon-helmet",
+      name: "Кевларовый / Нейлоновый шлем (Nylon Helmet)",
+      origName: "Nylon Helmet",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова",
+      sp: "20",
+      ev: "0",
+      cost: "100 eb",
+      book: "CP20",
+      desc: "Современный армейский и тактический шлем из баллистического нейлона и кевлара, обеспечивающий высокую защиту головы (ОС 20)."
+    },
+    {
+      id: "arm-m88-helmet",
+      name: "Тактический шлем Militech M-88 Revised Combat Helmet",
+      origName: "M-88 Revised Combat Helmet",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова (20) / Лицо (15)",
+      sp: "20 (15 забрало)",
+      ev: "0",
+      cost: "5,000 eb",
+      book: "Corp2",
+      desc: "Высокотехнологичный пехотный шлем со встроенным тактическим компьютером, инерциальной системой навигации, связью и бронированным лицевым забралом (ОС 20 череп, ОС 15 лицо, ОСТ 10)."
+    },
+    {
+      id: "arm-headgear-cyber",
+      name: "Шлем-кибердека Microtech HEADGEAR™",
+      origName: "Microtech HEADGEAR Cybermodem Helmet",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова",
+      sp: "16",
+      ev: "0",
+      cost: "4,100 eb",
+      book: "Chr1",
+      desc: "Ударопрочный мотоциклетный шлем (ОС 16) со встроенным проекционным HUD-дисплеем на визоре, радиосвязью и полноценной портативной кибердекой внутри корпуса (Память 10 MU, Скорость +2, Стены данных +2)."
+    },
+    {
+      id: "arm-gianni-helmet",
+      name: "Гермошлем «Gianni» со смарт-очками ('Gianni' Helmet)",
+      origName: "'Gianni' Helmet",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова",
+      sp: "20",
+      ev: "0",
+      cost: "800 eb",
+      book: "Chr3",
+      desc: "Закрытый итальянский шлем с полной защитой головы (ОС 20), встроенными фильтрами (+10 к сопротивлению газам) и интегрированными смарт-очками (Smartgoggles). Базовая версия без смарт-очков («Guercio» Helmet) стоит 600 eb."
+    },
+    {
+      id: "arm-bearskin-hat",
+      name: "Бронированная меховая шапка (Armored Bearskin Hat)",
+      origName: "Armored Bearskin Hat",
+      category: "Шлемы, щиты и модули",
+      coverage: "Голова",
+      sp: "10",
+      ev: "0",
+      cost: "75 eb",
+      book: "Corp3",
+      desc: "Тёплая зимняя шапка-ушанка с вшитым внутрь кевларовым куполом (ОС 10). Позволяет защитить голову от пистолетных пуль, не привлекая внимания ношением боевого шлема."
+    },
+    {
+      id: "arm-riot-shield",
+      name: "Полицейский штурмовой щит со стробоскопом (Police Issue Riot Shield)",
+      origName: "Police Issue Riot Shield",
+      category: "Шлемы, щиты и модули",
+      coverage: "Прикрываемые зоны за щитом",
+      sp: "15",
+      ev: "1",
+      cost: "150 eb (250 со стробоскопом)",
+      book: "PAC",
+      desc: "Прозрачный поликарбонатный тактический щит полиции (ОС 15). Модификация с ослепляющим фронтальным стробоскопом заставляет противника проходить проверку РЕФ и ТЕЛА от временного ослепления."
+    },
+    {
+      id: "arm-inserts-plates",
+      name: "Броневставки и накладные пластины (Armor Inserts / Full Plates)",
+      origName: "Armor Inserts / Full Plates",
+      category: "Шлемы, щиты и модули",
+      coverage: "1 выбранная зона тела",
+      sp: "+5 (до макс. 20) / 20–25",
+      ev: "0 / +1",
+      cost: "40–100 eb",
+      book: "FS (Shockwave)",
+      desc: "Жёсткие керамические броневставки (40 eb за 1 зону: повышают ОС мягкой брони на +5 вплоть до максимума ОС 20) или полноценные внешние накладные бронепластины Full Plates (60 eb за ОС 20 или 100 eb за ОС 25 на одну зону, добавляют +1 ЗУ)."
+    }
+  ];
+
+  ARMOR_PACK_ITEMS.forEach(newItem => {
+    const exists = extDb.armor.some(existing =>
+      existing.id === newItem.id ||
+      (existing.name && existing.name.toLowerCase() === newItem.name.toLowerCase()) ||
+      (existing.origName && existing.origName.toLowerCase() === newItem.origName.toLowerCase())
+    );
+    if (!exists) {
+      extDb.armor.push(newItem);
+    }
+  });
+})();

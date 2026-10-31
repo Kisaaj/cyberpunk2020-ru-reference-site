@@ -6120,5 +6120,106 @@
       }, 1000);
     });
   </script>
+  <!-- ========================================================================= -->
+  <!-- АВТО-СИНХРОНИЗАТОР ПОЛЕЙ БРОНИ (СОПОСТАВЛЯЕТ DATABASE.JS И SCHEMAS.ARMOR) -->
+  <!-- ========================================================================= -->
+  <script>
+    function repairAndSyncArmorFields() {
+      if (typeof DB === "undefined" || !Array.isArray(DB.armor)) return;
+
+      // 1. Если в database.js есть эталонные данные брони — подтягиваем из них sp, ev, coverage в существующие карточки
+      const extArmor = (window.CP2020_EXTERNAL_DATA && window.CP2020_EXTERNAL_DATA.db && Array.isArray(window.CP2020_EXTERNAL_DATA.db.armor))
+        ? window.CP2020_EXTERNAL_DATA.db.armor
+        : [];
+
+      // Смотрим, какие именно ключи (k) реально требует SCHEMAS.armor в твоём index.html
+      const schemaFields = (typeof SCHEMAS !== "undefined" && Array.isArray(SCHEMAS.armor)) ? SCHEMAS.armor : [];
+
+      DB.armor.forEach(item => {
+        if (!item) return;
+
+        // Ищем совпадение в database.js по id, имени или origName
+        const match = extArmor.find(ext =>
+          ext.id === item.id ||
+          (ext.name && item.name && ext.name.toLowerCase() === item.name.toLowerCase()) ||
+          (ext.origName && item.origName && ext.origName.toLowerCase() === item.origName.toLowerCase())
+        );
+
+        // Вытаскиваем реальные значения из самой карточки или из найденного эталона в database.js
+        const realCoverage = (item.coverage && item.coverage !== "—") ? item.coverage
+          : (item.zones && item.zones !== "—") ? item.zones
+          : (item.zone && item.zone !== "—") ? item.zone
+          : (item.location && item.location !== "—") ? item.location
+          : (match ? match.coverage : "");
+
+        const realSp = (item.sp !== undefined && item.sp !== "" && item.sp !== "—") ? item.sp
+          : (item.os !== undefined && item.os !== "" && item.os !== "—") ? item.os
+          : (item.armorSp !== undefined && item.armorSp !== "" && item.armorSp !== "—") ? item.armorSp
+          : (match ? match.sp : "");
+
+        const realEv = (item.ev !== undefined && item.ev !== "" && item.ev !== "—") ? item.ev
+          : (item.zu !== undefined && item.zu !== "" && item.zu !== "—") ? item.zu
+          : (item.encumbrance !== undefined && item.encumbrance !== "" && item.encumbrance !== "—") ? item.encumbrance
+          : (match ? match.ev : "");
+
+        // Записываем во все стандартные ключи
+        if (realCoverage) {
+          item.coverage = realCoverage;
+          item.zones = realCoverage;
+          item.zone = realCoverage;
+          item.location = realCoverage;
+          item.area = realCoverage;
+        }
+        if (realSp !== "") {
+          item.sp = realSp;
+          item.os = realSp;
+          item.armorSp = realSp;
+        }
+        if (realEv !== "") {
+          item.ev = realEv;
+          item.zu = realEv;
+          item.encumbrance = realEv;
+        }
+
+        // И самое главное: автоматически заполняем ключи напрямую по подписям из твоего SCHEMAS.armor!
+        schemaFields.forEach(f => {
+          const labelLow = (f.l || "").toLowerCase();
+          if (labelLow.includes("зон") || labelLow.includes("прикр") || labelLow.includes("част") || labelLow.includes("покрыт")) {
+            if ((!item[f.k] || item[f.k] === "—") && realCoverage) item[f.k] = realCoverage;
+          } else if (labelLow.includes("ос") || labelLow.includes("sp") || labelLow.includes("брон") || labelLow.includes("защит")) {
+            if ((!item[f.k] || item[f.k] === "—") && realSp !== "") item[f.k] = realSp;
+          } else if (labelLow.includes("зу") || labelLow.includes("ev") || labelLow.includes("помех") || labelLow.includes("штраф") || labelLow.includes("обремен")) {
+            if ((!item[f.k] || item[f.k] === "—") && realEv !== "") item[f.k] = realEv;
+          }
+        });
+      });
+    }
+
+    // Запускаем починку при каждом рендере каталога и карточки, а также после ответа облака Supabase
+    const origRenderCatArmorFix = renderCatalog;
+    window.renderCatalog = function() {
+      repairAndSyncArmorFields();
+      origRenderCatArmorFix();
+    };
+
+    const origRenderDetailArmorFix = renderDetailCard;
+    window.renderDetailCard = function(item) {
+      repairAndSyncArmorFields();
+      origRenderDetailArmorFix(item);
+    };
+
+    window.addEventListener("load", () => {
+      setTimeout(() => {
+        repairAndSyncArmorFields();
+        if (activeMainView === "catalog" && activeCatalogTab === "armor") {
+          renderCatalog();
+        }
+        // Сохраняем починенные поля брони в облако Supabase
+        if (typeof persistDatabase === "function") {
+          persistDatabase();
+        }
+      }, 1800);
+    });
+  </script>
 </body>
 </html>
