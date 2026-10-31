@@ -6221,5 +6221,261 @@
       }, 1800);
     });
   </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ТАБЛИЦЫ ЗАРПЛАТ РОЛЕЙ (УР. 1-5, 6, 7, 8, 9, 10) И НОВОЙ КОМПОНОВКИ -->
+  <!-- ========================================================================= -->
+  <script>
+    const ROLE_SALARY_LEVELS = [
+      { key: "lvl1_5", label: "Ур. 1–5", short: "1–5" },
+      { key: "lvl6",   label: "Ур. 6",   short: "6"   },
+      { key: "lvl7",   label: "Ур. 7",   short: "7"   },
+      { key: "lvl8",   label: "Ур. 8",   short: "8"   },
+      { key: "lvl9",   label: "Ур. 9",   short: "9"   },
+      { key: "lvl10",  label: "Ур. 10",  short: "10"  }
+    ];
+
+    // Каноничные таблицы зарплат из Cyberpunk 2020 Corebook (стр. 56) для автозаполнения базовых ролей
+    const CANON_ROLE_SALARIES = {
+      "соло":          { lvl1_5: "2 000 eb", lvl6: "3 000 eb", lvl7: "4 500 eb", lvl8: "7 000 eb", lvl9: "9 000 eb",  lvl10: "12 000 eb" },
+      "solo":          { lvl1_5: "2 000 eb", lvl6: "3 000 eb", lvl7: "4 500 eb", lvl8: "7 000 eb", lvl9: "9 000 eb",  lvl10: "12 000 eb" },
+      "рокер":         { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "2 500 eb", lvl8: "5 000 eb", lvl9: "8 000 eb",  lvl10: "12 000 eb" },
+      "rockerboy":     { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "2 500 eb", lvl8: "5 000 eb", lvl9: "8 000 eb",  lvl10: "12 000 eb" },
+      "нетраннер":     { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "3 000 eb", lvl8: "5 000 eb", lvl9: "7 000 eb",  lvl10: "10 000 eb" },
+      "netrunner":     { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "3 000 eb", lvl8: "5 000 eb", lvl9: "7 000 eb",  lvl10: "10 000 eb" },
+      "медиа":         { lvl1_5: "1 000 eb", lvl6: "1 200 eb", lvl7: "3 000 eb", lvl8: "5 000 eb", lvl9: "7 000 eb",  lvl10: "10 000 eb" },
+      "media":         { lvl1_5: "1 000 eb", lvl6: "1 200 eb", lvl7: "3 000 eb", lvl8: "5 000 eb", lvl9: "7 000 eb",  lvl10: "10 000 eb" },
+      "кочевник":      { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "2 000 eb", lvl8: "3 000 eb", lvl9: "4 000 eb",  lvl10: "5 000 eb"  },
+      "nomad":         { lvl1_5: "1 000 eb", lvl6: "1 500 eb", lvl7: "2 000 eb", lvl8: "3 000 eb", lvl9: "4 000 eb",  lvl10: "5 000 eb"  },
+      "фиксер":        { lvl1_5: "1 500 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "8 000 eb",  lvl10: "10 000 eb" },
+      "fixer":         { lvl1_5: "1 500 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "8 000 eb",  lvl10: "10 000 eb" },
+      "корпорат":      { lvl1_5: "1 500 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "9 000 eb",  lvl10: "12 000 eb" },
+      "corporate":     { lvl1_5: "1 500 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "9 000 eb",  lvl10: "12 000 eb" },
+      "техник":        { lvl1_5: "1 000 eb", lvl6: "2 000 eb", lvl7: "3 000 eb", lvl8: "4 000 eb", lvl9: "5 000 eb",  lvl10: "8 000 eb"  },
+      "techie":        { lvl1_5: "1 000 eb", lvl6: "2 000 eb", lvl7: "3 000 eb", lvl8: "4 000 eb", lvl9: "5 000 eb",  lvl10: "8 000 eb"  },
+      "медтехник":     { lvl1_5: "1 600 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "8 000 eb",  lvl10: "10 000 eb" },
+      "medtechie":     { lvl1_5: "1 600 eb", lvl6: "3 000 eb", lvl7: "5 000 eb", lvl8: "7 000 eb", lvl9: "8 000 eb",  lvl10: "10 000 eb" },
+      "законник":      { lvl1_5: "1 000 eb", lvl6: "1 200 eb", lvl7: "2 000 eb", lvl8: "3 000 eb", lvl9: "5 000 eb",  lvl10: "7 000 eb"  },
+      "cop":           { lvl1_5: "1 000 eb", lvl6: "1 200 eb", lvl7: "2 000 eb", lvl8: "3 000 eb", lvl9: "5 000 eb",  lvl10: "7 000 eb"  }
+    };
+
+    // Извлекает или формирует объект salaryTable для карточки Роли и обновляет строку диапазона item.salary
+    function resolveRoleSalaryTable(roleItem) {
+      if (!roleItem) return { lvl1_5: "—", lvl6: "—", lvl7: "—", lvl8: "—", lvl9: "—", lvl10: "—" };
+
+      if (roleItem.salaryTable && typeof roleItem.salaryTable === "object") {
+        const minVal = (roleItem.salaryTable.lvl1_5 || "").trim();
+        const maxVal = (roleItem.salaryTable.lvl10 || "").trim();
+        if (minVal && maxVal && minVal !== "—" && maxVal !== "—") {
+          roleItem.salary = `${minVal} — ${maxVal}`;
+        }
+        return roleItem.salaryTable;
+      }
+
+      // Проверяем, есть ли каноничная таблица по названию роли
+      const nameLow = (roleItem.name || "").toLowerCase();
+      const origLow = (roleItem.origName || "").toLowerCase();
+      for (const [key, table] of Object.entries(CANON_ROLE_SALARIES)) {
+        if (nameLow.includes(key) || origLow.includes(key)) {
+          roleItem.salaryTable = { ...table };
+          roleItem.salary = `${table.lvl1_5} — ${table.lvl10}`;
+          return roleItem.salaryTable;
+        }
+      }
+
+      // Если роль кастомная и была записана строкой вида "1000 — 9000 eb"
+      const rawSal = String(roleItem.salary || "").trim();
+      if (rawSal && rawSal !== "—") {
+        const parts = rawSal.split(/\s*[—–-]\s*/);
+        const minS = parts[0] || rawSal;
+        const maxS = parts[1] || parts[0] || "—";
+        roleItem.salaryTable = {
+          lvl1_5: minS,
+          lvl6: "—",
+          lvl7: "—",
+          lvl8: "—",
+          lvl9: "—",
+          lvl10: maxS
+        };
+        roleItem.salary = `${minS} — ${maxS}`;
+        return roleItem.salaryTable;
+      }
+
+      return { lvl1_5: "—", lvl6: "—", lvl7: "—", lvl8: "—", lvl9: "—", lvl10: "—" };
+    }
+
+    function syncAllRoleSalariesInMemory() {
+      if (typeof DB === "undefined" || !Array.isArray(DB.roles)) return;
+      DB.roles.forEach(r => resolveRoleSalaryTable(r));
+    }
+
+    // 1. В Конструкторе Ролей заменяем одиночное поле Зарплаты на удобную таблицу из 6 уровней (Ур. 1-5 ... Ур. 10)
+    const prevSetBuilderTypeRoles = window.setBuilderType;
+    window.setBuilderType = function(type, itemToEdit = null) {
+      prevSetBuilderTypeRoles(type, itemToEdit);
+      if (type !== "roles") return;
+
+      const container = document.getElementById("builderFieldsContainer");
+      if (!container) return;
+
+      const salTable = resolveRoleSalaryTable(itemToEdit);
+
+      // Находим старый инпут name="salary" и заменяем его обёртку на блок таблицы зарплат по уровням
+      const oldSalaryInput = container.querySelector('input[name="salary"]');
+      if (oldSalaryInput && oldSalaryInput.parentElement) {
+        const wrapper = oldSalaryInput.parentElement;
+        wrapper.className = "col-span-2 bg-cp-panel border border-cp-green/50 p-3.5 space-y-2.5";
+        wrapper.innerHTML = `
+          <div class="flex items-center justify-between border-b border-gray-800 pb-1.5">
+            <span class="text-[11px] font-bold uppercase text-cp-green">💰 Таблица зарплаты по уровню Особой Способности (eb/мес)</span>
+            <span class="text-[10px] text-gray-400">В списке карточек отобразится: <b>[Ур. 1–5] — [Ур. 10]</b></span>
+          </div>
+          <div class="grid grid-cols-2 sm:grid-cols-6 gap-2" id="roleSalaryBuilderGrid">
+            ${ROLE_SALARY_LEVELS.map(lv => `
+              <div class="bg-cp-bg border border-gray-800 p-2">
+                <label class="block text-[10px] font-bold uppercase text-cp-yellow text-center mb-1">${lv.label}</label>
+                <input type="text" data-salary-lvl="${lv.key}" value="${escapeHtmlAttr(salTable[lv.key] === '—' ? '' : (salTable[lv.key] || ''))}"
+                  placeholder="${lv.key === 'lvl1_5' ? '1 000 eb' : lv.key === 'lvl10' ? '10 000 eb' : '3 000 eb'}"
+                  oninput="updateHiddenRoleSalaryRangeInput()"
+                  class="w-full bg-cp-panel border border-gray-700 focus:border-cp-green px-2 py-1 text-xs text-center text-cp-green font-bold outline-none">
+              </div>
+            `).join("")}
+          </div>
+          <input type="hidden" name="salary" id="hiddenRoleSalaryRangeInput" value="${escapeHtmlAttr((itemToEdit && itemToEdit.salary) || '')}">
+        `;
+        window.updateHiddenRoleSalaryRangeInput();
+      }
+    };
+
+    window.updateHiddenRoleSalaryRangeInput = function() {
+      const grid = document.getElementById("roleSalaryBuilderGrid");
+      const hiddenInp = document.getElementById("hiddenRoleSalaryRangeInput");
+      if (!grid || !hiddenInp) return;
+      const minVal = (grid.querySelector('[data-salary-lvl="lvl1_5"]')?.value || "").trim() || "—";
+      const maxVal = (grid.querySelector('[data-salary-lvl="lvl10"]')?.value || "").trim() || "—";
+      hiddenInp.value = (minVal === "—" && maxVal === "—") ? "—" : `${minVal} — ${maxVal}`;
+    };
+
+    // 2. При сохранении карточки Роли в Конструкторе сохраняем объект salaryTable и диапазон [Ур. 1-5] — [Ур. 10]
+    const prevSaveBuilderItemRoles = window.saveBuilderItem;
+    window.saveBuilderItem = function(e) {
+      const wasRole = (activeBuilderType === "roles");
+      let capturedSalaryTable = null;
+
+      if (wasRole) {
+        window.updateHiddenRoleSalaryRangeInput();
+        const grid = document.getElementById("roleSalaryBuilderGrid");
+        if (grid) {
+          capturedSalaryTable = {};
+          ROLE_SALARY_LEVELS.forEach(lv => {
+            const val = (grid.querySelector(`[data-salary-lvl="${lv.key}"]`)?.value || "").trim();
+            capturedSalaryTable[lv.key] = val || "—";
+          });
+        }
+      }
+
+      const prevApplying = isApplyingRemoteUpdate;
+      if (wasRole) isApplyingRemoteUpdate = true;
+
+      prevSaveBuilderItemRoles(e);
+
+      if (wasRole) {
+        isApplyingRemoteUpdate = prevApplying;
+        if (selectedItemId && capturedSalaryTable) {
+          const savedRole = (DB.roles || []).find(r => r.id === selectedItemId);
+          if (savedRole) {
+            savedRole.salaryTable = capturedSalaryTable;
+            const minS = capturedSalaryTable.lvl1_5 || "—";
+            const maxS = capturedSalaryTable.lvl10 || "—";
+            savedRole.salary = (minS === "—" && maxS === "—") ? "—" : `${minS} — ${maxS}`;
+
+            const previewEl = document.getElementById("builderJsonPreview");
+            if (previewEl) {
+              previewEl.textContent = JSON.stringify({ ...savedRole, image: savedRole.image ? "[Изображение прикреплено]" : undefined }, null, 2);
+            }
+            persistDatabase();
+            renderCatalog();
+          }
+        }
+      }
+    };
+
+    // 3. Обновляем список карточек и правую карточку Роли:
+    //    - Сверху 2 широких блока: Особая Способность и Ключевой СТАТ
+    //    - Посередине: Профессиональные навыки
+    //    - Под навыками: красивая таблица зарплат по уровням Особой способности (Ур. 1-5 | 6 | 7 | 8 | 9 | 10)
+    const prevRenderCatalogRoles = window.renderCatalog;
+    window.renderCatalog = function() {
+      syncAllRoleSalariesInMemory();
+      prevRenderCatalogRoles();
+    };
+
+    const prevRenderDetailCardRoles = window.renderDetailCard;
+    window.renderDetailCard = function(item) {
+      syncAllRoleSalariesInMemory();
+      prevRenderDetailCardRoles(item);
+
+      if (activeCatalogTab !== "roles" || !item) return;
+      const box = document.getElementById("detailCard");
+      if (!box) return;
+
+      const salTable = resolveRoleSalaryTable(item);
+
+      // Находим старую верхнюю сетку из 3 колонок (.grid.grid-cols-3) и блок навыков (.bg-cp-bg.border-l-2.border-cp-yellow)
+      const topGrid3 = box.querySelector(".grid.grid-cols-3.gap-2\\.5.mb-4");
+      const skillsBox = box.querySelector(".bg-cp-bg.border-l-2.border-cp-yellow.p-3\\.5.mb-4");
+
+      // Перестраиваем верхний ряд: Особая Способность и Ключевой СТАТ делят пространство поровну (2 колонки)
+      if (topGrid3) {
+        topGrid3.className = "grid grid-cols-2 gap-3 mb-4";
+        topGrid3.innerHTML = `
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">⚡ Особая Способность</div>
+            <div class="text-sm font-display font-bold text-cp-yellow mt-1">${dash(item.ability)}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-3.5">
+            <div class="text-[10px] text-gray-400 uppercase tracking-wider">📊 Ключевой СТАТ</div>
+            <div class="text-sm font-display font-bold text-cp-cyan mt-1">${dash(item.stat)}</div>
+          </div>
+        `;
+      }
+
+      // Формируем таблицу зарплат для вставки сразу ПОД блоком Профессиональных навыков
+      const salaryTableSection = document.createElement("div");
+      salaryTableSection.className = "bg-cp-bg border border-gray-800 p-3.5 mb-4 space-y-2.5";
+      salaryTableSection.innerHTML = `
+        <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+          <span class="text-[11px] font-bold uppercase text-cp-green tracking-wider">💰 Зарплата по уровню Особой Способности</span>
+          <span class="text-xs font-bold text-cp-green">${dash(salTable.lvl1_5)} — ${dash(salTable.lvl10)}</span>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="border-b border-gray-800 text-[10px] text-gray-400 uppercase bg-cp-panel/60">
+                <th class="py-1.5 px-3 w-1/2">Уровень способности</th>
+                <th class="py-1.5 px-3 w-1/2 text-right">Доход (eb / мес)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-800/70">
+              ${ROLE_SALARY_LEVELS.map(lv => `
+                <tr class="hover:bg-white/5 transition-colors">
+                  <td class="py-1.5 px-3 font-bold text-cp-yellow">${lv.label}</td>
+                  <td class="py-1.5 px-3 text-right font-bold text-cp-green">${dash(salTable[lv.key])}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      if (skillsBox) {
+        skillsBox.insertAdjacentElement("afterend", salaryTableSection);
+      } else if (topGrid3) {
+        topGrid3.insertAdjacentElement("afterend", salaryTableSection);
+      }
+    };
+
+    // Синхронизируем зарплаты сразу при загрузке
+    syncAllRoleSalariesInMemory();
+  </script>
 </body>
 </html>
