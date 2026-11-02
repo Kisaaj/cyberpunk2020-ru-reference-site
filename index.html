@@ -5315,811 +5315,7 @@
       }
     };
 
-    // =========================================================================
-    // ЧАСТЬ 2: ГЛАВНАЯ СТРАНИЦА (ОТКРЫВАЕТСЯ ПЕРВОЙ + ТАБЛИЦА БД В ОБЛАКЕ)
-    // =========================================================================
-    let activeHomeSubtab = "news"; // "news" | "rules" | "contacts"
-    let editingHomePostId = null;
-    let editingContactUserId = null;
-    const expandedHomePosts = new Set();
-
-    const DEFAULT_SITE_RULES = [
-      {
-        id: "srule-1",
-        tabType: "rules",
-        title: "1. Уважительное общение и кибер-этика",
-        content: "Терминал DataTerm открыт для всех эджраннеров, рефери и новичков НРИ <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>. В комментариях под карточками и в профилях запрещены прямые оскорбления участников, травля, переходы на личности и агрессивный флуд.\n\nСпоры о трактовке правил и механик <span class=\"text-cp-cyan font-bold\">Friday Night Firefight</span> приветствуются, если они ведутся аргументированно и с уважением к собеседнику.",
-        authorName: "Kisaaj",
-        createdAt: "2026-10-30 12:00 (МСК)",
-        updatedAt: null,
-        sortOrder: 1
-      },
-      {
-        id: "srule-2",
-        tabType: "rules",
-        title: "2. Запрет неодобренных ссылок, спама и рекламы",
-        content: "В комментариях, описаниях публичных профилей и заметках строго запрещена публикация:\n• Фишинговых, вредоносных или подозрительных ссылок;\n• Рекламы сторонних коммерческих ресурсов, магазинов и несогласованных проектов;\n• Ссылок на материалы, нарушающие законодательство.\n\nРазрешены ссылки на проверенные хостинги изображений (<span class=\"text-cp-yellow font-bold\">Imgur, GitHub, Postimages, ВК</span>) для оформления аватарок и иллюстраций карточек.",
-        authorName: "Kisaaj",
-        createdAt: "2026-10-30 12:05 (МСК)",
-        updatedAt: null,
-        sortOrder: 2
-      },
-      {
-        id: "srule-3",
-        tabType: "rules",
-        title: "3. Правила оформления комментариев и Homebrew-материалов",
-        content: "Комментарии под карточками оружия, ролей, имплантов и механик предназначены для:\n• Обсуждения игрового баланса и применения предмета в партиях;\n• Уточнения переводов и ссылок на книги-источники (<span class=\"text-cp-cyan font-bold\">Corebook, Chromebook 1–4, Eurosource Plus, Max Metal</span>);\n• Советов от Рефери и игроков.\n\nПри добавлении авторских карточек администрацией обязательно указывайте плашку <span class=\"text-cp-yellow font-bold\">HOMEBREW</span>.",
-        authorName: "Kisaaj",
-        createdAt: "2026-10-30 12:10 (МСК)",
-        updatedAt: null,
-        sortOrder: 3
-      }
-    ];
-
-    const DEFAULT_HOME_NEWS = [
-      {
-        id: "news-welcome-1",
-        tabType: "news",
-        title: "ДОБРО ПОЖАЛОВАТЬ В СПРАВОЧНИК CYBERPUNK 2020 // ПОМОГАЛКА",
-        content: "Добро пожаловать в интерактивную русскоязычную базу данных по настольной ролевой игре <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>!\n\nЗдесь собраны переведённые и структурированные материалы из основной книги правил и дополнений: роли, оружие, броня, снаряжение, киберимпланты, программы для нетраннинга, транспорт, персонажи и игровые механики.\n\n<h4 class=\"text-cp-yellow font-display font-bold text-sm uppercase mt-2 mb-1\">Что доступно на сайте:</h4>• Умный поиск и фильтрация снаряжения по книгам-источникам, цене, надёжности (НАД) и доступности (ДОС);\n• Личный профиль Эджраннера с закладками «Избранное» и приватным терминалом заметок;\n• Обсуждение любой карточки в реальном времени и система уведомлений.\n\nНажмите на заголовок <b>CYBERPUNK 2020</b> в левом верхнем углу в любой момент, чтобы вернуться на эту главную страницу!",
-        authorName: "Kisaaj",
-        createdAt: "2026-10-30 12:00 (МСК)",
-        updatedAt: null,
-        sortOrder: 0
-      }
-    ];
-
-    // Инициализируем стартовыми данными сразу, чтобы Главная страница никогда не была пустой
-    let HOME_NEWS_LIST = JSON.parse(JSON.stringify(DEFAULT_HOME_NEWS));
-    let HOME_RULES_LIST = JSON.parse(JSON.stringify(DEFAULT_SITE_RULES));
-
-    function ensureHomeDataStructures() {
-      ensureMetaArraysInCategories();
-      if (!CATEGORIES._adminContacts || typeof CATEGORIES._adminContacts !== "object") {
-        CATEGORIES._adminContacts = {
-          "u-root": {
-            roleTitle: "Главный Архитектор и Создатель базы",
-            note: "По вопросам развития проекта, перевода книг Cyberpunk 2020 и сотрудничества.",
-            links: [
-              { label: "Сообщество ВК (Село ДнДшеское)", url: "https://vk.ru/selodnd" }
-            ]
-          }
-        };
-      }
-    }
-
-    function mapRowToHomePost(r) {
-      return {
-        id: r.id,
-        tabType: r.tab_type,
-        title: r.title,
-        content: r.content,
-        authorName: r.author_name || "Администратор",
-        createdAt: r.created_at || "",
-        updatedAt: r.updated_at || null,
-        updatedBy: r.updated_by || null,
-        sortOrder: r.sort_order || 0
-      };
-    }
-
-    function mapHomePostToRow(post) {
-      return {
-        id: post.id,
-        tab_type: post.tabType,
-        title: post.title,
-        content: post.content,
-        author_name: post.authorName,
-        created_at: post.createdAt,
-        updated_at: post.updatedAt || null,
-        updated_by: post.updatedBy || null,
-        sort_order: post.sortOrder || 0
-      };
-    }
-
-    async function fetchHomeContentFromCloud() {
-      if (typeof sbClient === "undefined" || !sbClient) return;
-      try {
-        const { data, error } = await sbClient
-          .from("cp2020_home_content")
-          .select("*")
-          .order("id", { ascending: false });
-
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const newsRows = data.filter(r => r.tab_type === "news");
-          const rulesRows = data.filter(r => r.tab_type === "rules");
-          rulesRows.sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
-
-          if (newsRows.length > 0) HOME_NEWS_LIST = newsRows.map(mapRowToHomePost);
-          if (rulesRows.length > 0) HOME_RULES_LIST = rulesRows.map(mapRowToHomePost);
-
-          if (activeMainView === "home") {
-            const activeEl = document.activeElement;
-            const isTyping = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA");
-            if (!isTyping) renderHomeView();
-          }
-        }
-      } catch (err) {
-        console.warn("Таблица cp2020_home_content пока не создана или недоступна, используются локальные данные:", err);
-      }
-    }
-
-    function injectHomeViewIntoDOM() {
-      if (document.getElementById("view-home")) return;
-      const catalogMain = document.getElementById("view-catalog");
-      if (!catalogMain) return;
-
-      const homeMain = document.createElement("main");
-      homeMain.id = "view-home";
-      homeMain.className = "max-w-[1880px] w-full mx-auto px-6 py-5 flex-1 flex flex-col gap-5";
-      homeMain.innerHTML = `
-        <div class="grid grid-cols-12 gap-6 items-start">
-          <section class="col-span-8 space-y-5" id="homeMainColumn"></section>
-          <aside class="col-span-4 sticky top-20 space-y-5">
-            <div class="bg-cp-panel cp-border p-5 space-y-4">
-              <div class="border-b border-gray-800 pb-3">
-                <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">НАВИГАЦИЯ ТЕРМИНАЛА DATATERM</div>
-                <h2 class="font-display font-black text-base text-white uppercase mt-0.5">🏠 Главная страница</h2>
-              </div>
-              <div class="flex flex-col gap-2.5" id="homeRightNav">
-                <button type="button" onclick="switchHomeSubtab('news')" id="homeNavBtn-news"
-                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <span class="text-base">📰</span>
-                    <div>
-                      <div class="font-display font-bold text-xs uppercase tracking-wider">Новости и обновления</div>
-                      <div class="text-[10px] opacity-75">Журнал разработки и патчноуты базы</div>
-                    </div>
-                  </div>
-                  <span id="homeCnt-news" class="text-xs font-bold px-2 py-0.5 bg-black/40">0</span>
-                </button>
-                <button type="button" onclick="switchHomeSubtab('rules')" id="homeNavBtn-rules"
-                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <span class="text-base">⚖️</span>
-                    <div>
-                      <div class="font-display font-bold text-xs uppercase tracking-wider">Правила сайта</div>
-                      <div class="text-[10px] opacity-75">Кодекс поведения и модерации NetWatch</div>
-                    </div>
-                  </div>
-                  <span id="homeCnt-rules" class="text-xs font-bold px-2 py-0.5 bg-black/40">0</span>
-                </button>
-                <button type="button" onclick="switchHomeSubtab('contacts')" id="homeNavBtn-contacts"
-                  class="w-full text-left px-4 py-3 border transition-all flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <span class="text-base">📡</span>
-                    <div>
-                      <div class="font-display font-bold text-xs uppercase tracking-wider">Контакты администрации</div>
-                      <div class="text-[10px] opacity-75">Профили админов и ссылки на соцсети</div>
-                    </div>
-                  </div>
-                  <span id="homeCnt-contacts" class="text-xs font-bold px-2 py-0.5 bg-black/40">1</span>
-                </button>
-              </div>
-            </div>
-            <div class="bg-cp-panel cp-border p-5 space-y-3">
-              <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
-                <span class="font-display text-xs font-bold uppercase text-cp-yellow">📊 Состояние базы Найт-Сити</span>
-                <span class="text-[10px] text-cp-green font-bold">ONLINE</span>
-              </div>
-              <div id="homeQuickStatsBox" class="grid grid-cols-2 gap-2.5 text-center"></div>
-              <div class="pt-2 border-t border-gray-800/80 text-[11px] text-gray-400 leading-relaxed">
-                Используйте верхнее меню разделов (<b>Роли, Оружие, Броня, Кибероснащение...</b>), чтобы перейти к карточкам справочника.
-              </div>
-            </div>
-          </aside>
-        </div>
-      `;
-      catalogMain.parentNode.insertBefore(homeMain, catalogMain);
-
-      const headerTitle = document.querySelector("header h1");
-      const headerLogo = document.querySelector("header .w-10.h-10.bg-cp-red");
-      if (headerTitle) {
-        headerTitle.classList.add("cursor-pointer", "hover:opacity-80", "transition-opacity");
-        headerTitle.title = "Перейти на Главную страницу";
-        headerTitle.onclick = () => switchMainView("home");
-      }
-      if (headerLogo) {
-        headerLogo.classList.add("cursor-pointer", "hover:scale-105", "transition-transform");
-        headerLogo.title = "Перейти на Главную страницу";
-        headerLogo.onclick = () => switchMainView("home");
-      }
-    }
-
-    const origSwitchMainViewForHome = switchMainView;
-    window.switchMainView = function(view, catalogTab = null) {
-      injectHomeViewIntoDOM();
-      ensureHomeDataStructures();
-
-      if (view === "home") {
-        activeMainView = "home";
-        ["home", "catalog", "rules", "profile", "admin"].forEach(v => {
-          const el = document.getElementById("view-" + v);
-          if (el) el.classList.toggle("hidden", v !== "home");
-        });
-        document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
-          btn.className = "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan transition-all";
-        });
-        renderHomeView();
-        fetchHomeContentFromCloud();
-        return;
-      }
-
-      const homeEl = document.getElementById("view-home");
-      if (homeEl) homeEl.classList.add("hidden");
-      origSwitchMainViewForHome(view, catalogTab);
-    };
-
-    window.switchHomeSubtab = function(subtab) {
-      activeHomeSubtab = subtab;
-      editingHomePostId = null;
-      editingContactUserId = null;
-      renderHomeView();
-    };
-
-    function getPlainTextLength(htmlStr) {
-      if (!htmlStr) return 0;
-      const tmp = document.createElement("div");
-      tmp.innerHTML = htmlStr;
-      return (tmp.textContent || tmp.innerText || "").length;
-    }
-
-    function getTruncatedPreviewHtml(htmlStr, maxChars = 1000) {
-      const tmp = document.createElement("div");
-      tmp.innerHTML = htmlStr || "";
-      const plain = tmp.textContent || tmp.innerText || "";
-      if (plain.length <= maxChars) return htmlStr;
-      const escaped = plain.slice(0, maxChars)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      return escaped + "…";
-    }
-
-    window.toggleExpandHomePost = function(postId) {
-      if (expandedHomePosts.has(postId)) expandedHomePosts.delete(postId);
-      else expandedHomePosts.add(postId);
-      renderHomeView();
-    };
-
-    window.insertHomeFormatTag = function(openTag, closeTag) {
-      const area = document.getElementById("homeEditorTextarea");
-      if (!area) return;
-      const start = area.selectionStart || 0;
-      const end = area.selectionEnd || 0;
-      const val = area.value;
-      const selected = val.slice(start, end) || "текст";
-      const replacement = openTag + selected + closeTag;
-      area.value = val.slice(0, start) + replacement + val.slice(end);
-      area.focus();
-      area.selectionStart = start + openTag.length;
-      area.selectionEnd = start + openTag.length + selected.length;
-      updateHomeEditorCharCounter();
-    };
-
-    window.updateHomeEditorCharCounter = function() {
-      const area = document.getElementById("homeEditorTextarea");
-      const counterEl = document.getElementById("homeEditorCharCount");
-      if (!area || !counterEl) return;
-      const len = getPlainTextLength(area.value);
-      counterEl.innerHTML = len > 1000
-        ? `Написано символов: <b class="text-cp-yellow">${len}</b> <span class="text-cp-cyan">(будет свёрнуто под кнопку «Развернуть» после 1000 симв.)</span>`
-        : `Написано символов: <b class="text-cp-green">${len}</b> / 1000 до сворачивания`;
-    };
-
-    async function broadcastSiteNotificationToAllUsers(notifType, messageHtml, targetHomeTab) {
-      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
-      const linkObj = { sectionKey: "home", itemId: targetHomeTab };
-
-      const cur = getCurrentUser();
-      if (cur) {
-        NOTIFICATIONS.unshift({
-          id: "ntf-" + Date.now() + "-self",
-          targetUserId: cur.id,
-          type: notifType,
-          text: messageHtml,
-          linkData: linkObj,
-          read: false,
-          createdAt: timeStr
-        });
-        updateNotifBellUI();
-      }
-
-      if (typeof sbClient !== "undefined" && sbClient) {
-        try {
-          const rowsToInsert = USERS.map((u, idx) => ({
-            id: "ntf-" + Date.now() + "-" + idx + "-" + Math.floor(Math.random() * 999),
-            target_user_id: u.id,
-            type: notifType,
-            text: messageHtml,
-            link_data: linkObj,
-            read: false,
-            created_at: timeStr
-          }));
-          if (rowsToInsert.length > 0) {
-            await sbClient.from("cp2020_notifications").insert(rowsToInsert);
-          }
-          if (typeof liveChannel !== "undefined" && liveChannel) {
-            liveChannel.send({
-              type: "broadcast",
-              event: "site_wide_notif",
-              payload: { sender: CLIENT_TAB_ID, type: notifType, text: messageHtml, linkData: linkObj, createdAt: timeStr }
-            });
-          }
-        } catch (err) {
-          console.error("Ошибка рассылки общего уведомления:", err);
-        }
-      }
-    }
-
-    const origOpenNotifTarget = openNotificationTarget;
-    window.openNotificationTarget = function(notifId) {
-      const n = NOTIFICATIONS.find(x => x.id === notifId);
-      if (n && n.linkData && n.linkData.sectionKey === "home") {
-        closeNotifDropdown();
-        activeHomeSubtab = n.linkData.itemId || "news";
-        switchMainView("home");
-        return;
-      }
-      origOpenNotifTarget(notifId);
-    };
-
-    function logHomePageAdminAction(actionType, subtabName, itemTitle) {
-      ensureMetaArraysInCategories();
-      const u = getCurrentUser();
-      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
-      const entry = {
-        id: "chg-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
-        action: actionType,
-        sectionKey: "home",
-        itemId: activeHomeSubtab,
-        itemName: itemTitle || "Запись главной страницы",
-        itemCategory: subtabName,
-        itemBook: "Главная страница",
-        userId: u ? u.id : "u-root",
-        userName: u ? u.displayName : "Администратор",
-        createdAt: timeStr
-      };
-      CATEGORIES._changeLogs.unshift(entry);
-      if (CATEGORIES._changeLogs.length > 250) {
-        CATEGORIES._changeLogs = CATEGORIES._changeLogs.slice(0, 250);
-      }
-      persistDatabase();
-    }
-
-    window.saveHomePostSubmit = async function(e) {
-      e.preventDefault();
-      if (!isCurrentUserAdmin()) return;
-
-      const titleInp = document.getElementById("homeEditorTitle");
-      const contentArea = document.getElementById("homeEditorTextarea");
-      if (!titleInp || !contentArea) return;
-
-      const titleVal = titleInp.value.trim();
-      const contentVal = contentArea.value.trim();
-      if (!titleVal || !contentVal) return;
-
-      const u = getCurrentUser();
-      const authorName = u ? u.displayName : "Администратор";
-      const timeStr = typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
-      const isNews = activeHomeSubtab === "news";
-      const tabType = isNews ? "news" : "rules";
-      const sectionTitleRu = isNews ? "📰 Новости" : "⚖️ Правила сайта";
-
-      let postObj = null;
-      let isEdit = false;
-
-      const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-      if (editingHomePostId) {
-        const found = targetList.find(x => x.id === editingHomePostId);
-        if (found) {
-          found.title = titleVal;
-          found.content = contentVal;
-          found.updatedAt = timeStr;
-          found.updatedBy = authorName;
-          postObj = found;
-          isEdit = true;
-        }
-      }
-
-      if (!isEdit) {
-        postObj = {
-          id: (isNews ? "news-" : "srule-") + Date.now(),
-          tabType,
-          title: titleVal,
-          content: contentVal,
-          authorName,
-          createdAt: timeStr,
-          updatedAt: null,
-          sortOrder: isNews ? 0 : (HOME_RULES_LIST.length + 1)
-        };
-        if (isNews) HOME_NEWS_LIST.unshift(postObj);
-        else HOME_RULES_LIST.push(postObj);
-      }
-
-      editingHomePostId = null;
-      logHomePageAdminAction(isEdit ? "edited" : "created", sectionTitleRu, titleVal);
-      renderHomeView();
-
-      if (typeof sbClient !== "undefined" && sbClient) {
-        try {
-          setCloudStatusBadge("🔄", "Сохранение записи...");
-          const { error } = await sbClient
-            .from("cp2020_home_content")
-            .upsert(mapHomePostToRow(postObj), { onConflict: "id" });
-          if (error) throw error;
-
-          if (typeof liveChannel !== "undefined" && liveChannel) {
-            liveChannel.send({
-              type: "broadcast",
-              event: "home_content_op",
-              payload: { sender: CLIENT_TAB_ID, action: isEdit ? "update" : "insert", post: postObj }
-            });
-          }
-          setCloudStatusBadge("🟢", "В сети");
-        } catch (err) {
-          console.error("Ошибка сохранения записи главной страницы:", err);
-        }
-      }
-
-      const notifText = isNews
-        ? (isEdit ? `📰 Обновлена новость: «<b>${titleVal}</b>»` : `📰 Опубликована новость: «<b>${titleVal}</b>»`)
-        : (isEdit ? `⚖️ Изменено правило сайта: «<b>${titleVal}</b>»` : `⚖️ Добавлено правило сайта: «<b>${titleVal}</b>»`);
-
-      await broadcastSiteNotificationToAllUsers("rank", notifText, activeHomeSubtab);
-    };
-
-    window.startEditHomePost = function(postId) {
-      if (!isCurrentUserAdmin()) return;
-      editingHomePostId = postId;
-      renderHomeView();
-      setTimeout(() => {
-        const editorBox = document.getElementById("homeAdminEditorBox");
-        if (editorBox) editorBox.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 60);
-    };
-
-    window.cancelEditHomePost = function() {
-      editingHomePostId = null;
-      renderHomeView();
-    };
-
-    window.deleteHomePost = async function(postId) {
-      if (!isCurrentUserAdmin()) return;
-      const isNews = activeHomeSubtab === "news";
-      const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-      const target = targetList.find(x => x.id === postId);
-      if (!target || !confirm(`Удалить запись «${target.title}»?`)) return;
-
-      if (isNews) HOME_NEWS_LIST = HOME_NEWS_LIST.filter(x => x.id !== postId);
-      else HOME_RULES_LIST = HOME_RULES_LIST.filter(x => x.id !== postId);
-
-      logHomePageAdminAction("deleted", isNews ? "📰 Новости" : "⚖️ Правила сайта", target.title);
-      renderHomeView();
-
-      if (typeof sbClient !== "undefined" && sbClient) {
-        try {
-          await sbClient.from("cp2020_home_content").delete().eq("id", postId);
-          if (typeof liveChannel !== "undefined" && liveChannel) {
-            liveChannel.send({
-              type: "broadcast",
-              event: "home_content_op",
-              payload: { sender: CLIENT_TAB_ID, action: "delete", postId }
-            });
-          }
-        } catch (e) {}
-      }
-    };
-
-    window.startEditAdminContact = function(userId) {
-      const cur = getCurrentUser();
-      if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
-      editingContactUserId = userId;
-      renderHomeView();
-    };
-
-    window.cancelEditAdminContact = function() {
-      editingContactUserId = null;
-      renderHomeView();
-    };
-
-    window.addAdminSocialLinkRow = function() {
-      const list = document.getElementById("adminSocialLinksEditList");
-      if (!list) return;
-      const row = document.createElement("div");
-      row.className = "admin-social-link-row grid grid-cols-12 gap-2 items-center";
-      row.innerHTML = `
-        <input type="text" data-sfield="label" placeholder="Название (VK, Telegram, Discord, Boosty...)" class="col-span-5 bg-cp-bg border border-gray-700 focus:border-cp-cyan px-2.5 py-1.5 text-xs text-white outline-none">
-        <input type="text" data-sfield="url" placeholder="https://t.me/... или ник в Discord" class="col-span-6 bg-cp-bg border border-gray-700 focus:border-cp-yellow px-2.5 py-1.5 text-xs text-white outline-none">
-        <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
-      `;
-      list.appendChild(row);
-    };
-
-    window.saveAdminContactSubmit = function(e, userId) {
-      e.preventDefault();
-      const cur = getCurrentUser();
-      if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
-      ensureHomeDataStructures();
-
-      const roleTitle = document.getElementById("admContactRoleTitle")?.value.trim() || "";
-      const note = document.getElementById("admContactNote")?.value.trim() || "";
-      const rows = document.querySelectorAll("#adminSocialLinksEditList .admin-social-link-row");
-      const links = Array.from(rows).map(r => ({
-        label: r.querySelector('[data-sfield="label"]')?.value.trim() || "",
-        url: r.querySelector('[data-sfield="url"]')?.value.trim() || ""
-      })).filter(l => l.label !== "" || l.url !== "");
-
-      CATEGORIES._adminContacts[userId] = { roleTitle, note, links };
-      editingContactUserId = null;
-
-      const targetAdmin = USERS.find(u => u.id === userId);
-      logHomePageAdminAction("edited", "📡 Контакты", `Обновлены контакты админа ${targetAdmin ? targetAdmin.displayName : userId}`);
-      renderHomeView();
-    };
-
-    function renderHomeView() {
-      injectHomeViewIntoDOM();
-      ensureHomeDataStructures();
-
-      const adminsList = USERS.filter(u => u.role === "ROOT" || u.role === "ADMIN");
-      document.getElementById("homeCnt-news").textContent = HOME_NEWS_LIST.length;
-      document.getElementById("homeCnt-rules").textContent = HOME_RULES_LIST.length;
-      document.getElementById("homeCnt-contacts").textContent = adminsList.length;
-
-      ["news", "rules", "contacts"].forEach(tab => {
-        const btn = document.getElementById("homeNavBtn-" + tab);
-        if (!btn) return;
-        const isCur = activeHomeSubtab === tab;
-        btn.className = isCur
-          ? "w-full text-left px-4 py-3 border transition-all flex items-center justify-between bg-cp-yellow text-black border-cp-yellow shadow-[0_0_15px_rgba(252,238,10,0.25)]"
-          : "w-full text-left px-4 py-3 border border-gray-800 bg-cp-bg text-gray-300 hover:border-cp-cyan transition-all flex items-center justify-between";
-      });
-
-      const totalCards = Object.keys(SECTION_LABELS).reduce((acc, k) => acc + (DB[k]?.length || 0), 0);
-      const statsEl = document.getElementById("homeQuickStatsBox");
-      if (statsEl) {
-        statsEl.innerHTML = `
-          <div class="bg-cp-bg border border-gray-800 p-2.5">
-            <div class="text-[10px] text-gray-400 uppercase">Всего карточек</div>
-            <div class="text-lg font-display font-black text-cp-yellow mt-0.5">${totalCards}</div>
-          </div>
-          <div class="bg-cp-bg border border-gray-800 p-2.5">
-            <div class="text-[10px] text-gray-400 uppercase">Участников</div>
-            <div class="text-lg font-display font-black text-cp-cyan mt-0.5">${USERS.length}</div>
-          </div>
-        `;
-      }
-
-      const mainCol = document.getElementById("homeMainColumn");
-      if (!mainCol) return;
-      const isAdmin = isCurrentUserAdmin();
-
-      if (activeHomeSubtab === "news" || activeHomeSubtab === "rules") {
-        const isNews = activeHomeSubtab === "news";
-        const postsList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-        const postToEdit = editingHomePostId ? postsList.find(p => p.id === editingHomePostId) : null;
-
-        const headerBannerHtml = isNews
-          ? `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-yellow flex items-center justify-between gap-4"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ИНФОРМАЦИОННЫЙ КАНАЛ NIGHT CITY NETWORK</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📰 Новости и обновления сайта</h2><p class="text-xs text-gray-400 mt-1">Свежие патчноуты, добавленные книги-источники, новые разделы и объявления администрации.</p></div></div>`
-          : `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan flex items-center justify-between gap-4"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ДИРЕКТИВЫ БЕЗОПАСНОСТИ СЕТЕВОГО ДОЗОРА</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">⚖️ Правила сайта и сообщества</h2><p class="text-xs text-gray-400 mt-1">Обязательный свод правил для всех пользователей терминала DataTerm.</p></div></div>`;
-
-        const adminEditorHtml = !isAdmin ? "" : `
-          <div id="homeAdminEditorBox" class="bg-cp-panel cp-border p-5 space-y-3.5 border-t-2 ${postToEdit ? 'border-t-cp-cyan' : 'border-t-cp-yellow'}">
-            <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
-              <div class="flex items-center gap-2">
-                <span class="text-sm">${postToEdit ? '✏️' : '➕'}</span>
-                <h3 class="font-display text-xs font-bold uppercase ${postToEdit ? 'text-cp-cyan' : 'text-cp-yellow'}">
-                  ${postToEdit ? `Редактирование записи: ${postToEdit.title}` : (isNews ? 'Опубликовать новую новость' : 'Добавить новый блок правил')}
-                </h3>
-              </div>
-              ${postToEdit ? `<button type="button" onclick="cancelEditHomePost()" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 border border-gray-600">✕ Отменить редактирование</button>` : ""}
-            </div>
-            <form onsubmit="saveHomePostSubmit(event)" class="space-y-3">
-              <div>
-                <label class="block text-[11px] text-gray-400 font-bold uppercase mb-1">Заголовок ${isNews ? 'новости' : 'правила'}*:</label>
-                <input type="text" id="homeEditorTitle" required value="${postToEdit ? escapeHtmlAttr(postToEdit.title) : ''}" placeholder="${isNews ? 'Например: Обновление 2.4 — Добавлены все роли из Chromebook!' : 'Например: 4. Правила публикации ссылок и артов'}" class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2 text-xs text-white font-bold outline-none">
-              </div>
-              <div class="space-y-1.5">
-                <div class="flex items-center justify-between flex-wrap gap-2">
-                  <label class="text-[11px] text-gray-400 font-bold uppercase">Инструменты форматирования текста:</label>
-                  <span id="homeEditorCharCount" class="text-[11px] text-gray-400">Написано символов: <b class="text-cp-green">0</b> / 1000 до сворачивания</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-1.5 bg-cp-bg border border-gray-800 p-1.5">
-                  <button type="button" onclick="insertHomeFormatTag('<b>', '</b>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold"><b>B</b></button>
-                  <button type="button" onclick="insertHomeFormatTag('<i>', '</i>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic">I</button>
-                  <button type="button" onclick="insertHomeFormatTag('<u>', '</u>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline">U</button>
-                  <span class="text-gray-700 px-1">|</span>
-                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый акцент</button>
-                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан акцент</button>
-                  <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный акцент</button>
-                  <span class="text-gray-700 px-1">|</span>
-                  <button type="button" onclick="insertHomeFormatTag('<h4 class=&quot;text-cp-yellow font-display font-bold text-sm uppercase mt-2 mb-1&quot;>', '</h4>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px] font-bold">Подзаголовок H4</button>
-                  <button type="button" onclick="insertHomeFormatTag('<blockquote class=&quot;border-l-2 border-cp-cyan pl-3 italic text-gray-300 my-2&quot;>', '</blockquote>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px]">❝ Цитата</button>
-                  <button type="button" onclick="insertHomeFormatTag('• ', '\\n')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-cyan hover:text-black border border-gray-700 text-[11px]">• Пункт списка</button>
-                </div>
-                <textarea id="homeEditorTextarea" required rows="6" oninput="updateHomeEditorCharCounter()" placeholder="Введите полный текст... Если объём превысит 1000 символов, на странице он автоматически аккуратно свернётся под кнопку «Развернуть полностью»." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
-              </div>
-              <div class="flex items-center justify-between pt-1">
-                <span class="text-[11px] text-gray-400">🔔 При сохранении всем пользователям придёт уведомление в колокольчик, а запись попадёт в Логи.</span>
-                <button type="submit" class="px-6 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
-                  ${postToEdit ? '💾 Сохранить изменения' : (isNews ? '📢 Опубликовать новость' : '➕ Добавить правило')}
-                </button>
-              </div>
-            </form>
-          </div>
-        `;
-
-        const postsCardsHtml = postsList.length === 0
-          ? `<div class="bg-cp-panel cp-border p-8 text-center text-xs text-gray-500">Записей пока нет.</div>`
-          : postsList.map(post => {
-              const charLen = getPlainTextLength(post.content);
-              const isLong = charLen > 1000;
-              const isExpanded = expandedHomePosts.has(post.id);
-              const displayedContent = (isLong && !isExpanded) ? getTruncatedPreviewHtml(post.content, 1000) : post.content;
-
-              return `
-                <article class="bg-cp-panel cp-border p-6 space-y-3.5 transition-all hover:border-gray-600">
-                  <div class="flex items-start justify-between gap-4 border-b border-gray-800 pb-3">
-                    <div>
-                      <div class="flex items-center gap-2 text-[11px] text-gray-400 mb-1">
-                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isNews ? 'bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40' : 'bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/40'}">${isNews ? 'НОВОСТЬ' : 'ПРАВИЛО'}</span>
-                        <span>Автор: <b class="text-white">${dash(post.authorName)}</b></span>
-                        <span>• ${dash(post.createdAt)}</span>
-                        ${post.updatedAt ? `<span class="text-cp-cyan">(обновлено: ${post.updatedAt})</span>` : ""}
-                      </div>
-                      <h3 class="font-display text-lg font-black text-white">${post.title}</h3>
-                    </div>
-                    ${isAdmin ? `
-                      <div class="flex items-center gap-1.5 shrink-0">
-                        <button type="button" onclick="startEditHomePost('${post.id}')" class="px-3 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
-                        <button type="button" onclick="deleteHomePost('${post.id}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
-                      </div>
-                    ` : ""}
-                  </div>
-                  <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line bg-cp-bg/70 border-l-2 ${isNews ? 'border-cp-yellow' : 'border-cp-cyan'} p-4">${displayedContent}</div>
-                  ${isLong ? `
-                    <div class="pt-1 flex items-center justify-between">
-                      <span class="text-[11px] text-gray-500">Объём текста: ${charLen} симв.</span>
-                      <button type="button" onclick="toggleExpandHomePost('${post.id}')" class="px-4 py-1.5 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/60 text-xs font-bold uppercase transition-colors">
-                        ${isExpanded ? '▲ Свернуть текст' : `▼ Развернуть полностью (${charLen} симв.)`}
-                      </button>
-                    </div>
-                  ` : ""}
-                </article>
-              `;
-            }).join("");
-
-        mainCol.innerHTML = `${headerBannerHtml}${adminEditorHtml}<div class="space-y-4">${postsCardsHtml}</div>`;
-        if (postToEdit) updateHomeEditorCharCounter();
-        return;
-      }
-
-      // Вкладка 3: Контакты администрации
-      const curUser = getCurrentUser();
-      const contactsCardsHtml = adminsList.map(adm => {
-        const isRoot = adm.role === "ROOT";
-        const cInfo = CATEGORIES._adminContacts[adm.id] || { roleTitle: "", note: "", links: [] };
-        const canEditThisContact = Boolean(curUser && (isCurrentUserRoot() || curUser.id === adm.id));
-        const isEditingThis = editingContactUserId === adm.id;
-
-        const avHtml = adm.avatar
-          ? `<img src="${adm.avatar}" onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">`
-          : `<div onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 bg-cp-bg border-2 ${isRoot ? 'border-cp-red text-cp-red' : 'border-cp-cyan text-cp-cyan'} flex items-center justify-center font-display font-black text-xl cursor-pointer shrink-0">${(adm.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
-
-        const linksHtml = (!Array.isArray(cInfo.links) || cInfo.links.length === 0)
-          ? `<span class="text-xs text-gray-500 italic">Ссылки на соцсети пока не указаны</span>`
-          : cInfo.links.map(l => {
-              const isHttp = l.url && (l.url.startsWith("http://") || l.url.startsWith("https://"));
-              return isHttp
-                ? `<a href="${escapeHtmlAttr(l.url)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5"><span>🔗</span><span>${l.label || l.url}</span></a>`
-                : `<span class="px-3 py-1.5 bg-cp-bg border border-gray-700 text-xs text-gray-200 inline-flex items-center gap-1.5"><b class="text-cp-yellow">${l.label}:</b> <span>${l.url}</span></span>`;
-            }).join("");
-
-        const editFormHtml = !isEditingThis ? "" : `
-          <form onsubmit="saveAdminContactSubmit(event, '${adm.id}')" class="mt-4 pt-4 border-t border-gray-800 space-y-3 bg-cp-bg/90 p-4 border border-cp-cyan/50">
-            <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройка контактных данных (${adm.displayName})</div>
-            <div class="grid grid-cols-2 gap-3">
-              <div><label class="block text-[11px] text-gray-400 mb-1">Должность / Роль в проекте:</label><input type="text" id="admContactRoleTitle" value="${escapeHtmlAttr(cInfo.roleTitle)}" placeholder="Главный Администратор / Модератор..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
-              <div><label class="block text-[11px] text-gray-400 mb-1">По каким вопросам обращаться:</label><input type="text" id="admContactNote" value="${escapeHtmlAttr(cInfo.note)}" placeholder="Вопросы по сайту, перевод, предложения..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
-            </div>
-            <div class="space-y-2">
-              <div class="flex items-center justify-between"><label class="text-[11px] text-cp-yellow font-bold uppercase">Ссылки на соцсети и мессенджеры:</label><button type="button" onclick="addAdminSocialLinkRow()" class="px-2.5 py-1 bg-cp-cyan text-black font-bold text-[11px] uppercase hover:bg-cyan-300">+ Добавить ссылку</button></div>
-              <div id="adminSocialLinksEditList" class="space-y-2">
-                ${(cInfo.links && cInfo.links.length > 0 ? cInfo.links : [{ label: "", url: "" }]).map(l => `
-                  <div class="admin-social-link-row grid grid-cols-12 gap-2 items-center">
-                    <input type="text" data-sfield="label" value="${escapeHtmlAttr(l.label)}" placeholder="Название (VK, Telegram, Discord...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-                    <input type="text" data-sfield="url" value="${escapeHtmlAttr(l.url)}" placeholder="https://... или @username" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-                    <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
-                  </div>
-                `).join("")}
-              </div>
-            </div>
-            <div class="flex items-center gap-2 pt-2"><button type="submit" class="px-5 py-2 bg-cp-green text-black font-bold text-xs uppercase hover:bg-green-400">💾 Сохранить контакты</button><button type="button" onclick="cancelEditAdminContact()" class="px-4 py-2 bg-gray-800 text-gray-300 text-xs font-bold uppercase border border-gray-700">Отмена</button></div>
-          </form>
-        `;
-
-        return `
-          <div class="bg-cp-panel cp-border p-5 space-y-3">
-            <div class="flex items-start justify-between gap-4">
-              <div class="flex items-center gap-4">
-                ${avHtml}
-                <div>
-                  <div class="flex items-center gap-2 flex-wrap">
-                    <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="font-display text-lg font-black text-white hover:text-cp-yellow hover:underline">${adm.displayName}</button>
-                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isRoot ? 'bg-cp-red text-white' : 'bg-cp-cyan text-black'}">${isRoot ? '👑 ГЛАВНЫЙ АДМИН (ROOT)' : '🛡️ АДМИНИСТРАТОР'}</span>
-                  </div>
-                  <div class="text-xs text-cp-yellow font-bold mt-0.5">${cInfo.roleTitle || (isRoot ? "Создатель и Главный Администратор проекта" : "Администратор и модератор справочника")}</div>
-                  <div class="text-xs text-gray-400 mt-1">${cInfo.note || adm.bio || "Связь с администрацией сайта."}</div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 shrink-0">
-                <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль на сайте</button>
-                ${canEditThisContact ? `<button type="button" onclick="startEditAdminContact('${adm.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Мои ссылки</button>` : ""}
-              </div>
-            </div>
-            <div class="pt-3 border-t border-gray-800 flex items-center flex-wrap gap-2">
-              <span class="text-[11px] font-bold uppercase text-gray-400 mr-1">Соцсети и связь:</span>
-              ${linksHtml}
-            </div>
-            ${editFormHtml}
-          </div>
-        `;
-      }).join("");
-
-      mainCol.innerHTML = `
-        <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-red">
-          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-red">КОМАНДНЫЙ ЦЕНТР СПРАВОЧНИКА</div>
-          <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📡 Контакты Администрации</h2>
-          <p class="text-xs text-gray-400 mt-1">Список действующих администраторов проекта, их профили на сайте и прямые ссылки для связи.</p>
-        </div>
-        <div class="space-y-4">${contactsCardsHtml}</div>
-      `;
-    }
-
-    const origJumpFromLog = jumpToCardFromChangeLog;
-    window.jumpToCardFromChangeLog = function(sectionKey, itemId) {
-      if (sectionKey === "home") {
-        activeHomeSubtab = itemId || "news";
-        switchMainView("home");
-        return;
-      }
-      origJumpFromLog(sectionKey, itemId);
-    };
-
-    // МГНОВЕННО открываем Главную страницу при загрузке скрипта (и повторно после подключения к облаку)
-    injectHomeViewIntoDOM();
-    ensureHomeDataStructures();
-    switchMainView("home");
-
-    window.addEventListener("load", () => {
-      setTimeout(() => {
-        fetchHomeContentFromCloud();
-        if (typeof liveChannel !== "undefined" && liveChannel) {
-          liveChannel
-            .on("broadcast", { event: "home_content_op" }, (msg) => {
-              const p = msg.payload;
-              if (!p || p.sender === CLIENT_TAB_ID) return;
-              fetchHomeContentFromCloud();
-            })
-            .on("broadcast", { event: "site_wide_notif" }, (msg) => {
-              const p = msg.payload;
-              const u = getCurrentUser();
-              if (!p || !u || p.sender === CLIENT_TAB_ID) return;
-              NOTIFICATIONS.unshift({
-                id: "ntf-" + Date.now(),
-                targetUserId: u.id,
-                type: p.type || "rank",
-                text: p.text,
-                linkData: p.linkData,
-                read: false,
-                createdAt: p.createdAt
-              });
-              updateNotifBellUI();
-            });
-        }
-      }, 1000);
-    });
-  </script>
+  
   <!-- ========================================================================= -->
   <!-- АВТО-СИНХРОНИЗАТОР ПОЛЕЙ БРОНИ (СОПОСТАВЛЯЕТ DATABASE.JS И SCHEMAS.ARMOR) -->
   <!-- ========================================================================= -->
@@ -8236,6 +7432,1408 @@
       injectMultiImageUploaderIntoBuilder();
     });
     injectMultiImageUploaderIntoBuilder();
+  </script>
+  <!-- ========================================================================= -->
+  <!-- ЧИСТЫЙ МОНОЛИТНЫЙ МОДУЛЬ ГЛАВНОЙ СТРАНИЦЫ (БЕЗ СЧЁТЧИКОВ И СБОЕВ)         -->
+  <!-- ========================================================================= -->
+  <script>
+    (function setupCleanHomeAndRemoveCounts() {
+      // 1. Внутренние безопасные хелперы (не зависят от того, что объявлено выше в коде)
+      function safeEsc(val) {
+        if (val === undefined || val === null) return "";
+        return String(val)
+          .replace(/&/g, "&amp;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function safeDash(val) {
+        if (val === undefined || val === null || String(val).trim() === "") return "—";
+        return String(val);
+      }
+
+      function checkIsAdmin() {
+        if (typeof isCurrentUserAdmin === "function") {
+          try { return Boolean(isCurrentUserAdmin()); } catch (e) {}
+        }
+        const u = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        return Boolean(u && (u.role === "ROOT" || u.role === "ADMIN" || u.login === "Kisaaj"));
+      }
+
+      function checkIsRoot() {
+        const u = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        return Boolean(u && (u.role === "ROOT" || u.id === "u-root" || u.login === "Kisaaj"));
+      }
+
+      // 2. Полное удаление подсчёта карточек по всему сайту (в навигации и на главной)
+      function stripAllCardCountersEverywhere() {
+        // Удаляем лишнюю кнопку nav-home-btn, если она когда-либо создавалась
+        const extraHomeBtn = document.getElementById("nav-home-btn");
+        if (extraHomeBtn) extraHomeBtn.remove();
+
+        // Удаляем все спаны вида id="cnt-..." внутри кнопок верхнего меню (#mainNav)
+        document.querySelectorAll('#mainNav [id^="cnt-"]').forEach(el => el.remove());
+
+        // Если в кнопках #mainNav остались скобки вида (0) или (15) текстом — аккуратно убираем
+        document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
+          btn.querySelectorAll("span").forEach(sp => {
+            if (/^\(\d+\)$/.test((sp.textContent || "").trim())) {
+              sp.remove();
+            }
+          });
+        });
+      }
+
+      // Переопределяем глобальную функцию updateCounts, чтобы она больше нигде не рисовала цифры
+      window.updateCounts = function() {
+        stripAllCardCountersEverywhere();
+      };
+
+      // 3. Состояние и базовые данные Главной страницы
+      window.activeHomeSubtab = "news"; // "news" | "rules" | "legal" | "contacts"
+      window.editingHomePostId = null;
+      window.editingContactUserId = null;
+      window.expandedHomePosts = new Set();
+
+      const INITIAL_RULES = [
+        {
+          id: "srule-1",
+          tabType: "rules",
+          title: "1. Уважительное общение и кибер-этика",
+          content: "Терминал DataTerm открыт для всех эджраннеров, рефери и новичков НРИ <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>. В комментариях под карточками и в профилях запрещены прямые оскорбления участников, травля, переходы на личности и агрессивный флуд.\n\nСпоры о трактовке правил и механик <span class=\"text-cp-cyan font-bold\">Friday Night Firefight</span> приветствуются, если они ведутся аргументированно и с уважением к собеседнику.",
+          authorName: "Kisaaj",
+          createdAt: "2026-10-30 12:00 (МСК)",
+          updatedAt: null,
+          sortOrder: 1
+        },
+        {
+          id: "srule-2",
+          tabType: "rules",
+          title: "2. Запрет неодобренных ссылок, спама и рекламы",
+          content: "В комментариях, описаниях публичных профилей и заметках строго запрещена публикация:\n• Фишинговых, вредоносных или подозрительных ссылок;\n• Рекламы сторонних коммерческих ресурсов, магазинов и несогласованных проектов;\n• Ссылок на материалы, нарушающие законодательство.\n\nРазрешены ссылки на проверенные хостинги изображений (<span class=\"text-cp-yellow font-bold\">Imgur, GitHub, Postimages, ВК</span>) для оформления аватарок и иллюстраций карточек.",
+          authorName: "Kisaaj",
+          createdAt: "2026-10-30 12:05 (МСК)",
+          updatedAt: null,
+          sortOrder: 2
+        },
+        {
+          id: "srule-3",
+          tabType: "rules",
+          title: "3. Правила оформления комментариев и Homebrew-материалов",
+          content: "Комментарии под карточками оружия, ролей, имплантов и механик предназначены для:\n• Обсуждения игрового баланса и применения предмета в партиях;\n• Уточнения переводов и ссылок на книги-источники (<span class=\"text-cp-cyan font-bold\">Corebook, Chromebook 1–4, Eurosource Plus, Max Metal</span>);\n• Советов от Рефери и игроков.\n\nПри добавлении авторских карточек администрацией обязательно указывайте плашку <span class=\"text-cp-yellow font-bold\">HOMEBREW</span>.",
+          authorName: "Kisaaj",
+          createdAt: "2026-10-30 12:10 (МСК)",
+          updatedAt: null,
+          sortOrder: 3
+        }
+      ];
+
+      const INITIAL_NEWS = [
+        {
+          id: "news-welcome-1",
+          tabType: "news",
+          title: "ДОБРО ПОЖАЛОВАТЬ В СПРАВОЧНИК CYBERPUNK 2020 // ПОМОГАЛКА",
+          content: "Добро пожаловать в интерактивную русскоязычную базу данных по настольной ролевой игре <b>Cyberpunk 2020</b> от сообщества <span class=\"text-cp-cyan font-bold\">Село ДнДшеское</span>!\n\nЗдесь собраны переведённые и структурированные материалы из основной книги правил и дополнений: роли, оружие, броня, снаряжение, киберимпланты, программы для нетраннинга, транспорт, персонажи, корпорации, боргирование и игровые механики.\n\n<h4 class=\"text-cp-yellow font-display font-bold text-sm uppercase mt-2 mb-1\">Что доступно на сайте:</h4>• Умный поиск и фильтрация снаряжения по книгам-источникам, цене, надёжности (НАД) и доступности (ДОС);\n• Личный профиль Эджраннера с выбором любимой роли и корпорации, закладками «Избранное» и приватным терминалом заметок;\n• Обсуждение любой карточки в реальном времени и система уведомлений.\n\nНажмите на логотип <b>CP</b> или заголовок <b>CYBERPUNK 2020</b> в левом верхнем углу в любой момент, чтобы вернуться на эту главную страницу!",
+          authorName: "Kisaaj",
+          createdAt: "2026-10-30 12:00 (МСК)",
+          updatedAt: null,
+          sortOrder: 0
+        }
+      ];
+
+      if (!Array.isArray(window.HOME_NEWS_LIST) || window.HOME_NEWS_LIST.length === 0) {
+        window.HOME_NEWS_LIST = JSON.parse(JSON.stringify(INITIAL_NEWS));
+      }
+      if (!Array.isArray(window.HOME_RULES_LIST) || window.HOME_RULES_LIST.length === 0) {
+        window.HOME_RULES_LIST = JSON.parse(JSON.stringify(INITIAL_RULES));
+      }
+
+      window.ensureHomeDataStructures = function() {
+        if (typeof CATEGORIES === "undefined") return;
+        if (!CATEGORIES._adminContacts || typeof CATEGORIES._adminContacts !== "object") {
+          CATEGORIES._adminContacts = {};
+        }
+        if (!CATEGORIES._adminContacts["u-root"]) {
+          CATEGORIES._adminContacts["u-root"] = {
+            roleTitle: "Главный Архитектор и Создатель базы",
+            note: "По вопросам развития проекта, перевода книг Cyberpunk 2020 и сотрудничества.",
+            links: [
+              { label: "Сообщество ВК (Село ДнДшеское)", url: "https://vk.ru/selodnd" }
+            ]
+          };
+        }
+      };
+
+      // 4. Привязка клика к иконке CP и названию сайта в левом верхнем углу
+      function bindHeaderBrandClickToHome() {
+        const header = document.querySelector("header");
+        if (!header) return;
+
+        const titleEl = header.querySelector("h1");
+        const logoBox = header.querySelector(".bg-cp-red") || header.querySelector(".w-10.h-10");
+        const brandWrapper = titleEl ? titleEl.parentElement : null;
+
+        [titleEl, logoBox, brandWrapper].forEach(el => {
+          if (!el) return;
+          el.style.cursor = "pointer";
+          el.classList.add("cursor-pointer", "select-none");
+          el.title = "Нажмите, чтобы перейти на Главную страницу";
+          el.onclick = function(ev) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            window.switchMainView("home");
+          };
+        });
+      }
+
+      // 5. Создание чистой разметки Главной страницы (без счётчиков карточек)
+      window.injectHomeViewIntoDOM = function() {
+        bindHeaderBrandClickToHome();
+        stripAllCardCountersEverywhere();
+
+        let homeMain = document.getElementById("view-home");
+        if (!homeMain) {
+          const catalogMain = document.getElementById("view-catalog");
+          if (!catalogMain || !catalogMain.parentNode) return;
+
+          homeMain = document.createElement("main");
+          homeMain.id = "view-home";
+          homeMain.className = "max-w-[1880px] w-full mx-auto px-6 py-5 flex-1 flex flex-col gap-5";
+          catalogMain.parentNode.insertBefore(homeMain, catalogMain);
+        }
+
+        // Проверяем, наша ли стоит чистая разметка v2 (если старая — полностью заменяем)
+        if (homeMain.getAttribute("data-clean-home") !== "v2") {
+          homeMain.setAttribute("data-clean-home", "v2");
+          homeMain.innerHTML = `
+            <div class="grid grid-cols-12 gap-6 items-start">
+              <!-- Левая колонка контента -->
+              <section class="col-span-12 lg:col-span-8 space-y-5" id="homeMainColumn"></section>
+
+              <!-- Правая панель навигации Главной страницы (без счётчиков) -->
+              <aside class="col-span-12 lg:col-span-4 sticky top-20 space-y-5">
+                <div class="bg-cp-panel cp-border p-5 space-y-4">
+                  <div class="border-b border-gray-800 pb-3">
+                    <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">НАВИГАЦИЯ ТЕРМИНАЛА DATATERM</div>
+                    <h2 class="font-display font-black text-base text-white uppercase mt-0.5">🏠 Главная страница</h2>
+                  </div>
+                  <div class="flex flex-col gap-2.5" id="homeRightNav">
+                    <button type="button" id="homeNavBtn-news"
+                      onclick="window.switchHomeSubtab('news')"
+                      class="w-full text-left px-4 py-3 border transition-all flex items-center gap-3">
+                      <span class="text-base shrink-0">📰</span>
+                      <div>
+                        <div class="font-display font-bold text-xs uppercase tracking-wider">Новости и обновления</div>
+                        <div class="text-[10px] opacity-75">Журнал разработки и обновления базы</div>
+                      </div>
+                    </button>
+
+                    <button type="button" id="homeNavBtn-rules"
+                      onclick="window.switchHomeSubtab('rules')"
+                      class="w-full text-left px-4 py-3 border transition-all flex items-center gap-3">
+                      <span class="text-base shrink-0">⚖️</span>
+                      <div>
+                        <div class="font-display font-bold text-xs uppercase tracking-wider">Правила сайта</div>
+                        <div class="text-[10px] opacity-75">Кодекс поведения и модерации NetWatch</div>
+                      </div>
+                    </button>
+
+                    <button type="button" id="homeNavBtn-legal"
+                      onclick="window.switchHomeSubtab('legal')"
+                      class="w-full text-left px-4 py-3 border transition-all flex items-center gap-3">
+                      <span class="text-base shrink-0">🛡️</span>
+                      <div>
+                        <div class="font-display font-bold text-xs uppercase tracking-wider">Правовая часть</div>
+                        <div class="text-[10px] opacity-75">Некоммерческий статус и права R. Talsorian Games</div>
+                      </div>
+                    </button>
+
+                    <button type="button" id="homeNavBtn-contacts"
+                      onclick="window.switchHomeSubtab('contacts')"
+                      class="w-full text-left px-4 py-3 border transition-all flex items-center gap-3">
+                      <span class="text-base shrink-0">📡</span>
+                      <div>
+                        <div class="font-display font-bold text-xs uppercase tracking-wider">Контакты администрации</div>
+                        <div class="text-[10px] opacity-75">Профили админов и ссылки для связи</div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="bg-cp-panel cp-border p-4 space-y-2">
+                  <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+                    <span class="font-display text-xs font-bold uppercase text-cp-yellow">⚡ Статус терминала</span>
+                    <span class="text-[10px] text-cp-green font-bold">ONLINE // 2020</span>
+                  </div>
+                  <div class="text-[11px] text-gray-400 leading-relaxed">
+                    Выберите любой раздел в верхнем меню (<b>Роли, Оружие, Броня, Корпорации, Боргирование...</b>) для работы со справочником. Чтобы вернуться сюда — нажмите на иконку <b>CP</b> или название сайта в шапке.
+                  </div>
+                </div>
+              </aside>
+            </div>
+          `;
+        }
+      };
+
+      // 6. Переключение вкладок внутри Главной страницы
+      window.switchHomeSubtab = function(subtab) {
+        window.activeHomeSubtab = subtab || "news";
+        window.editingHomePostId = null;
+        window.editingContactUserId = null;
+        window.renderHomeView();
+      };
+
+      // 7. Перехват главного переключателя экранов сайта (switchMainView)
+      const prevSwitchMainView = window.switchMainView;
+      window.switchMainView = function(view, catalogTab = null) {
+        window.injectHomeViewIntoDOM();
+        window.ensureHomeDataStructures();
+        stripAllCardCountersEverywhere();
+
+        if (view === "home") {
+          activeMainView = "home";
+          ["home", "catalog", "rules", "profile", "admin"].forEach(v => {
+            const el = document.getElementById("view-" + v);
+            if (el) el.classList.toggle("hidden", v !== "home");
+          });
+          // Снимаем выделение со всех кнопок каталога, когда открыта Главная
+          document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
+            btn.className = "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan transition-all";
+          });
+          window.renderHomeView();
+          return;
+        }
+
+        const homeEl = document.getElementById("view-home");
+        if (homeEl) homeEl.classList.add("hidden");
+
+        if (typeof prevSwitchMainView === "function") {
+          prevSwitchMainView(view, catalogTab);
+        }
+        stripAllCardCountersEverywhere();
+      };
+
+      // 8. Вспомогательные функции для Новостей, Правил и Контактов
+      function getPlainLen(htmlStr) {
+        if (!htmlStr) return 0;
+        const d = document.createElement("div");
+        d.innerHTML = htmlStr;
+        return (d.textContent || d.innerText || "").length;
+      }
+
+      function getShortPreview(htmlStr, maxChars = 1000) {
+        const d = document.createElement("div");
+        d.innerHTML = htmlStr || "";
+        const plain = d.textContent || d.innerText || "";
+        if (plain.length <= maxChars) return htmlStr;
+        return safeEsc(plain.slice(0, maxChars)) + "…";
+      }
+
+      window.toggleExpandHomePost = function(postId) {
+        if (window.expandedHomePosts.has(postId)) window.expandedHomePosts.delete(postId);
+        else window.expandedHomePosts.add(postId);
+        window.renderHomeView();
+      };
+
+      window.insertHomeFormatTag = function(openTag, closeTag) {
+        const area = document.getElementById("homeEditorTextarea");
+        if (!area) return;
+        const start = area.selectionStart || 0;
+        const end = area.selectionEnd || 0;
+        const val = area.value;
+        const selected = val.slice(start, end) || "текст";
+        area.value = val.slice(0, start) + openTag + selected + closeTag + val.slice(end);
+        area.focus();
+      };
+
+      window.startEditHomePost = function(postId) {
+        if (!checkIsAdmin()) return;
+        window.editingHomePostId = postId;
+        window.renderHomeView();
+      };
+
+      window.cancelEditHomePost = function() {
+        window.editingHomePostId = null;
+        window.renderHomeView();
+      };
+
+      window.saveHomePostSubmit = async function(e) {
+        e.preventDefault();
+        if (!checkIsAdmin()) return;
+
+        const titleInp = document.getElementById("homeEditorTitle");
+        const contentArea = document.getElementById("homeEditorTextarea");
+        if (!titleInp || !contentArea) return;
+
+        const titleVal = titleInp.value.trim();
+        const contentVal = contentArea.value.trim();
+        if (!titleVal || !contentVal) return;
+
+        const u = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        const authorName = u ? u.displayName : "Kisaaj";
+        const timeStr = (typeof getMoscowTimeFormatted === "function") ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16);
+        const isNews = (window.activeHomeSubtab === "news");
+        const targetList = isNews ? window.HOME_NEWS_LIST : window.HOME_RULES_LIST;
+
+        let postObj = null;
+        if (window.editingHomePostId) {
+          postObj = targetList.find(x => x.id === window.editingHomePostId);
+          if (postObj) {
+            postObj.title = titleVal;
+            postObj.content = contentVal;
+            postObj.updatedAt = timeStr;
+          }
+        }
+
+        if (!postObj) {
+          postObj = {
+            id: (isNews ? "news-" : "srule-") + Date.now(),
+            tabType: isNews ? "news" : "rules",
+            title: titleVal,
+            content: contentVal,
+            authorName: authorName,
+            createdAt: timeStr,
+            updatedAt: null,
+            sortOrder: isNews ? 0 : (window.HOME_RULES_LIST.length + 1)
+          };
+          if (isNews) window.HOME_NEWS_LIST.unshift(postObj);
+          else window.HOME_RULES_LIST.push(postObj);
+        }
+
+        window.editingHomePostId = null;
+        window.renderHomeView();
+
+        if (typeof sbClient !== "undefined" && sbClient) {
+          try {
+            await sbClient.from("cp2020_home_content").upsert({
+              id: postObj.id,
+              tab_type: postObj.tabType,
+              title: postObj.title,
+              content: postObj.content,
+              author_name: postObj.authorName,
+              created_at: postObj.createdAt,
+              updated_at: postObj.updatedAt || null,
+              sort_order: postObj.sortOrder || 0
+            }, { onConflict: "id" });
+          } catch (err) {}
+        }
+      };
+
+      window.deleteHomePost = async function(postId) {
+        if (!checkIsAdmin()) return;
+        const isNews = (window.activeHomeSubtab === "news");
+        const targetList = isNews ? window.HOME_NEWS_LIST : window.HOME_RULES_LIST;
+        const target = targetList.find(x => x.id === postId);
+        if (!target || !confirm(`Удалить запись «${target.title}»?`)) return;
+
+        if (isNews) window.HOME_NEWS_LIST = window.HOME_NEWS_LIST.filter(x => x.id !== postId);
+        else window.HOME_RULES_LIST = window.HOME_RULES_LIST.filter(x => x.id !== postId);
+
+        window.renderHomeView();
+        if (typeof sbClient !== "undefined" && sbClient) {
+          try { await sbClient.from("cp2020_home_content").delete().eq("id", postId); } catch (e) {}
+        }
+      };
+
+      // Управление контактами администрации
+      window.startEditAdminContact = function(userId) {
+        const cur = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        if (!cur || (!checkIsRoot() && cur.id !== userId)) return;
+        window.editingContactUserId = userId;
+        window.renderHomeView();
+      };
+
+      window.cancelEditAdminContact = function() {
+        window.editingContactUserId = null;
+        window.renderHomeView();
+      };
+
+      window.addAdminSocialLinkRow = function() {
+        const list = document.getElementById("adminSocialLinksEditList");
+        if (!list) return;
+        const row = document.createElement("div");
+        row.className = "admin-social-link-row grid grid-cols-12 gap-2 items-center";
+        row.innerHTML = `
+          <input type="text" data-sfield="label" placeholder="Название (ВК, Telegram, Discord...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+          <input type="text" data-sfield="url" placeholder="https://... или ник" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+          <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
+        `;
+        list.appendChild(row);
+      };
+
+      window.saveAdminContactSubmit = function(e, userId) {
+        e.preventDefault();
+        const cur = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        if (!cur || (!checkIsRoot() && cur.id !== userId)) return;
+        window.ensureHomeDataStructures();
+
+        const roleTitle = document.getElementById("admContactRoleTitle")?.value.trim() || "";
+        const note = document.getElementById("admContactNote")?.value.trim() || "";
+        const rows = document.querySelectorAll("#adminSocialLinksEditList .admin-social-link-row");
+        const links = Array.from(rows).map(r => ({
+          label: r.querySelector('[data-sfield="label"]')?.value.trim() || "",
+          url: r.querySelector('[data-sfield="url"]')?.value.trim() || ""
+        })).filter(l => l.label !== "" || l.url !== "");
+
+        CATEGORIES._adminContacts[userId] = { roleTitle, note, links };
+        window.editingContactUserId = null;
+        if (typeof persistDatabase === "function") persistDatabase();
+        window.renderHomeView();
+      };
+
+      // 9. ГЛАВНАЯ ФУНКЦИЯ ОТРИСОВКИ ВСЕХ 4 ВКЛАДОК ГЛАВНОЙ СТРАНИЦЫ
+      window.renderHomeView = function() {
+        window.injectHomeViewIntoDOM();
+        window.ensureHomeDataStructures();
+
+        // Подсвечиваем активную вкладку справа
+        ["news", "rules", "legal", "contacts"].forEach(tab => {
+          const btn = document.getElementById("homeNavBtn-" + tab);
+          if (!btn) return;
+          const isCur = (window.activeHomeSubtab === tab);
+          btn.className = isCur
+            ? "w-full text-left px-4 py-3 border transition-all flex items-center gap-3 bg-cp-yellow text-black border-cp-yellow shadow-[0_0_15px_rgba(252,238,10,0.25)]"
+            : "w-full text-left px-4 py-3 border border-gray-800 bg-cp-bg text-gray-300 hover:border-cp-cyan transition-all flex items-center gap-3";
+        });
+
+        const mainCol = document.getElementById("homeMainColumn");
+        if (!mainCol) return;
+        const isAdmin = checkIsAdmin();
+
+        // --- ВКЛАДКА 1: ПРАВОВАЯ ЧАСТЬ (legal) ---
+        if (window.activeHomeSubtab === "legal") {
+          mainCol.innerHTML = `
+            <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan">
+              <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">NETWATCH LEGAL COMPLIANCE // DISCLAIMER</div>
+              <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">🛡️ Правовая часть и юридический статус</h2>
+              <p class="text-xs text-gray-400 mt-1">Официальное уведомление о некоммерческом статусе справочника и защите авторских прав правообладателей.</p>
+            </div>
+
+            <article class="bg-cp-panel cp-border p-6 space-y-4 text-xs text-gray-200 leading-relaxed">
+              <div class="border-b border-gray-800 pb-3">
+                <h3 class="font-display text-base font-bold text-cp-yellow">1. Некоммерческий фанатский статус проекта</h3>
+                <p class="text-gray-300 mt-1">
+                  Интерактивный справочник и база данных <b>Cyberpunk 2020 // Помогалка</b> (далее — <i>«Сайт», «Терминал DataTerm»</i>) является исключительно некоммерческим, любительским фанатским проектом, созданным силами сообщества <span class="text-cp-cyan font-bold">Село ДнДшеское</span> для поддержки русскоязычных игроков и Рефери настольной ролевой игры (НРИ) <i>Cyberpunk 2020</i>. Проект не извлекает никакой прямой или косвенной финансовой выгоды, не осуществляет продажу игровых материалов, книг или цифровых копий и не содержит монетизации, коммерческой рекламы или платных подписок.
+                </p>
+              </div>
+
+              <div class="border-b border-gray-800 pb-3">
+                <h3 class="font-display text-base font-bold text-cp-yellow">2. Защита интеллектуальной собственности и торговых марок</h3>
+                <p class="text-gray-300 mt-1">
+                  Все права на настольную ролевую игру <b>Cyberpunk®</b>, оригинальный сеттинг, игровую механику <i>Interlock System / Friday Night Firefight</i>, терминологию, логотипы, лор и сопутствующие печатные материалы принадлежат компании <b>R. Talsorian Games, Inc.</b><br><br>
+                  Торговые марки <i>Cyberpunk®</i>, <i>Cyberpunk 2020™</i>, а также фирменные наименования корпораций (<i>Arasaka, Militech, Trauma Team, Biotechnica</i> и др.), образцов вооружения и киберимплантов являются собственностью <b>R. Talsorian Games, Inc.</b> Все материалы, представленные на сайте (любительские переводы описаний, сводки правил, таблицы и характеристики снаряжения), размещены исключительно в справочных, ознакомительных и информационных целях в рамках добросовестного использования (Fair Use).
+                </p>
+              </div>
+
+              <div class="border-b border-gray-800 pb-3">
+                <h3 class="font-display text-base font-bold text-cp-yellow">3. Отсутствие пиратства и распространения копий</h3>
+                <p class="text-gray-300 mt-1">
+                  Администрация сайта строго заявляет: <b>на данном ресурсе не размещаются, не хранятся и не распространяются пиратские цифровые копии книг правил, официальных руководств, сканированные страницы или PDF-файлы</b> изданий R. Talsorian Games. Сайт функционирует как интерактивный каталог-шпаргалка для удобства ведения игровых сессий теми игроками и ведущими, которые уже обладают легальными копиями книг правил.
+                </p>
+                <div class="mt-2.5 p-3 bg-cp-bg border-l-2 border-cp-yellow text-[11px] text-gray-300">
+                  📌 Мы настоятельно призываем поддерживать авторов игры и приобретать официальные печатные и цифровые книги правил в магазине <b>R. Talsorian Games</b> или на площадке <b>DriveThruRPG</b>.
+                </div>
+              </div>
+
+              <div>
+                <h3 class="font-display text-base font-bold text-cp-yellow">4. Официальные ресурсы правообладателя и обратная связь</h3>
+                <p class="text-gray-300 mt-1">Ознакомиться с оригинальной продукцией, приобрести официальные издания и связаться с правообладателями или администрацией справочника вы можете по ссылкам ниже:</p>
+                <div class="mt-3 flex flex-wrap items-center gap-2.5">
+                  <a href="https://rtalsoriangames.com/" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
+                    <span>🌐</span><span>Официальный сайт R. Talsorian Games</span>
+                  </a>
+                  <a href="https://www.drivethrurpg.com/en/publisher/13/r-talsorian-games-inc" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
+                    <span>🛒</span><span>Каталог R. Talsorian Games на DriveThruRPG</span>
+                  </a>
+                  <button type="button" onclick="window.switchHomeSubtab('contacts')" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
+                    <span>📡</span><span>Контакты администрации сайта</span>
+                  </button>
+                </div>
+              </div>
+            </article>
+          `;
+          return;
+        }
+
+        // --- ВКЛАДКА 2: КОНТАКТЫ АДМИНИСТРАЦИИ (contacts) ---
+        if (window.activeHomeSubtab === "contacts") {
+          const curUser = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+          const isCurRoot = checkIsRoot();
+
+          const rawAdmins = (typeof USERS !== "undefined" && Array.isArray(USERS))
+            ? USERS.filter(u => u && (u.role === "ROOT" || u.role === "ADMIN"))
+            : [];
+
+          const effectiveAdmins = rawAdmins.length > 0 ? rawAdmins : [{
+            id: "u-root",
+            displayName: "Kisaaj",
+            role: "ROOT",
+            bio: "Создатель и Главный Архитектор базы данных Cyberpunk 2020."
+          }];
+
+          const contactsCardsHtml = effectiveAdmins.map(adm => {
+            const isRoot = (adm.role === "ROOT" || adm.id === "u-root");
+            const cInfo = (CATEGORIES && CATEGORIES._adminContacts && CATEGORIES._adminContacts[adm.id])
+              ? CATEGORIES._adminContacts[adm.id]
+              : { roleTitle: "", note: "", links: [] };
+
+            const canEditThisContact = Boolean(curUser && (isCurRoot || curUser.id === adm.id));
+            const isEditingThis = (window.editingContactUserId === adm.id);
+
+            const avHtml = adm.avatar
+              ? `<img src="${safeEsc(adm.avatar)}" onclick="if(typeof openPublicProfileModal==='function') openPublicProfileModal('${adm.id}')" class="w-16 h-16 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">`
+              : `<div onclick="if(typeof openPublicProfileModal==='function') openPublicProfileModal('${adm.id}')" class="w-16 h-16 bg-cp-bg border-2 ${isRoot ? 'border-cp-red text-cp-red' : 'border-cp-cyan text-cp-cyan'} flex items-center justify-center font-display font-black text-xl cursor-pointer shrink-0">${safeEsc((adm.displayName || "CP").slice(0, 2).toUpperCase())}</div>`;
+
+            const linksList = Array.isArray(cInfo.links) ? cInfo.links : [];
+            const linksHtml = linksList.length === 0
+              ? `<span class="text-xs text-gray-500 italic">Ссылки на соцсети пока не указаны</span>`
+              : linksList.map(l => {
+                  const urlStr = String(l.url || "").trim();
+                  const labelStr = String(l.label || urlStr).trim();
+                  const isHttp = urlStr.startsWith("http://") || urlStr.startsWith("https://");
+                  return isHttp
+                    ? `<a href="${safeEsc(urlStr)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5"><span>🔗</span><span>${safeEsc(labelStr)}</span></a>`
+                    : `<span class="px-3 py-1.5 bg-cp-bg border border-gray-700 text-xs text-gray-200 inline-flex items-center gap-1.5"><b class="text-cp-yellow">${safeEsc(labelStr)}:</b> <span>${safeEsc(urlStr)}</span></span>`;
+                }).join("");
+
+            const editFormHtml = !isEditingThis ? "" : `
+              <form onsubmit="window.saveAdminContactSubmit(event, '${adm.id}')" class="mt-4 pt-4 border-t border-gray-800 space-y-3 bg-cp-bg/90 p-4 border border-cp-cyan/50">
+                <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройка контактов (${safeEsc(adm.displayName)})</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] text-gray-400 mb-1">Должность на проекте:</label>
+                    <input type="text" id="admContactRoleTitle" value="${safeEsc(cInfo.roleTitle || '')}" placeholder="Создатель базы / Модератор..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none">
+                  </div>
+                  <div>
+                    <label class="block text-[11px] text-gray-400 mb-1">По каким вопросам обращаться:</label>
+                    <input type="text" id="admContactNote" value="${safeEsc(cInfo.note || '')}" placeholder="По вопросам переводов, багов..." class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none">
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <div class="flex items-center justify-between">
+                    <label class="text-[11px] text-cp-yellow font-bold uppercase">Соцсети и ссылки для связи:</label>
+                    <button type="button" onclick="window.addAdminSocialLinkRow()" class="px-2.5 py-1 bg-cp-cyan text-black font-bold text-[11px] uppercase">+ Добавить ссылку</button>
+                  </div>
+                  <div id="adminSocialLinksEditList" class="space-y-2">
+                    ${(linksList.length > 0 ? linksList : [{ label: "", url: "" }]).map(l => `
+                      <div class="admin-social-link-row grid grid-cols-12 gap-2 items-center">
+                        <input type="text" data-sfield="label" value="${safeEsc(l.label || '')}" placeholder="Название (ВК, Telegram...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+                        <input type="text" data-sfield="url" value="${safeEsc(l.url || '')}" placeholder="https://... или ник" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
+                        <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
+                      </div>
+                    `).join("")}
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 pt-2">
+                  <button type="submit" class="px-5 py-2 bg-cp-green text-black font-bold text-xs uppercase">💾 Сохранить</button>
+                  <button type="button" onclick="window.cancelEditAdminContact()" class="px-4 py-2 bg-gray-800 text-gray-300 text-xs font-bold border border-gray-700">Отмена</button>
+                </div>
+              </form>
+            `;
+
+            return `
+              <div class="bg-cp-panel cp-border p-5 space-y-3">
+                <div class="flex items-start justify-between gap-4 flex-wrap">
+                  <div class="flex items-center gap-4">
+                    ${avHtml}
+                    <div>
+                      <div class="flex items-center gap-2 flex-wrap">
+                        <button type="button" onclick="if(typeof openPublicProfileModal==='function') openPublicProfileModal('${adm.id}')" class="font-display text-lg font-black text-white hover:text-cp-yellow hover:underline">${safeEsc(adm.displayName)}</button>
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isRoot ? 'bg-cp-red text-white' : 'bg-cp-cyan text-black'}">${isRoot ? '👑 ГЛАВНЫЙ АДМИН (ROOT)' : '🛡️ АДМИНИСТРАТОР'}</span>
+                      </div>
+                      <div class="text-xs text-cp-yellow font-bold mt-0.5">${safeEsc(cInfo.roleTitle || (isRoot ? "Создатель и Главный Администратор проекта" : "Администратор проекта"))}</div>
+                      <div class="text-xs text-gray-400 mt-1">${safeEsc(cInfo.note || adm.bio || "Связь с администрацией справочника.")}</div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" onclick="if(typeof openPublicProfileModal==='function') openPublicProfileModal('${adm.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>
+                    ${canEditThisContact ? `<button type="button" onclick="window.startEditAdminContact('${adm.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Мои ссылки</button>` : ""}
+                  </div>
+                </div>
+                <div class="pt-3 border-t border-gray-800 flex items-center flex-wrap gap-2">
+                  <span class="text-[11px] font-bold uppercase text-gray-400 mr-1">Соцсети и связь:</span>
+                  ${linksHtml}
+                </div>
+                ${editFormHtml}
+              </div>
+            `;
+          }).join("");
+
+          mainCol.innerHTML = `
+            <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-red">
+              <div class="text-[10px] font-bold uppercase tracking-widest text-cp-red">КОМАНДНЫЙ ЦЕНТР СПРАВОЧНИКА</div>
+              <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📡 Контакты Администрации</h2>
+              <p class="text-xs text-gray-400 mt-1">Список администраторов проекта и прямые ссылки для связи.</p>
+            </div>
+            <div class="space-y-4">${contactsCardsHtml}</div>
+          `;
+          return;
+        }
+
+        // --- ВКЛАДКИ 3 и 4: НОВОСТИ (news) И ПРАВИЛА САЙТА (rules) ---
+        const isNews = (window.activeHomeSubtab === "news");
+        const postsList = isNews ? window.HOME_NEWS_LIST : window.HOME_RULES_LIST;
+        const postToEdit = window.editingHomePostId ? postsList.find(p => p.id === window.editingHomePostId) : null;
+
+        const headerBannerHtml = isNews
+          ? `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-yellow"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ИНФОРМАЦИОННЫЙ КАНАЛ NIGHT CITY NETWORK</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📰 Новости и обновления сайта</h2><p class="text-xs text-gray-400 mt-1">Свежие патчноуты, добавленные книги-источники, новые разделы и объявления администрации.</p></div></div>`
+          : `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ДИРЕКТИВЫ БЕЗОПАСНОСТИ СЕТЕВОГО ДОЗОРА</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">⚖️ Правила сайта и сообщества</h2><p class="text-xs text-gray-400 mt-1">Обязательный свод правил для всех пользователей терминала DataTerm.</p></div></div>`;
+
+        const adminEditorHtml = !isAdmin ? "" : `
+          <div id="homeAdminEditorBox" class="bg-cp-panel cp-border p-5 space-y-3.5 border-t-2 ${postToEdit ? 'border-t-cp-cyan' : 'border-t-cp-yellow'}">
+            <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">${postToEdit ? '✏️' : '➕'}</span>
+                <h3 class="font-display text-xs font-bold uppercase ${postToEdit ? 'text-cp-cyan' : 'text-cp-yellow'}">
+                  ${postToEdit ? `Редактирование записи: ${safeEsc(postToEdit.title)}` : (isNews ? 'Опубликовать новую новость' : 'Добавить новое правило')}
+                </h3>
+              </div>
+              ${postToEdit ? `<button type="button" onclick="window.cancelEditHomePost()" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 border border-gray-600">✕ Отмена</button>` : ""}
+            </div>
+            <form onsubmit="window.saveHomePostSubmit(event)" class="space-y-3">
+              <div>
+                <label class="block text-[11px] text-gray-400 font-bold uppercase mb-1">Заголовок*:</label>
+                <input type="text" id="homeEditorTitle" required value="${postToEdit ? safeEsc(postToEdit.title) : ''}" placeholder="Введите заголовок..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2 text-xs text-white font-bold outline-none">
+              </div>
+              <div class="space-y-1.5">
+                <div class="flex flex-wrap items-center gap-1.5 bg-cp-bg border border-gray-800 p-1.5">
+                  <button type="button" onclick="window.insertHomeFormatTag('<b>', '</b>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold"><b>B</b></button>
+                  <button type="button" onclick="window.insertHomeFormatTag('<i>', '</i>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic">I</button>
+                  <button type="button" onclick="window.insertHomeFormatTag('<u>', '</u>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline">U</button>
+                  <span class="text-gray-700 px-1">|</span>
+                  <button type="button" onclick="window.insertHomeFormatTag('<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый</button>
+                  <button type="button" onclick="window.insertHomeFormatTag('<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан</button>
+                  <button type="button" onclick="window.insertHomeFormatTag('<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный</button>
+                </div>
+                <textarea id="homeEditorTextarea" required rows="6" placeholder="Введите текст..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
+              </div>
+              <div class="flex items-center justify-end pt-1">
+                <button type="submit" class="px-6 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
+                  ${postToEdit ? '💾 Сохранить изменения' : (isNews ? '📢 Опубликовать новость' : '➕ Добавить правило')}
+                </button>
+              </div>
+            </form>
+          </div>
+        `;
+
+        const postsCardsHtml = postsList.length === 0
+          ? `<div class="bg-cp-panel cp-border p-8 text-center text-xs text-gray-500">Записей пока нет.</div>`
+          : postsList.map(post => {
+              const charLen = getPlainLen(post.content);
+              const isLong = charLen > 1000;
+              const isExpanded = window.expandedHomePosts.has(post.id);
+              const displayedContent = (isLong && !isExpanded) ? getShortPreview(post.content, 1000) : post.content;
+
+              return `
+                <article class="bg-cp-panel cp-border p-6 space-y-3.5 transition-all hover:border-gray-600">
+                  <div class="flex items-start justify-between gap-4 border-b border-gray-800 pb-3">
+                    <div>
+                      <div class="flex items-center gap-2 text-[11px] text-gray-400 mb-1">
+                        <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isNews ? 'bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40' : 'bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/40'}">${isNews ? 'НОВОСТЬ' : 'ПРАВИЛО'}</span>
+                        <span>Автор: <b class="text-white">${safeDash(post.authorName)}</b></span>
+                        <span>• ${safeDash(post.createdAt)}</span>
+                      </div>
+                      <h3 class="font-display text-lg font-black text-white">${post.title}</h3>
+                    </div>
+                    ${isAdmin ? `
+                      <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onclick="window.startEditHomePost('${post.id}')" class="px-3 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
+                        <button type="button" onclick="window.deleteHomePost('${post.id}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
+                      </div>
+                    ` : ""}
+                  </div>
+                  <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line bg-cp-bg/70 border-l-2 ${isNews ? 'border-cp-yellow' : 'border-cp-cyan'} p-4">${displayedContent}</div>
+                  ${isLong ? `
+                    <div class="pt-1 flex items-center justify-end">
+                      <button type="button" onclick="window.toggleExpandHomePost('${post.id}')" class="px-4 py-1.5 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/60 text-xs font-bold uppercase transition-colors">
+                        ${isExpanded ? '▲ Свернуть текст' : '▼ Развернуть полностью'}
+                      </button>
+                    </div>
+                  ` : ""}
+                </article>
+              `;
+            }).join("");
+
+        mainCol.innerHTML = `${headerBannerHtml}${adminEditorHtml}<div class="space-y-4">${postsCardsHtml}</div>`;
+      };
+
+      // 10. Запускаем инициализацию сразу и после загрузки DOM
+      stripAllCardCountersEverywhere();
+      window.injectHomeViewIntoDOM();
+      window.ensureHomeDataStructures();
+      window.switchMainView("home");
+
+      window.addEventListener("DOMContentLoaded", () => {
+        stripAllCardCountersEverywhere();
+        window.injectHomeViewIntoDOM();
+        window.switchMainView("home");
+      });
+    })();
+  </script>
+  <!-- ========================================================================= -->
+  <!-- МОДУЛЬ ЗАЩИТЫ КАРТОЧЕК ОТ ПЕРЕЗАПИСИ БАЗОЙ DATABASE.JS (OVERWRITE GUARD)  -->
+  <!-- ========================================================================= -->
+  <script>
+    (function setupDatabaseOverwriteGuard() {
+      const PROTECTED_STORAGE_KEY = "cp2020_user_protected_db_v1";
+      const ALL_SECTIONS = [
+        "roles", "weapons", "armor", "gear", "cyberware",
+        "programs", "vehicles", "characters", "corporations", "borging"
+      ];
+
+      // Флаг: разрешено ли отправлять базу в облако (блокирует перезапись облака при старте страницы)
+      let isCloudHydrated = false;
+
+      function ensureDeletedIdsList() {
+        if (typeof CATEGORIES === "undefined") return [];
+        if (!Array.isArray(CATEGORIES._deletedIds)) {
+          CATEGORIES._deletedIds = [];
+        }
+        return CATEGORIES._deletedIds;
+      }
+
+      // 1. Сохраняем защищённую копию всех карточек и категорий в localStorage
+      function saveProtectedLocalSnapshot() {
+        try {
+          if (typeof DB === "undefined") return;
+          const snapshot = {
+            updatedAt: Date.now(),
+            db: {},
+            categories: (typeof CATEGORIES !== "undefined") ? CATEGORIES : {}
+          };
+          ALL_SECTIONS.forEach(sec => {
+            if (Array.isArray(DB[sec])) {
+              snapshot.db[sec] = DB[sec];
+            }
+          });
+          localStorage.setItem(PROTECTED_STORAGE_KEY, JSON.stringify(snapshot));
+        } catch (err) {
+          console.warn("Не удалось сохранить локальный слепок БД:", err);
+        }
+      }
+
+      // 2. Читаем защищённую копию из localStorage
+      function loadProtectedLocalSnapshot() {
+        try {
+          const raw = localStorage.getItem(PROTECTED_STORAGE_KEY);
+          if (!raw) return null;
+          return JSON.parse(raw);
+        } catch (err) {
+          return null;
+        }
+      }
+
+      // 3. Умное слияние: Пользовательские данные (Облако / LocalStorage) ВСЕГДА побеждают database.js!
+      //    Карточки из database.js добавляются ТОЛЬКО если карточки с таким ID ещё вообще не было и она не была удалена.
+      function mergePreservingUserEdits(userDbSource, userCatsSource) {
+        if (typeof DB === "undefined") return;
+
+        // Восстанавливаем категории и служебные мета-данные (_deletedIds, _changeLogs, _adminContacts)
+        if (userCatsSource && typeof userCatsSource === "object" && typeof CATEGORIES !== "undefined") {
+          Object.keys(userCatsSource).forEach(k => {
+            if (k.startsWith("_")) {
+              CATEGORIES[k] = userCatsSource[k];
+            } else if (Array.isArray(userCatsSource[k])) {
+              if (!Array.isArray(CATEGORIES[k])) CATEGORIES[k] = [];
+              userCatsSource[k].forEach(c => {
+                if (c && !CATEGORIES[k].includes(c)) CATEGORIES[k].push(c);
+              });
+            }
+          });
+        }
+
+        const deletedIds = new Set(ensureDeletedIdsList());
+        const extDb = (window.CP2020_EXTERNAL_DATA && window.CP2020_EXTERNAL_DATA.db) ? window.CP2020_EXTERNAL_DATA.db : {};
+
+        ALL_SECTIONS.forEach(sec => {
+          const userItems = (userDbSource && Array.isArray(userDbSource[sec])) ? userDbSource[sec] : [];
+          const externalItems = Array.isArray(extDb[sec]) ? extDb[sec] : [];
+          const currentMemItems = Array.isArray(DB[sec]) ? DB[sec] : [];
+
+          // Если в userDbSource есть данные для этого раздела — берём их за основу
+          const baseList = userItems.length > 0 ? userItems : currentMemItems;
+
+          const finalMap = new Map();
+
+          // Сначала кладём все пользовательские/облачные карточки (они неприкосновенны!)
+          baseList.forEach(item => {
+            if (!item || !item.id) return;
+            if (deletedIds.has(item.id)) return;
+            finalMap.set(item.id, item);
+          });
+
+          // Затем проверяем эталон из database.js: добавляем ТОЛЬКО те карточки, чьего ID ещё нет в базе и в списке удалённых
+          externalItems.forEach(extItem => {
+            if (!extItem || !extItem.id) return;
+            if (deletedIds.has(extItem.id)) return;
+
+            if (!finalMap.has(extItem.id)) {
+              // Дополнительная проверка: вдруг эта карточка уже была сохранена пользователем под старым именем, но с другим ID
+              const alreadyExistsByName = Array.from(finalMap.values()).some(existing =>
+                existing.name && extItem.name &&
+                existing.name.trim().toLowerCase() === extItem.name.trim().toLowerCase()
+              );
+              if (!alreadyExistsByName) {
+                finalMap.set(extItem.id, JSON.parse(JSON.stringify(extItem)));
+              }
+            }
+          });
+
+          DB[sec] = Array.from(finalMap.values());
+        });
+      }
+
+      // 4. Перехватываем mergeExternalDataIntoMemory, чтобы он никогда не затирал существующие карточки
+      if (typeof window.mergeExternalDataIntoMemory === "function") {
+        window.mergeExternalDataIntoMemory = function(extData, overwriteExisting = false) {
+          // Игнорируем любые попытки принудительной перезаписи (overwriteExisting всегда считаем false)
+          const snap = loadProtectedLocalSnapshot();
+          mergePreservingUserEdits(snap ? snap.db : DB, snap ? snap.categories : CATEGORIES);
+        };
+      }
+
+      // 5. Отключаем опасный авто-вызов persistDatabase() из старого фикса брони при старте страницы
+      //    и ставим умный перехватчик на persistDatabase()
+      const origPersistDatabase = window.persistDatabase;
+      window.persistDatabase = async function(forceManual = false) {
+        // Всегда сохраняем локальный слепок при реальных действиях
+        if (isCloudHydrated || forceManual) {
+          saveProtectedLocalSnapshot();
+        } else {
+          // Если облако ещё не ответило при старте страницы — НЕ даём скриптам перезаписать Supabase заводской базой!
+          console.log("[Guard] Блокирована ранняя перезапись облака до завершения загрузки из Supabase.");
+          return;
+        }
+
+        if (typeof origPersistDatabase === "function") {
+          await origPersistDatabase();
+        }
+
+        // Гарантируем, что в таблицу cp2020_state (main_state) в Supabase улетают ВСЕ разделы (включая corporations и borging)
+        if (typeof sbClient !== "undefined" && sbClient) {
+          try {
+            await sbClient.from("cp2020_state").upsert({
+              id: "main_state",
+              db: DB,
+              categories: CATEGORIES,
+              rules: (typeof RULES !== "undefined") ? RULES : [],
+              updated_at: new Date().toISOString()
+            }, { onConflict: "id" });
+          } catch (err) {
+            console.warn("Ошибка прямой синхронизации cp2020_state:", err);
+          }
+        }
+      };
+
+      // 6. Разрешаем сохранение при любых ручных действиях администратора (Конструктор, быстрые галочки, удаление)
+      const origSaveBuilder = window.saveBuilderItem;
+      if (typeof origSaveBuilder === "function") {
+        window.saveBuilderItem = function(e) {
+          isCloudHydrated = true; // Админ нажал кнопку «Сохранить» — снимаем блокировку!
+          origSaveBuilder(e);
+          saveProtectedLocalSnapshot();
+        };
+      }
+
+      // Перехватываем удаление карточки, чтобы заносить её ID в чёрный список _deletedIds (чтобы database.js не возвращал её)
+      const origDeleteSelected = window.deleteSelectedCatalogItem;
+      if (typeof origDeleteSelected === "function") {
+        window.deleteSelectedCatalogItem = function() {
+          isCloudHydrated = true;
+          const targetId = selectedItemId;
+          origDeleteSelected();
+          if (targetId && (!DB[activeCatalogTab] || !DB[activeCatalogTab].some(x => x.id === targetId))) {
+            const delList = ensureDeletedIdsList();
+            if (!delList.includes(targetId)) delList.push(targetId);
+            saveProtectedLocalSnapshot();
+            window.persistDatabase(true);
+          }
+        };
+      }
+
+      // 7. При загрузке страницы: сначала поднимаем защищённый локальный слепок, затем тянем актуальную базу из Supabase
+      async function hydrateFromCloudAndProtect() {
+        // Шаг А: Мгновенно восстанавливаем правки из защищённого localStorage, чтобы даже до ответа сети ничего не сбросилось
+        const localSnap = loadProtectedLocalSnapshot();
+        if (localSnap && localSnap.db) {
+          mergePreservingUserEdits(localSnap.db, localSnap.categories);
+        }
+
+        // Шаг Б: Запрашиваем актуальное состояние main_state из облака Supabase
+        if (typeof sbClient !== "undefined" && sbClient) {
+          try {
+            const { data, error } = await sbClient
+              .from("cp2020_state")
+              .select("*")
+              .eq("id", "main_state")
+              .maybeSingle();
+
+            if (!error && data && data.db) {
+              // Проверяем: если в локальном слепке есть карточки, которых ещё не было в облаке, бережно объединяем их
+              mergePreservingUserEdits(data.db, data.categories);
+              if (Array.isArray(data.rules) && data.rules.length > 0 && typeof RULES !== "undefined") {
+                RULES = data.rules;
+              }
+            }
+          } catch (err) {
+            console.warn("Не удалось получить main_state из Supabase, работаем от локального слепка:", err);
+          }
+        }
+
+        // Теперь база полностью синхронизирована с облаком — открываем разрешение на запись!
+        isCloudHydrated = true;
+        saveProtectedLocalSnapshot();
+
+        if (typeof renderCatalog === "function" && activeMainView === "catalog") {
+          renderCatalog();
+          if (selectedItemId && DB[activeCatalogTab]) {
+            const curItem = DB[activeCatalogTab].find(x => x && x.id === selectedItemId);
+            if (curItem && typeof renderDetailCard === "function") {
+              renderDetailCard(curItem);
+            }
+          }
+        }
+      }
+
+      // Запускаем защиту сразу
+      const initialSnap = loadProtectedLocalSnapshot();
+      if (initialSnap && initialSnap.db) {
+        mergePreservingUserEdits(initialSnap.db, initialSnap.categories);
+      }
+
+      window.addEventListener("DOMContentLoaded", () => {
+        hydrateFromCloudAndProtect();
+      });
+    })();
+  </script>
+  <!-- ========================================================================= -->
+  <!-- ТОЧНЫЙ ФИКС БЛОКА «ЗАРПЛАТА / ЦЕНА» -> «СОРТИРОВКА ПО СОТРУДНИКАМ»         -->
+  <!-- ========================================================================= -->
+  <script>
+    (function fixCorpSalaryBlockProperly() {
+      let currentCorpSortValue = "default";
+      let cachedOriginalSelectHtml = null;
+
+      // 1. Находим в панели фильтров тот самый блок, который в других вкладках называется «Зарплата» или «Цена»
+      function findPriceOrSalaryControl() {
+        const catalogView = document.getElementById("view-catalog");
+        if (!catalogView) return null;
+
+        // Ищем по всем select внутри панели каталога
+        const allSelects = catalogView.querySelectorAll("select");
+        for (const sel of allSelects) {
+          const parentBox = sel.parentElement;
+          if (!parentBox) continue;
+
+          // Ищем заголовок (label / div / span) над этим селектом
+          const labelEl = parentBox.querySelector("label, div, span");
+          const labelTxt = labelEl ? (labelEl.textContent || "").trim().toLowerCase() : "";
+          const selTxt = (sel.textContent || "").trim().toLowerCase();
+
+          // Проверяем и по известным ID, и по тексту «зарплата» / «цена» / «сотрудник»
+          if (
+            sel.id.toLowerCase().includes("price") ||
+            sel.id.toLowerCase().includes("cost") ||
+            sel.id.toLowerCase().includes("salary") ||
+            sel.id.toLowerCase().includes("sort") ||
+            labelTxt.includes("зарплат") ||
+            labelTxt.includes("цен") ||
+            labelTxt.includes("стоимост") ||
+            labelTxt.includes("сотрудник") ||
+            selTxt.includes("зарплат") ||
+            selTxt.includes("цен") ||
+            selTxt.includes("дороже") ||
+            selTxt.includes("дешевле") ||
+            selTxt.includes("возрастан") ||
+            selTxt.includes("убыван")
+          ) {
+            return { selectEl: sel, labelEl: labelEl !== sel ? labelEl : null, boxEl: parentBox };
+          }
+        }
+
+        // Дополнительный поиск: если заголовок «Зарплата» лежит отдельно над обёрткой селекта
+        const allLabels = catalogView.querySelectorAll("label, div, span");
+        for (const lbl of allLabels) {
+          if (lbl.children.length === 0) {
+            const txt = (lbl.textContent || "").trim().toLowerCase();
+            if (txt === "зарплата" || txt === "зарплата:" || txt === "цена" || txt === "цена:" || txt === "сортировка по сотрудникам") {
+              const nearSelect = lbl.parentElement ? lbl.parentElement.querySelector("select") : null;
+              if (nearSelect) {
+                return { selectEl: nearSelect, labelEl: lbl, boxEl: lbl.parentElement };
+              }
+            }
+          }
+        }
+
+        return null;
+      }
+
+      // 2. Извлекаем число из строк вида "1 612 000 по всему миру"
+      function parseStatNum(rawVal) {
+        if (!rawVal) return 0;
+        const m = String(rawVal).match(/\d[\d\s.,]*/);
+        if (!m) return 0;
+        const n = parseInt(m[0].replace(/[^\d]/g, ""), 10);
+        return isNaN(n) ? 0 : n;
+      }
+
+      // 3. Сортируем карточки корпораций в #catalogList
+      function sortRenderedCorpCards(mode) {
+        if (typeof activeCatalogTab === "undefined" || activeCatalogTab !== "corporations") return;
+        const listContainer = document.getElementById("catalogList");
+        if (!listContainer || !mode || mode === "default") return;
+
+        const cards = Array.from(listContainer.querySelectorAll("[onclick^=\"selectCatalogItem('\"]"));
+        if (cards.length <= 1) return;
+
+        const paired = cards.map(cardEl => {
+          const match = (cardEl.getAttribute("onclick") || "").match(/selectCatalogItem\('([^']+)'\)/);
+          const id = match ? match[1] : null;
+          const item = id ? (DB.corporations || []).find(c => c && c.id === id) : null;
+          return { el: cardEl, item };
+        });
+
+        if (mode.startsWith("emp_") || mode.startsWith("sol_") || mode.startsWith("ops_")) {
+          const isAsc = mode.endsWith("_asc");
+          const fieldKey = mode.startsWith("emp_")
+            ? "employees"
+            : mode.startsWith("sol_")
+              ? "soldiers"
+              : "operatives";
+
+          paired.sort((a, b) => {
+            const valA = a.item ? parseStatNum(a.item[fieldKey]) : 0;
+            const valB = b.item ? parseStatNum(b.item[fieldKey]) : 0;
+            return isAsc ? (valA - valB) : (valB - valA);
+          });
+
+          paired.forEach(p => listContainer.appendChild(p.el));
+        }
+      }
+
+      // 4. Меняем заголовок блока ("Зарплата" -> "Сортировка по сотрудникам") и список внутри него
+      function syncSalaryBlockWithTab() {
+        const ctrl = findPriceOrSalaryControl();
+        if (!ctrl || !ctrl.selectEl) return;
+
+        const { selectEl, labelEl, boxEl } = ctrl;
+
+        // Показываем блок, если базовый скрипт вдруг попытался его скрыть
+        if (boxEl && activeCatalogTab === "corporations") {
+          boxEl.classList.remove("hidden");
+        }
+
+        if (activeCatalogTab === "corporations") {
+          // А) ПЕРЕИМЕНОВЫВАЕМ САМ ЗАГОЛОВОК БЛОКА («Зарплата» -> «Сортировка по сотрудникам»)
+          if (labelEl) {
+            labelEl.textContent = "Сортировка по сотрудникам";
+          }
+
+          // Также проверяем все текстовые узлы внутри родителя селекта, если там написано "Зарплата"
+          if (boxEl) {
+            boxEl.querySelectorAll("label, span, div").forEach(el => {
+              if (el.children.length === 0) {
+                const t = (el.textContent || "").trim().toLowerCase();
+                if (t === "зарплата" || t === "зарплата:" || t === "цена" || t === "цена:" || t.includes("по зарплате")) {
+                  el.textContent = "Сортировка по сотрудникам";
+                }
+              }
+            });
+          }
+
+          // Б) Сохраняем исходные опции селекта (если ещё не сохранили) и ставим 6 вариантов сортировки корпораций
+          if (!selectEl.querySelector('option[value="emp_desc"]')) {
+            if (!cachedOriginalSelectHtml) {
+              cachedOriginalSelectHtml = selectEl.innerHTML;
+            }
+            selectEl.innerHTML = `
+              <option value="default">Без сортировки (По умолчанию)</option>
+              <option value="emp_desc">👥 Сотрудники: от большего к меньшему (↓)</option>
+              <option value="emp_asc">👥 Сотрудники: от меньшего к большему (↑)</option>
+              <option value="sol_desc">🪖 Солдаты: от большего к меньшему (↓)</option>
+              <option value="sol_asc">🪖 Солдаты: от меньшего к большему (↑)</option>
+              <option value="ops_desc">🕶️ Оперативники: от большего к меньшему (↓)</option>
+              <option value="ops_asc">🕶️ Оперативники: от меньшего к большему (↑)</option>
+            `;
+          }
+
+          if (currentCorpSortValue && selectEl.querySelector(`option[value="${currentCorpSortValue}"]`)) {
+            selectEl.value = currentCorpSortValue;
+          }
+
+          if (!selectEl.hasAttribute("data-corp-salary-bound")) {
+            selectEl.setAttribute("data-corp-salary-bound", "1");
+            selectEl.addEventListener("change", function() {
+              if (activeCatalogTab === "corporations") {
+                currentCorpSortValue = this.value;
+                sortRenderedCorpCards(currentCorpSortValue);
+              }
+            });
+          }
+
+          sortRenderedCorpCards(selectEl.value);
+        } else {
+          // Когда переключаемся на «Роли» или «Оружие» — возвращаем им их родной заголовок и родные опции!
+          if (labelEl && (labelEl.textContent || "").trim() === "Сортировка по сотрудникам") {
+            labelEl.textContent = (activeCatalogTab === "roles") ? "Зарплата" : "Цена";
+          }
+          if (selectEl.querySelector('option[value="emp_desc"]') && cachedOriginalSelectHtml) {
+            selectEl.innerHTML = cachedOriginalSelectHtml;
+            selectEl.value = "default";
+          }
+        }
+      }
+
+      // Перехватываем и switchMainView, и renderCatalog, чтобы заголовок «Сортировка по сотрудникам» ставился мгновенно
+      const origRenderCatalog = window.renderCatalog;
+      window.renderCatalog = function() {
+        const ctrlBefore = findPriceOrSalaryControl();
+        if (activeCatalogTab === "corporations" && ctrlBefore && ctrlBefore.selectEl && ctrlBefore.selectEl.querySelector('option[value="emp_desc"]')) {
+          currentCorpSortValue = ctrlBefore.selectEl.value || currentCorpSortValue;
+        }
+
+        if (typeof origRenderCatalog === "function") {
+          origRenderCatalog();
+        }
+        syncSalaryBlockWithTab();
+      };
+
+      const origSwitchMain = window.switchMainView;
+      window.switchMainView = function(view, catalogTab = null) {
+        if (typeof origSwitchMain === "function") {
+          origSwitchMain(view, catalogTab);
+        }
+        syncSalaryBlockWithTab();
+      };
+
+      window.addEventListener("DOMContentLoaded", syncSalaryBlockWithTab);
+      syncSalaryBlockWithTab();
+    })();
+  </script>
+  <!-- ========================================================================= -->
+  <!-- ФИКС ЛЮБИМОЙ КОРПОРАЦИИ: БЕЗ ЗАСОРЕНИЯ «ИЗБРАННОГО» + ПУБЛИЧНЫЙ ПРОФИЛЬ    -->
+  <!-- ========================================================================= -->
+  <script>
+    (function fixUserFavoriteCorporation() {
+      const LOCAL_CORP_MAP_KEY = "cp2020_user_fav_corps_v1";
+      const DEFAULT_CORP_NAME = "Независимый (Без корпорации)";
+
+      // 1. Инициализируем словарь любимых корпораций в CATEGORIES._userFavCorps и localStorage
+      function ensureFavCorpMap() {
+        if (typeof CATEGORIES !== "undefined") {
+          if (!CATEGORIES._userFavCorps || typeof CATEGORIES._userFavCorps !== "object") {
+            CATEGORIES._userFavCorps = {};
+          }
+        }
+        try {
+          const raw = localStorage.getItem(LOCAL_CORP_MAP_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object" && typeof CATEGORIES !== "undefined") {
+              Object.assign(CATEGORIES._userFavCorps, parsed);
+            }
+          }
+        } catch (e) {}
+        return (typeof CATEGORIES !== "undefined" && CATEGORIES._userFavCorps) ? CATEGORIES._userFavCorps : {};
+      }
+
+      function saveFavCorpMap() {
+        if (typeof CATEGORIES === "undefined" || !CATEGORIES._userFavCorps) return;
+        try {
+          localStorage.setItem(LOCAL_CORP_MAP_KEY, JSON.stringify(CATEGORIES._userFavCorps));
+        } catch (e) {}
+      }
+
+      // 2. Вычищаем старые фантомные маркеры "__CORP__:" из массива favorites у всех пользователей,
+      //    чтобы счётчик избранных карточек больше НИКОГДА не увеличивался от выбора корпорации
+      function purgeLegacyCorpMarkersFromFavorites() {
+        if (typeof USERS === "undefined" || !Array.isArray(USERS)) return;
+        const map = ensureFavCorpMap();
+        let anyPurged = false;
+
+        USERS.forEach(u => {
+          if (!u || !Array.isArray(u.favorites)) return;
+          const marker = u.favorites.find(x => typeof x === "string" && x.startsWith("__CORP__:"));
+          if (marker) {
+            const extractedCorp = marker.slice(9).trim();
+            if (extractedCorp && !map[u.id]) {
+              map[u.id] = extractedCorp;
+              u.favCorp = extractedCorp;
+            }
+            // Удаляем маркер из избранного навсегда!
+            u.favorites = u.favorites.filter(x => !(typeof x === "string" && x.startsWith("__CORP__:")));
+            anyPurged = true;
+          }
+        });
+
+        if (anyPurged) {
+          saveFavCorpMap();
+        }
+      }
+
+      // 3. Переопределяем глобальные функции чтения и записи Любимой корпорации
+      window.getUserFavCorp = function(userObj) {
+        if (!userObj) return DEFAULT_CORP_NAME;
+        purgeLegacyCorpMarkersFromFavorites();
+        const map = ensureFavCorpMap();
+
+        if (userObj.id && map[userObj.id] && String(map[userObj.id]).trim() !== "") {
+          userObj.favCorp = map[userObj.id];
+          return map[userObj.id];
+        }
+        if (userObj.favCorp && String(userObj.favCorp).trim() !== "") {
+          if (userObj.id) map[userObj.id] = userObj.favCorp;
+          return userObj.favCorp;
+        }
+        return DEFAULT_CORP_NAME;
+      };
+
+      window.setUserFavCorp = function(userObj, corpName) {
+        if (!userObj) return;
+        const cleanCorp = (corpName || "").trim() || DEFAULT_CORP_NAME;
+        userObj.favCorp = cleanCorp;
+
+        const map = ensureFavCorpMap();
+        if (userObj.id) {
+          map[userObj.id] = cleanCorp;
+          saveFavCorpMap();
+        }
+
+        // На всякий случай убеждаемся, что в userObj.favorites нет никаких __CORP__
+        if (Array.isArray(userObj.favorites)) {
+          userObj.favorites = userObj.favorites.filter(x => !(typeof x === "string" && x.startsWith("__CORP__:")));
+        }
+      };
+
+      // 4. Обновляем сохранение профиля: сохраняем корпорацию в словарь и синхронизируем БД без трогания избранного
+      const prevSaveProfile = window.saveUserProfileChanges;
+      window.saveUserProfileChanges = async function(e) {
+        const u = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        const editCorpSel = document.getElementById("editProfFavCorp");
+        const chosenCorp = editCorpSel ? editCorpSel.value : null;
+
+        if (u && chosenCorp !== null) {
+          window.setUserFavCorp(u, chosenCorp);
+        }
+
+        if (typeof prevSaveProfile === "function") {
+          await prevSaveProfile(e);
+        }
+
+        // Повторно применяем чистку после старого обработчика (на случай если старый скрипт выше добавил __CORP__ в favorites)
+        if (u) {
+          if (chosenCorp !== null) window.setUserFavCorp(u, chosenCorp);
+          purgeLegacyCorpMarkersFromFavorites();
+          if (typeof saveSingleUserToCloud === "function") {
+            try { await saveSingleUserToCloud(u); } catch (err) {}
+          }
+          if (typeof persistDatabase === "function") {
+            try { await persistDatabase(true); } catch (err) {}
+          }
+        }
+
+        if (typeof renderProfileView === "function") {
+          renderProfileView();
+        }
+      };
+
+      // 5. Перехватываем рендер Личного профиля (чтобы счётчик избранного и бейдж корпорации всегда были точными)
+      const prevRenderProfile = window.renderProfileView;
+      window.renderProfileView = function() {
+        purgeLegacyCorpMarkersFromFavorites();
+        if (typeof prevRenderProfile === "function") {
+          prevRenderProfile();
+        }
+
+        const u = (typeof getCurrentUser === "function") ? getCurrentUser() : null;
+        if (!u) return;
+
+        const corpVal = window.getUserFavCorp(u);
+        const corpTextEl = document.getElementById("profileFavCorpText");
+        if (corpTextEl) corpTextEl.textContent = corpVal;
+
+        const editCorpSel = document.getElementById("editProfFavCorp");
+        if (editCorpSel) {
+          if (!Array.from(editCorpSel.options).some(opt => opt.value === corpVal)) {
+            const opt = document.createElement("option");
+            opt.value = corpVal;
+            opt.textContent = corpVal;
+            editCorpSel.appendChild(opt);
+          }
+          editCorpSel.value = corpVal;
+        }
+
+        // Обновляем честный счётчик избранного (только реальные существующие карточки)
+        const realFavCount = Array.isArray(u.favorites)
+          ? u.favorites.filter(id => typeof id === "string" && !id.startsWith("__CORP__:")).length
+          : 0;
+        const favCountEl = document.getElementById("profileFavCount") || document.getElementById("favItemsCount");
+        if (favCountEl) favCountEl.textContent = realFavCount;
+      };
+
+      // 6. Железобетонная отрисовка Любимой корпорации в модальном окне Публичного профиля
+      function renderFavCorpInPublicModal(userId) {
+        purgeLegacyCorpMarkersFromFavorites();
+        const target = (typeof USERS !== "undefined" && Array.isArray(USERS))
+          ? USERS.find(u => u && u.id === userId)
+          : null;
+        if (!target) return;
+
+        const corpName = window.getUserFavCorp(target);
+
+        // Ищем само модальное окно публичного профиля или элемент любимой роли внутри него
+        const roleEl = document.getElementById("pubProfFavRole");
+        const modalEl = document.getElementById("publicProfileModal")
+          || (roleEl ? roleEl.closest(".fixed") : null)
+          || document.querySelector('[id*="publicProfile"], [id*="pubProf"]')?.closest(".fixed");
+
+        if (!modalEl && !roleEl) return;
+
+        // Удаляем старую плашку корпорации в модалке, если она там была, чтобы обновить свежими данными
+        const oldBadge = document.getElementById("pubProfFavCorpWrap");
+        if (oldBadge) oldBadge.remove();
+
+        const corpRow = document.createElement("div");
+        corpRow.id = "pubProfFavCorpWrap";
+        corpRow.className = "text-xs text-gray-400 mt-1 flex items-center gap-1.5 flex-wrap";
+        corpRow.innerHTML = `<span>Любимая корпорация:</span> <span class="text-cp-yellow font-bold">🏢 ${corpName}</span>`;
+
+        // Вариант 1: Если есть штатный элемент #pubProfFavRole
+        if (roleEl) {
+          const roleContainer = (roleEl.tagName === "SPAN" && roleEl.parentElement) ? roleEl.parentElement : roleEl;
+          roleContainer.insertAdjacentElement("afterend", corpRow);
+          return;
+        }
+
+        // Вариант 2: Если в модалке нет ID #pubProfFavRole, ищем строку со словами «Любимая роль» или «Роль:»
+        if (modalEl) {
+          const allDivs = modalEl.querySelectorAll("div, p, span");
+          for (const el of allDivs) {
+            const txt = (el.textContent || "").trim();
+            if ((txt.startsWith("Любимая роль") || txt.startsWith("Роль:")) && el.children.length <= 2) {
+              el.insertAdjacentElement("afterend", corpRow);
+              return;
+            }
+          }
+        }
+      }
+
+      const prevOpenPublicProfile = window.openPublicProfileModal;
+      window.openPublicProfileModal = function(userId) {
+        if (typeof prevOpenPublicProfile === "function") {
+          prevOpenPublicProfile(userId);
+        }
+        renderFavCorpInPublicModal(userId);
+      };
+
+      // Запускаем очистку фантомных закладок сразу и при загрузке страницы
+      purgeLegacyCorpMarkersFromFavorites();
+      window.addEventListener("DOMContentLoaded", () => {
+        purgeLegacyCorpMarkersFromFavorites();
+      });
+    })();
   </script>
 </body>
 </html>
