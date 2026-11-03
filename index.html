@@ -2252,7 +2252,7 @@
                       <button type="button" onclick="cancelEditComment('${itemId}')" class="px-3 py-1 bg-gray-800 text-gray-300 text-[11px] uppercase">Отмена</button>
                     </div>
                   </div>
-                ` : `<div class="text-xs ${author.id === 'u-smasher' ? 'text-white font-semibold' : 'text-gray-200'} leading-relaxed whitespace-pre-line pl-10">${escapeHtmlAttr(c.text).replace(/\*([^*]+)\*/g, '<em class="text-cp-red font-bold not-italic bg-cp-red/10 px-1 border border-cp-red/30">*$1*</em>')}</div>`}
+                ` : `<div class="text-xs ${author.id === 'u-smasher' ? 'text-white font-semibold' : 'text-gray-200'} leading-relaxed whitespace-pre-line pl-10">${formatRichTextWithLinks(escapeHtmlAttr(c.text).replace(/\*([^*]+)\*/g, '<em class="text-cp-red font-bold not-italic bg-cp-red/10 px-1 border border-cp-red/30">*$1*</em>'))}</div>`}
               </div>
             `;
           }).join("");
@@ -2448,8 +2448,36 @@
       renderHomeView();
     }
 
-    function insertHomeFormatTag(openTag, closeTag) {
-      const area = document.getElementById("homeEditorTextarea");
+    // Автоматическое превращение голых URL (http/https) в кликабельные ссылки (не трогает уже готовые теги <a> и атрибуты)
+    function formatRichTextWithLinks(rawText) {
+      if (rawText === undefined || rawText === null) return "";
+      const str = String(rawText);
+      if (str.trim() === "" || str.trim() === "—") return str;
+
+      // Разбиваем строку по существующим HTML-тегам <a ...>...</a> и прочим тегам, чтобы не ломать их атрибуты href/src
+      const parts = str.split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/gi);
+      return parts.map(part => {
+        if (part.startsWith("<")) return part;
+        return part.replace(/(https?:\/\/[^\s<>"']+)/gi, (url) => {
+          // Убираем случайную точку, запятую или скобку в самом конце ссылки
+          const cleanUrl = url.replace(/[.,;!?)]+$/, "");
+          const trailing = url.slice(cleanUrl.length);
+          return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-cp-cyan hover:text-cp-yellow underline underline-offset-2 font-bold transition-colors">${cleanUrl}</a>${trailing}`;
+        });
+      }).join("");
+    }
+
+    // Список эмодзи для быстрой вставки в новости и описания карточек
+    const CP_EMOJI_LIST = [
+      "⚡", "🔥", "💀", "🦾", "🦿", "🧠", "🔫", "🛡️", "⚔️", "💣",
+      "💉", "💊", "🧬", "💻", "🌐", "📡", "🔒", "🔓", "⚠️", "🚨",
+      "🏢", "🚗", "🚁", "💰", "💎", "🎲", "🎯", "⭐", "👑", "✅",
+      "❌", "📌", "📋", "🔧", "⚙️", "🕶️", "🎭", "🎸", "🍺", "❤️"
+    ];
+
+    // Универсальная вставка тега в любое текстовое поле (по его ID)
+    function insertRichFormatTag(textareaId, openTag, closeTag) {
+      const area = document.getElementById(textareaId);
       if (!area) return;
       const start = area.selectionStart || 0;
       const end = area.selectionEnd || 0;
@@ -2457,6 +2485,86 @@
       const selected = val.slice(start, end) || "текст";
       area.value = val.slice(0, start) + openTag + selected + closeTag + val.slice(end);
       area.focus();
+      const newCursorPos = start + openTag.length + selected.length + closeTag.length;
+      area.setSelectionRange(newCursorPos, newCursorPos);
+    }
+
+    // Совместимость со старым вызовом
+    function insertHomeFormatTag(openTag, closeTag) {
+      insertRichFormatTag("homeEditorTextarea", openTag, closeTag);
+    }
+
+    // Вставка оформленной гиперссылки (спрашивает URL и текст ссылки)
+    function insertRichHyperlink(textareaId) {
+      const area = document.getElementById(textareaId);
+      if (!area) return;
+      const start = area.selectionStart || 0;
+      const end = area.selectionEnd || 0;
+      const val = area.value;
+      const selectedText = val.slice(start, end).trim();
+
+      const rawUrl = prompt("Введите адрес ссылки (URL):", "https://");
+      if (!rawUrl || !rawUrl.trim() || rawUrl.trim() === "https://") return;
+      let cleanUrl = rawUrl.trim();
+      if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+        cleanUrl = "https://" + cleanUrl;
+      }
+
+      const linkLabel = prompt("Введите отображаемый текст ссылки:", selectedText || "Перейти по ссылке");
+      if (linkLabel === null) return;
+      const finalLabel = linkLabel.trim() || cleanUrl;
+
+      const linkHtml = `<a href="${escapeHtmlAttr(cleanUrl)}" target="_blank" rel="noopener noreferrer" class="text-cp-cyan hover:text-cp-yellow underline font-bold">${finalLabel}</a>`;
+      area.value = val.slice(0, start) + linkHtml + val.slice(end);
+      area.focus();
+    }
+
+    // Открытие/закрытие палитры эмодзи над конкретным текстовым полем
+    function toggleRichEmojiPicker(textareaId) {
+      const picker = document.getElementById("emoji-picker-" + textareaId);
+      if (!picker) return;
+      picker.classList.toggle("hidden");
+    }
+
+    // Вставка выбранного эмодзи на место курсора
+    function insertEmojiAtCursor(textareaId, emojiChar) {
+      const area = document.getElementById(textareaId);
+      if (!area) return;
+      const start = area.selectionStart || 0;
+      const end = area.selectionEnd || 0;
+      const val = area.value;
+      area.value = val.slice(0, start) + emojiChar + val.slice(end);
+      area.focus();
+      const pos = start + emojiChar.length;
+      area.setSelectionRange(pos, pos);
+    }
+
+    // Генератор готовой панели инструментов форматирования для любого textarea по его ID
+    function getRichToolbarHTML(textareaId) {
+      const emojiButtons = CP_EMOJI_LIST.map(em =>
+        `<button type="button" onclick="insertEmojiAtCursor('${textareaId}', '${em}')" class="w-7 h-7 flex items-center justify-center bg-cp-bg hover:bg-cp-yellow/20 border border-gray-800 hover:border-cp-yellow text-sm transition-colors" title="Вставить ${em}">${em}</button>`
+      ).join("");
+
+      return `
+        <div class="space-y-1 mb-1">
+          <div class="flex flex-wrap items-center gap-1 bg-cp-bg border border-gray-800 p-1.5">
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<b>', '</b>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold" title="Жирный текст"><b>B</b></button>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<i>', '</i>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic" title="Курсив">I</button>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<u>', '</u>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline" title="Подчёркнутый">U</button>
+            <span class="text-gray-700 px-0.5">|</span>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый</button>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан</button>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный</button>
+            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-green font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-green font-bold">Зелёный</button>
+            <span class="text-gray-700 px-0.5">|</span>
+            <button type="button" onclick="insertRichHyperlink('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-[11px] font-bold transition-colors" title="Вставить оформленную гиперссылку">🔗 Ссылка</button>
+            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button>
+          </div>
+          <div id="emoji-picker-${textareaId}" class="hidden bg-cp-panel border border-cp-yellow/60 p-2 grid grid-cols-10 gap-1 shadow-lg">
+            ${emojiButtons}
+          </div>
+        </div>
+      `;
     }
 
     function startEditHomePost(postId) {
@@ -2703,16 +2811,8 @@
               <input type="text" id="homeEditorTitle" required value="${postToEdit ? escapeHtmlAttr(postToEdit.title) : ''}" placeholder="Введите заголовок..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2 text-xs text-white font-bold outline-none">
             </div>
             <div class="space-y-1.5">
-              <div class="flex flex-wrap items-center gap-1.5 bg-cp-bg border border-gray-800 p-1.5">
-                <button type="button" onclick="insertHomeFormatTag('<b>', '</b>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold"><b>B</b></button>
-                <button type="button" onclick="insertHomeFormatTag('<i>', '</i>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic">I</button>
-                <button type="button" onclick="insertHomeFormatTag('<u>', '</u>')" class="px-2.5 py-1 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline">U</button>
-                <span class="text-gray-700 px-1">|</span>
-                <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый</button>
-                <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан</button>
-                <button type="button" onclick="insertHomeFormatTag('<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2.5 py-1 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный</button>
-              </div>
-              <textarea id="homeEditorTextarea" required rows="6" placeholder="Введите текст..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
+              ${getRichToolbarHTML('homeEditorTextarea')}
+              <textarea id="homeEditorTextarea" required rows="6" placeholder="Введите текст (обычные ссылки https://... станут кликабельными автоматически, либо используйте кнопку 🔗 Ссылка)..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
             </div>
             <div class="flex items-center justify-end pt-1">
               <button type="submit" class="px-6 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
@@ -2729,7 +2829,8 @@
             const charLen = getPlainTextLength(post.content);
             const isLong = charLen > 1000;
             const isExpanded = expandedHomePosts.has(post.id);
-            const displayedContent = (isLong && !isExpanded) ? getTruncatedPreviewHtml(post.content, 1000) : post.content;
+            const rawDisplayed = (isLong && !isExpanded) ? getTruncatedPreviewHtml(post.content, 1000) : post.content;
+            const displayedContent = formatRichTextWithLinks(rawDisplayed);
 
             return `
               <article class="bg-cp-panel cp-border p-6 space-y-3.5 transition-all hover:border-gray-600">
@@ -3903,7 +4004,21 @@
       const maxVal = (grid.querySelector('[data-salary-lvl="lvl10"]')?.value || "").trim() || "—";
       hiddenInp.value = (minVal === "—" && maxVal === "—") ? "—" : `${minVal} — ${maxVal}`;
     };
-
+    // Автоматически добавляет панель форматирования (B/I/U, Цвета, Ссылка, Эмодзи) над всеми полями описаний (textarea) в Конструкторе
+    function attachRichToolbarsToBuilderTextareas() {
+      const container = document.getElementById("builderFieldsContainer");
+      if (!container) return;
+      container.querySelectorAll("textarea").forEach((ta, idx) => {
+        if (ta.getAttribute("data-rich-attached") === "1") return;
+        ta.setAttribute("data-rich-attached", "1");
+        if (!ta.id) {
+          ta.id = "builder-ta-" + Date.now() + "-" + idx + "-" + Math.floor(Math.random() * 1000);
+        }
+        const toolbarWrap = document.createElement("div");
+        toolbarWrap.innerHTML = getRichToolbarHTML(ta.id);
+        ta.parentElement.insertBefore(toolbarWrap, ta);
+      });
+    }
     function setBuilderType(type, itemToEdit = null) {
       activeBuilderType = type;
       const addedCheckEl = document.getElementById("builderShowAddedCheck");
@@ -3955,6 +4070,7 @@
           </div>
           <div><label class="text-[11px] text-gray-400">Текст игровой механики</label><textarea name="content" rows="5" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.content || ''}</textarea></div>
         `;
+        attachRichToolbarsToBuilderTextareas();
         return;
       }
 
@@ -3984,6 +4100,7 @@
           <div><label class="text-[11px] text-gray-400">Описание / Биография</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>
         `;
         renderCharEquipmentBuilderBoxes();
+        attachRichToolbarsToBuilderTextareas();
         return;
       }
 
@@ -4030,6 +4147,7 @@
           <div><label class="text-[11px] text-gray-400">Описание</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>
         `;
         renderBorgCyberwareBuilderList();
+        attachRichToolbarsToBuilderTextareas();
         return;
       }
       if (type === "acpa") {
@@ -4064,6 +4182,7 @@
           </div>
         `;
         renderAcpaBuilderLists();
+        attachRichToolbarsToBuilderTextareas();
         return;
       }
       const isDeck = type === "netrunning" && activeNetBuilderKind === "deck";
@@ -4137,6 +4256,7 @@
 
       container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${weaponAmmoCasingHtml}${roleAbilityDescHtml}${deckChecksHtml}${vehicleExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
       if (type === "roles") window.updateHiddenRoleSalaryRangeInput();
+      attachRichToolbarsToBuilderTextareas();
     }
 
     function saveBuilderItem(e) {
