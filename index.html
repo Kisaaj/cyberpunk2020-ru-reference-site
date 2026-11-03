@@ -240,6 +240,7 @@
         <button type="button" onclick="switchMainView('catalog', 'services')" data-view="services" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">💼 Услуги</button>
         <button type="button" onclick="switchMainView('catalog', 'cyberware')" data-view="cyberware" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🦾 Кибероснащение</button>
         <button type="button" onclick="switchMainView('catalog', 'borging')" data-view="borging" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🤖 Боргирование</button>
+        <button type="button" onclick="switchMainView('catalog', 'acpa')" data-view="acpa" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🛡️ ACPA</button>
         <button type="button" onclick="switchMainView('catalog', 'netrunning')" data-view="netrunning" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🌐 Нетраннинг</button>
         <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🚗 Транспорт</button>
         <button type="button" onclick="switchMainView('catalog', 'corporations')" data-view="corporations" class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">🏢 Корпорации</button>
@@ -352,12 +353,22 @@
             </button>
           </div>
         </div>
-        <div class="bg-cp-panel cp-border p-4 space-y-2">
+        <div class="bg-cp-panel cp-border p-4 space-y-3">
           <div class="flex items-center justify-between border-b border-gray-800 pb-2">
             <span class="font-display text-xs font-bold uppercase text-cp-yellow">⚡ Статус терминала</span>
             <span class="text-[10px] text-cp-green font-bold">ONLINE // 2020</span>
           </div>
-          <div class="text-[11px] text-gray-400 leading-relaxed">
+          <div class="grid grid-cols-2 gap-2.5 text-center">
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <div class="text-[10px] text-gray-400 uppercase">Всего карточек</div>
+              <div id="homeStatTotalCards" class="text-lg font-display font-black text-cp-yellow mt-0.5">0</div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <div class="text-[10px] text-gray-400 uppercase">Участников</div>
+              <div id="homeStatTotalUsers" class="text-lg font-display font-black text-cp-cyan mt-0.5">1</div>
+            </div>
+          </div>
+          <div class="pt-1 border-t border-gray-800/80 text-[11px] text-gray-400 leading-relaxed">
             Выберите любой раздел в верхнем меню для работы со справочником. Чтобы вернуться на Главную страницу из любого места — нажмите на логотип <b>CP</b> или заголовок <b>CYBERPUNK 2020</b> в левом верхнем углу.
           </div>
         </div>
@@ -632,6 +643,7 @@
           <button type="button" onclick="setBuilderType('services')" data-btype="services" class="btype-btn px-3 py-2 text-xs font-bold border">💼 Услуги</button>
           <button type="button" onclick="setBuilderType('cyberware')" data-btype="cyberware" class="btype-btn px-3 py-2 text-xs font-bold border">🦾 Кибероснащение</button>
           <button type="button" onclick="setBuilderType('borging')" data-btype="borging" class="btype-btn px-3 py-2 text-xs font-bold border">🤖 Боргирование</button>
+          <button type="button" onclick="setBuilderType('acpa')" data-btype="acpa" class="btype-btn px-3 py-2 text-xs font-bold border">🛡️ ACPA</button>
           <button type="button" onclick="setBuilderType('netrunning')" data-btype="netrunning" class="btype-btn px-3 py-2 text-xs font-bold border">🌐 Нетраннинг</button>
           <button type="button" onclick="setBuilderType('vehicles')" data-btype="vehicles" class="btype-btn px-3 py-2 text-xs font-bold border">🚗 Транспорт</button>
           <button type="button" onclick="setBuilderType('corporations')" data-btype="corporations" class="btype-btn px-3 py-2 text-xs font-bold border">🏢 Корпорации</button>
@@ -859,6 +871,7 @@
       services: "💼 Услуги",
       cyberware: "🦾 Кибероснащение",
       borging: "🤖 Боргирование",
+      acpa: "🛡️ ACPA",
       netrunning: "🌐 Нетраннинг",
       vehicles: "🚗 Транспорт",
       corporations: "🏢 Корпорации",
@@ -934,6 +947,17 @@
         { k: "category", l: "Категория", isCat: true, ph: "Полное боргирование (Full Body Conversion)" },
         { k: "book", l: "Книга-источник", isBook: true, ph: "Chr2 / SOF2", stat: "Источник" }
       ],
+      acpa: [
+        { k: "name", l: "Название модели ACPA (рус. / англ.)", ph: "Arasaka «DaiOni» / Militech Commando" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Arasaka DaiOni" },
+        { k: "category", l: "Тип ACPA", isCat: true, ph: "Тяжёлая штурмовая ACPA", stat: "Тип", c: "text-cp-cyan" },
+        { k: "cost", l: "Цена", ph: "160,000 eb", stat: "Цена", c: "text-cp-green", span: 2 },
+        { k: "str", l: "Сила (STR)", ph: "16", stat: "Сила", c: "text-cp-yellow" },
+        { k: "sdp", l: "ОСТ (Очки Структуры)", ph: "80", stat: "ОСТ", c: "text-cp-red" },
+        { k: "os", l: "ОС (Останавливающая способность)", ph: "40", stat: "ОС", c: "text-cp-cyan" },
+        { k: "weight", l: "Вес", ph: "340 кг", stat: "Вес", c: "text-white" },
+        { k: "book", l: "Книга-источник", isBook: true, ph: "MM (Max Metal)" }
+      ],
       vehicles: [
         { k: "name", l: "Название модели транспорта", ph: "AV-4 Aerodyne" },
         { k: "category", l: "Тип транспорта", isCat: true, ph: "Аэродайн (AV)", stat: "Тип транспорта", c: "text-cp-cyan" },
@@ -996,7 +1020,8 @@
         gear: ["Инструменты и Ремонт"],
         services: ["Медицина и Trauma Team"],
         cyberware: ["Нейрооснащение"],
-        borging: ["Полное боргирование (Full Body Conversion)", "Частичное боргирование", "Экзотическое боргирование (Exotics)", "ACPA / Тяжёлая силовая броня"],
+        borging: ["Полное боргирование (Full Body Conversion)", "Частичное боргирование", "Экзотическое боргирование (Exotics)"],
+        acpa: ["Лёгкая ACPA", "Средняя ACPA", "Тяжёлая штурмовая ACPA", "Специализированная ACPA"],
         netrunning: ["Вторжение", "Кибердеки"],
         vehicles: ["Аэродайн (AV)"],
         corporations: ["Безопасность и ВПК", "Промышленность и кибернетика", "Биотехнологии и фармацевтика", "Топливо и агропром", "Инфокомп и микроэлектроника", "Медиа и связь", "Финансы и орбитальные корпорации"],
@@ -1005,7 +1030,7 @@
       },
       db: {
         roles: [{ id: "r-solo", name: "Соло", origName: "Solo", category: "Базовые роли (Corebook)", ability: "Чувство Боя", stat: "ИНТ / РЕФ", skills: ["Чувство Боя", "Внимательность", "Пистолеты"], salary: "2,000 – 12,000 eb/мес", book: "CP20", desc: "Положите файл database.js в одну папку с index.html, чтобы загрузить полный каталог." }],
-        weapons: [], armor: [], gear: [], services: [], cyberware: [], borging: [], netrunning: [], vehicles: [], corporations: [], characters: [], rules: []
+        weapons: [], armor: [], gear: [], services: [], cyberware: [], borging: [], acpa: [], netrunning: [], vehicles: [], corporations: [], characters: [], rules: []
       }
     };
 
@@ -1022,7 +1047,69 @@
       createdAt: "2026-01-01"
     };
 
-    const DEFAULT_USERS = [JSON.parse(JSON.stringify(HARDCODED_ROOT_USER))];
+    // Встроенная SVG-аватарка Адама Смэшера (боевой череп-визор Arasaka, работает без интернета и внешних ссылок)
+    const SMASHER_AVATAR = "adam smasher.png";
+
+    const HARDCODED_SMASHER_USER = {
+      id: "u-smasher",
+      displayName: "Adam Smasher",
+      role: "ARASAKA",
+      favRole: "Засекречено корпорацией Arasaka",
+      favCorp: "Arasaka",
+      avatar: SMASHER_AVATAR,
+      bio: "🔒 ДОСЬЕ ЗАСЕКРЕЧЕНО КОРПОРАЦИЕЙ ARASAKA // УРОВЕНЬ ДОПУСКА: ЧЁРНЫЙ ЛЁД",
+      favorites: [],
+      notes: "",
+      createdAt: "Засекречено корпорацией Arasaka"
+    };
+
+    // 1. СЦЕНАРИЙ А: Призвали ответом (↩) на чей-то комментарий — 20 реплик по одиночной цели
+    const SMASHER_TARGET_QUOTES = [
+      "«Никто не покинет скотобойню живым!» *Передергивает затвор дробовика и расстреливает в упор*",
+      "«Ты выглядишь как кусок мяса, готовый к нарезке.» *Врубает Сандевистан и разрывает цель очередью*",
+      "«Интересно, сколько в тебе хрома, а сколько дешёвых понтов?» *Пробивает грудную клетку бронированным кулаком*",
+      "«Тебе сказали — не лезь в дела Arasaka!» *Выпускает рой микроракет из наплечной установки*",
+      "«Мясо всегда кричит одинаково.» *Впечатывает цель в бетон стальным ботинком шасси DaiOni*",
+      "«Это и есть твой лучший комментарий? Какое разочарование.» *Сносит башку выстрелом из тяжёлого пулемёта*",
+      "«Твоя подписка на Trauma Team только что была аннулирована.» *Расстреливает из автодробовика*",
+      "«Беги, визжи, моли о пощаде — мне нравится, когда еда дёргается!» *Давит прикладом и даёт очередь в упор*",
+      "«Слабая плоть. Никакого сопротивления.» *Отрывает киберруку и добивает контрольным выстрелом*",
+      "«Сильверхенд хотя бы умел меня развлечь. А ты просто мусор.» *Разносит укрытие вместе с целью из гранатомёта*",
+      "«Пора обновить твой статус в базе данных на \"МЁРТВ\".» *Прошивает тело крупнокалиберной очередью*",
+      "«Ты правда думал, что экран терминала тебя спасёт?!» *Вламывается сквозь стену и расстреливает с двух рук*",
+      "«Никакой пощады. Только холодная сталь.» *Вгоняет моно-клинок прямо в нейропроцессор цели*",
+      "«Ещё один уличный панк возомнил себя легендой Найт-Сити.» *Стирает в порошок шквальным огнём*",
+      "«Скажи привет Бестии на том свете, кусок мяса!» *Поднимает за горло одной рукой и швыряет с крыши Arasaka Tower*",
+      "«Твоя броня — как картон для моих калибров.» *Разряжает полный магазин разрывных патронов*",
+      "«Конец связи, эджраннер.» *Наступает трехсоттикилограммовой ногой прямо на корпус цели*",
+      "«Слишком медленно. Даже мой сервопривод зевает.» *Уходит с линии атаки на гиперскорости и бьёт наотмашь*",
+      "«Корпорация Arasaka передаёт тебе пламенный привет.» *Выжигает позицию зажигательными боеприпасами*",
+      "«Люблю запах горелой проводки и жареного мяса по утрам!» *Смеётся через вокодер и добивает очередью*"
+    ];
+
+    // 2. СЦЕНАРИЙ Б: Призвали без ответа в пустом чате (до 2 комментариев) — злится на призвавшего!
+    const SMASHER_ANGRY_SUMMONER_QUOTES = [
+      "«Ты какого хрена дёргаешь меня по пустякам без цели, кусок мяса?!» *Злится, разворачивает пулемёт и расстреливает самого призывателя*",
+      "«Здесь даже убивать некого! Решил потратить моё время впустую?!» *Хватает призвавшего за шкирку и впечатывает в терминал DataTerm*",
+      "«Ложный вызов боевой единицы Arasaka карается аннигиляцией!» *Наводит наплечную ракетницу прямо на автора комментария и нажимает спуск*",
+      "«Позвал меня в пустую комнату?! Ну тогда развлекать меня будешь ТЫ!» *Загоняет призывателя в угол и шинкует свинцом*",
+      "«В следующий раз указывай цель через кнопку Ответа, идиот! Хотя следующего раза для тебя не будет!» *Давит призвавшего стальным сапогом*",
+      "«Ты отвлёк меня от калибровки DaiOni ради ЭТОГО?!» *Раздражённо сносит призывателя выстрелом из дробовика в упор*"
+    ];
+
+    // 3. СЦЕНАРИЙ В: Призвали без ответа в оживлённую ветку (где уже больше 2 других комментов) — массовая бойня!
+    const SMASHER_MASSACRE_QUOTES = [
+      "«Ха-ха-ха, сколько свежего мяса в одном месте! Сейчас будет настоящая бойня!» *Включает боевой режим DaiOni и расстреливает всех присутствующих в комментариях:*",
+      "«О-о-о, да тут целая вечеринка отбросов Найт-Сити! Никто не уйдёт живым!» *Зажимает гашетки обоих пулемётов и выкашивает всю ветку комментариев:*",
+      "«Слишком много болтовни в эфире! Пора зачистить этот сектор под ноль!» *Выпускает кассетный залп микроракет по всем участникам обсуждения:*",
+      "«Мясорубка открыта! Становитесь в очередь на утилизацию, ублюдки!» *Прыгает в самый центр чата с крыши и устраивает тотальный расстрел всем вокруг:*",
+      "«Корпорация Arasaka объявляет эту ветку комментариев зоной свободного огня! ХА-ХА-ХА!» *Активирует Сандевистан и за долю секунды разносит всех комментаторов:*"
+    ];
+
+    const DEFAULT_USERS = [
+      JSON.parse(JSON.stringify(HARDCODED_ROOT_USER)),
+      JSON.parse(JSON.stringify(HARDCODED_SMASHER_USER))
+    ];
 
     const STORAGE_DB_KEY = "cp2020_full_db_v50";
     const STORAGE_CAT_KEY = "cp2020_full_cats_v50";
@@ -1058,6 +1145,7 @@
 
     let charBuilderState = { weaponsList: [], cyberwareList: [], armorList: [], gearList: [] };
     let borgBuilderCyberwareList = [];
+    let acpaBuilderState = { gearList: [], weaponsList: [] };
     let lightboxGalleryState = { images: [], currentIndex: 0, title: "" };
 
     // Переменные Главной страницы
@@ -1177,10 +1265,20 @@
           "Топливо и агропром", "Инфокомп и микроэлектроника", "Медиа и связь", "Финансы и орбитальные корпорации"
         ];
       }
+      CATEGORIES.borging = (CATEGORIES.borging || []).filter(c => !c.includes("ACPA"));
       if (CATEGORIES.borging.length === 0) {
         CATEGORIES.borging = [
-          "Полное боргирование (Full Body Conversion)", "Частичное боргирование",
-          "Экзотическое боргирование (Exotics)", "ACPA / Тяжёлая силовая броня"
+          "Полное боргирование (Full Body Conversion)",
+          "Частичное боргирование",
+          "Экзотическое боргирование (Exotics)"
+        ];
+      }
+      if (CATEGORIES.acpa.length === 0) {
+        CATEGORIES.acpa = [
+          "Лёгкая ACPA",
+          "Средняя ACPA",
+          "Тяжёлая штурмовая ACPA",
+          "Специализированная ACPA"
         ];
       }
       if (!Array.isArray(CATEGORIES._books) || CATEGORIES._books.length === 0) {
@@ -1670,6 +1768,14 @@
         existing.role = "ROOT";
         if (existing.banInfo) { delete existing.banInfo; changed = true; }
       }
+
+      const smasherIdx = USERS.findIndex(u => u && u.id === "u-smasher");
+      if (smasherIdx === -1) {
+        USERS.push(JSON.parse(JSON.stringify(HARDCODED_SMASHER_USER)));
+      } else {
+        USERS[smasherIdx] = { ...HARDCODED_SMASHER_USER, avatar: SMASHER_AVATAR };
+      }
+
       USERS.forEach(u => {
         if (!u) return;
         if (u.password !== undefined) { delete u.password; changed = true; }
@@ -2013,6 +2119,26 @@
       const target = USERS.find(u => u && u.id === userId);
       if (!target) return;
       currentlyViewedPublicUserId = target.id;
+      // Особый засекреченный экран для Адама Смэшера
+      if (target.id === "u-smasher") {
+        document.getElementById("pubProfAvatar").innerHTML = `<img src="${escapeHtmlAttr(target.avatar || SMASHER_AVATAR)}" class="w-full h-full object-cover">`;
+        const badge = document.getElementById("pubProfBadge");
+        badge.className = "inline-block text-[10px] px-2 py-0.5 font-bold uppercase bg-cp-red text-white shadow-[0_0_10px_#ff003c]";
+        badge.textContent = "💀 КИБОРГ ARASAKA // ПАЛАЧ";
+        document.getElementById("pubProfBanStatusBadge").classList.add("hidden");
+
+        document.getElementById("pubProfName").textContent = "Adam Smasher";
+        document.getElementById("pubProfRole").textContent = "Засекречено корпорацией Arasaka";
+        const pubCorpEl = document.getElementById("pubProfCorp");
+        if (pubCorpEl) pubCorpEl.textContent = "Засекречено корпорацией Arasaka";
+
+        document.getElementById("pubProfDate").textContent = "Засекречено корпорацией Arasaka";
+        document.getElementById("pubProfCommentsCnt").textContent = "Засекречено корпорацией Arasaka";
+        document.getElementById("pubProfBio").innerHTML = `<span class="text-cp-red font-bold uppercase tracking-wider">🔒 Засекречено корпорацией Arasaka</span>`;
+        document.getElementById("pubProfAdminActions").innerHTML = "";
+        document.getElementById("publicProfileModal").classList.remove("hidden");
+        return;
+      }
 
       document.getElementById("pubProfAvatar").innerHTML = target.avatar ? `<img src="${escapeHtmlAttr(target.avatar)}" class="w-full h-full object-cover">` : (target.displayName || "CP").slice(0, 2).toUpperCase();
       const badge = document.getElementById("pubProfBadge");
@@ -2075,7 +2201,13 @@
             const author = USERS.find(u => u && u.id === c.userId) || { id: c.userId, displayName: c.fallbackName || "Раннер", role: "USER", avatar: "" };
             const isOwn = Boolean(curUser && curUser.id === c.userId);
             const canDel = isOwn || isAdmin;
-            const roleBadge = author.role === "ROOT" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red text-white font-bold uppercase">ROOT</span>` : author.role === "ADMIN" ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-cyan text-black font-bold uppercase">ADM</span>` : "";
+            const roleBadge = author.id === "u-smasher"
+              ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red text-white font-bold uppercase shadow-[0_0_8px_#ff003c]">💀 ARASAKA</span>`
+              : author.role === "ROOT"
+                ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red text-white font-bold uppercase">ROOT</span>`
+                : author.role === "ADMIN"
+                  ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-cyan text-black font-bold uppercase">ADM</span>`
+                  : "";
             const banTag = isUserCurrentlyBanned(author) ? `<span class="px-1.5 py-0.5 text-[9px] bg-cp-red/30 text-cp-red border border-cp-red/50 font-bold uppercase">BANNED</span>` : "";
             const avHtml = author.avatar ? `<img src="${escapeHtmlAttr(author.avatar)}" onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 object-cover border border-cp-cyan cursor-pointer shrink-0">` : `<div onclick="openPublicProfileModal('${author.id}')" class="w-8 h-8 bg-cp-panel border border-gray-700 hover:border-cp-yellow text-cp-yellow flex items-center justify-center font-display font-bold text-xs cursor-pointer shrink-0">${(author.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
 
@@ -2120,7 +2252,7 @@
                       <button type="button" onclick="cancelEditComment('${itemId}')" class="px-3 py-1 bg-gray-800 text-gray-300 text-[11px] uppercase">Отмена</button>
                     </div>
                   </div>
-                ` : `<div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line pl-10">${c.text}</div>`}
+                ` : `<div class="text-xs ${author.id === 'u-smasher' ? 'text-white font-semibold' : 'text-gray-200'} leading-relaxed whitespace-pre-line pl-10">${escapeHtmlAttr(c.text).replace(/\*([^*]+)\*/g, '<em class="text-cp-red font-bold not-italic bg-cp-red/10 px-1 border border-cp-red/30">*$1*</em>')}</div>`}
               </div>
             `;
           }).join("");
@@ -2240,6 +2372,19 @@
 
     function updateCounts() {
       updateAuthHeaderUI();
+
+      const cardsEl = document.getElementById("homeStatTotalCards");
+      if (cardsEl) {
+        const totalCards = Object.keys(SECTION_LABELS).reduce((sum, key) => {
+          return sum + (Array.isArray(DB[key]) ? DB[key].length : 0);
+        }, 0);
+        cardsEl.textContent = totalCards;
+      }
+
+      const usersEl = document.getElementById("homeStatTotalUsers");
+      if (usersEl) {
+        usersEl.textContent = Array.isArray(USERS) ? USERS.length : 1;
+      }
     }
 
     function getAllCategoriesForSection(secKey) {
@@ -2653,7 +2798,7 @@
 
       populateBookFilterDropdown();
 
-      subLabel.textContent = activeCatalogTab === "vehicles" ? "Тип транспорта" : activeCatalogTab === "characters" ? "Роль персонажа" : activeCatalogTab === "corporations" ? "Сектор корпорации" : "Категория / Раздел";
+      subLabel.textContent = activeCatalogTab === "vehicles" ? "Тип транспорта" : activeCatalogTab === "acpa" ? "Тип ACPA" : activeCatalogTab === "characters" ? "Роль персонажа" : activeCatalogTab === "corporations" ? "Сектор корпорации" : "Категория / Раздел";
       subSelect.innerHTML = `<option value="ALL">Все категории</option>` + categories.map(c => `<option value="${escapeHtmlAttr(c)}">${c}</option>`).join("");
       if (categories.includes(prevSubVal)) subSelect.value = prevSubVal;
 
@@ -2693,6 +2838,16 @@
         extraLabel.textContent = "Цена";
         extraSelect.innerHTML = `<option value="ALL">Без сортировки цен</option><option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option><option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>`;
         legend.innerHTML = `<span><b class="text-cp-cyan">ПЧ</b> = Потеря Человечности</span><span><b class="text-cp-yellow">Коды операций:</b> <b>Н</b> — Незначительная • <b>М</b> — Малая • <b>С</b> — Серьёзная • <b>КР</b> — Критическая</span>`;
+      } else if (activeCatalogTab === "acpa") {
+        extraLabel.textContent = "Сортировка (Цена / ОС)";
+        extraSelect.innerHTML = `
+          <option value="ALL">Без сортировки</option>
+          <option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option>
+          <option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>
+          <option value="SORT_OS_ASC">🛡️ ОС: по возрастанию (от меньшей к большей)</option>
+          <option value="SORT_OS_DESC">🛡️ ОС: по убыванию (от большей к меньшей)</option>
+        `;
+        legend.innerHTML = `<span><b class="text-cp-yellow">Сила</b> = Характеристика силы шасси</span><span><b class="text-cp-red">ОСТ</b> = Очки Структуры</span><span><b class="text-cp-cyan">ОС</b> = Броня ACPA</span>`;  
       } else if (activeCatalogTab === "corporations") {
         // ИСПРАВЛЕНО: Вместо "Зарплата" здесь стоит "Сортировка по сотрудникам" со всеми 6 пунктами!
         extraLabel.textContent = "Сортировка по сотрудникам";
@@ -2860,6 +3015,11 @@
       } else if (activeCatalogTab === "armor") {
         if (extra === "SORT_OS_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.os) - extractMaxNumericValue(b.os));
         else if (extra === "SORT_OS_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.os) - extractMaxNumericValue(a.os));
+      } else if (activeCatalogTab === "acpa") {
+        if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+        else if (extra === "SORT_OS_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.os) - extractMaxNumericValue(b.os));
+        else if (extra === "SORT_OS_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.os) - extractMaxNumericValue(a.os));  
       } else if (activeCatalogTab === "gear" || activeCatalogTab === "cyberware" || activeCatalogTab === "services" || activeCatalogTab === "borging") {
         if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
         else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
@@ -2960,6 +3120,9 @@
         } else if (activeCatalogTab === "borging") {
           subline = `Производитель: <b class="text-cp-yellow">${dash(item.manufacturer)}</b> • Тип: <b class="text-cp-cyan">${dash(item.borgType || item.category)}</b>`;
           rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">ПЧ: ${dash(item.hc)}</span>`;
+        } else if (activeCatalogTab === "acpa") {
+          subline = `Сила: <b class="text-cp-yellow">${dash(item.str)}</b> • Вес: <b class="text-gray-200">${dash(item.weight)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">ОСТ: ${dash(item.sdp)}</span> <span class="px-2 py-0.5 bg-cp-cyan/15 border border-cp-cyan/50 text-cp-cyan font-bold text-xs">ОС: ${dash(item.os)}</span>`;  
         } else if (activeCatalogTab === "netrunning") {
           const isDeck = item.itemKind === "deck" || item.category === "Кибердеки";
           if (isDeck) {
@@ -3161,7 +3324,7 @@
         const isDeck = activeCatalogTab === "netrunning" && (item.itemKind === "deck" || item.category === "Кибердеки");
         const schemaKey = activeCatalogTab === "netrunning" ? (isDeck ? "net_deck" : "net_program") : activeCatalogTab;
         const fields = (SCHEMAS[schemaKey] || []).filter(f => f.stat);
-        const gridCols = activeCatalogTab === "weapons" ? "grid-cols-4" : "grid-cols-3";
+        const gridCols = (activeCatalogTab === "weapons" || activeCatalogTab === "acpa") ? "grid-cols-4" : "grid-cols-3";
         const magCalc = activeCatalogTab === "weapons" ? calculateWeaponMagCost(item) : null;
 
         const statsHtml = fields.map(f => {
@@ -3295,6 +3458,48 @@
               ` : ""}
             </div>
           `;
+        } else if (activeCatalogTab === "acpa") {
+          const gearArr = Array.isArray(item.acpaGearList) ? item.acpaGearList : [];
+          const weaponsArr = Array.isArray(item.acpaWeaponsList) ? item.acpaWeaponsList : [];
+
+          extraSpecialHtml = `
+            <div class="space-y-3 mb-4">
+              ${gearArr.length > 0 ? `
+                <div class="bg-cp-bg border-l-2 border-cp-cyan p-3.5 space-y-2">
+                  <div class="text-[11px] font-bold uppercase text-cp-cyan">🔧 Особое снаряжение (${gearArr.length}):</div>
+                  ${gearArr.map(g => `
+                    <div class="bg-cp-panel border border-gray-800 p-2.5 text-xs">
+                      <div class="font-bold text-white">${dash(g.name)}</div>
+                      ${g.desc && g.desc !== "—" ? `<div class="text-gray-300 mt-1 whitespace-pre-line">${g.desc}</div>` : ""}
+                    </div>
+                  `).join("")}
+                </div>
+              ` : ""}
+
+              ${weaponsArr.length > 0 ? `
+                <div class="bg-cp-bg border-l-2 border-cp-red p-3.5 space-y-2.5">
+                  <div class="text-[11px] font-bold uppercase text-cp-red">🔫 Встроенное вооружение (${weaponsArr.length}):</div>
+                  ${weaponsArr.map(w => `
+                    <div class="bg-cp-panel border border-gray-800 p-3 space-y-2">
+                      <div class="border-b border-gray-800 pb-1 font-bold text-sm text-white">${dash(w.name)}</div>
+                      <div class="grid grid-cols-3 sm:grid-cols-9 gap-1 text-center text-[11px]">
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Тип</div><b>${dash(w.type)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">СКР</div><b class="text-cp-cyan">${dash(w.skr)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ТО</div><b class="text-cp-yellow">${dash(w.to)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Урон</div><b class="text-cp-red">${dash(w.damage)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">МАГ</div><b>${dash(w.mag)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">СКО</div><b>${dash(w.sko)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ДИС</div><b class="text-cp-cyan">${dash(w.range)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">НАД</div><b class="text-cp-green">${dash(w.nad)}</b></div>
+                        <div class="bg-cp-bg p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Цена</div><b class="text-cp-green">${dash(w.cost)}</b></div>
+                      </div>
+                      ${w.desc && w.desc !== "—" ? `<div class="text-xs text-gray-300 pt-1 border-t border-gray-800 whitespace-pre-line">${w.desc}</div>` : ""}
+                    </div>
+                  `).join("")}
+                </div>
+              ` : ""}
+            </div>
+          `;  
         } else if (activeCatalogTab === "characters") {
           const weaponsArr = Array.isArray(item.charWeaponsList) && item.charWeaponsList.length > 0
             ? item.charWeaponsList
@@ -3542,7 +3747,102 @@
             </div>
           `).join("");
     }
+    function initAcpaBuilderState(itemObj) {
+      const v = itemObj || {};
+      acpaBuilderState.gearList = Array.isArray(v.acpaGearList) ? JSON.parse(JSON.stringify(v.acpaGearList)) : [];
+      acpaBuilderState.weaponsList = Array.isArray(v.acpaWeaponsList) ? JSON.parse(JSON.stringify(v.acpaWeaponsList)) : [];
+    }
 
+    function syncAcpaBuilderFromDOM() {
+      const gearCont = document.getElementById("acpa-gearList-container");
+      if (gearCont) {
+        acpaBuilderState.gearList = Array.from(gearCont.querySelectorAll(".acpa-gear-builder-item")).map(el => ({
+          name: el.querySelector('[data-field="name"]')?.value || "",
+          desc: el.querySelector('[data-field="desc"]')?.value || ""
+        }));
+      }
+      const weapCont = document.getElementById("acpaWeaponsBuilderList");
+      if (weapCont) {
+        acpaBuilderState.weaponsList = Array.from(weapCont.querySelectorAll(".acpa-weapon-builder-item")).map(el => ({
+          name: el.querySelector('[data-field="name"]')?.value || "",
+          type: el.querySelector('[data-field="type"]')?.value || "",
+          skr: el.querySelector('[data-field="skr"]')?.value || "",
+          to: el.querySelector('[data-field="to"]')?.value || "",
+          damage: el.querySelector('[data-field="damage"]')?.value || "",
+          mag: el.querySelector('[data-field="mag"]')?.value || "",
+          sko: el.querySelector('[data-field="sko"]')?.value || "",
+          range: el.querySelector('[data-field="range"]')?.value || "",
+          nad: el.querySelector('[data-field="nad"]')?.value || "",
+          cost: el.querySelector('[data-field="cost"]')?.value || "",
+          desc: el.querySelector('[data-field="desc"]')?.value || ""
+        }));
+      }
+    }
+
+    window.addAcpaGearBlock = function() {
+      syncAcpaBuilderFromDOM();
+      acpaBuilderState.gearList.push({ name: "", desc: "" });
+      renderAcpaBuilderLists();
+    };
+    window.removeAcpaGearBlock = function(idx) {
+      syncAcpaBuilderFromDOM();
+      acpaBuilderState.gearList.splice(idx, 1);
+      renderAcpaBuilderLists();
+    };
+    window.addAcpaWeaponBlock = function() {
+      syncAcpaBuilderFromDOM();
+      acpaBuilderState.weaponsList.push({ name: "", type: "", skr: "", to: "", damage: "", mag: "", sko: "", range: "", nad: "", cost: "", desc: "" });
+      renderAcpaBuilderLists();
+    };
+    window.removeAcpaWeaponBlock = function(idx) {
+      syncAcpaBuilderFromDOM();
+      acpaBuilderState.weaponsList.splice(idx, 1);
+      renderAcpaBuilderLists();
+    };
+
+    function renderAcpaBuilderLists() {
+      const gBox = document.getElementById("acpa-gearList-container");
+      if (gBox) {
+        gBox.innerHTML = acpaBuilderState.gearList.length === 0
+          ? `<div class="text-[11px] text-gray-500 italic py-2 px-3 bg-black/30 border border-gray-800">Особое снаряжение не добавлено. Нажмите «+ Добавить снаряжение».</div>`
+          : acpaBuilderState.gearList.map((g, idx) => `
+              <div class="acpa-gear-builder-item bg-cp-bg border border-cp-cyan/50 p-3 space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                  <input type="text" data-field="name" value="${escapeHtmlAttr(g.name)}" placeholder="Название элемента снаряжения (сенсоры, анти-ослепление, жизнеобеспечение...)" class="flex-1 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+                  <button type="button" onclick="removeAcpaGearBlock(${idx})" class="px-2 py-1 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-[10px] font-bold">✕</button>
+                </div>
+                <textarea data-field="desc" rows="2" placeholder="Описание и игровой эффект элемента снаряжения..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white outline-none">${g.desc || ""}</textarea>
+              </div>
+            `).join("");
+      }
+
+      const wBox = document.getElementById("acpaWeaponsBuilderList");
+      if (wBox) {
+        wBox.innerHTML = acpaBuilderState.weaponsList.length === 0
+          ? `<div class="text-[11px] text-gray-500 italic py-2 px-3 bg-black/30 border border-gray-800">Вооружение не добавлено. Нажмите «+ Добавить вооружение».</div>`
+          : acpaBuilderState.weaponsList.map((w, idx) => `
+              <div class="acpa-weapon-builder-item bg-cp-bg border border-cp-red/50 p-3 space-y-2.5">
+                <div class="flex items-center justify-between gap-2 border-b border-gray-800 pb-1.5">
+                  <span class="text-[10px] font-bold uppercase text-cp-red">🔫 Встроенное оружие #${idx + 1}</span>
+                  <button type="button" onclick="removeAcpaWeaponBlock(${idx})" class="text-[10px] px-2 py-0.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white font-bold uppercase">✕ Удалить</button>
+                </div>
+                <input type="text" data-field="name" value="${escapeHtmlAttr(w.name)}" placeholder="Название встроенного оружия..." class="w-full bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+                <div class="grid grid-cols-3 sm:grid-cols-9 gap-1.5">
+                  <div><label class="block text-[9px] text-gray-400 text-center">Тип</label><input type="text" data-field="type" value="${escapeHtmlAttr(w.type)}" placeholder="ТЯЖ" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-white"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">СКР</label><input type="text" data-field="skr" value="${escapeHtmlAttr(w.skr)}" placeholder="Нет" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-cyan"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">ТО</label><input type="text" data-field="to" value="${escapeHtmlAttr(w.to)}" placeholder="+1" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-yellow"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">Урон</label><input type="text" data-field="damage" value="${escapeHtmlAttr(w.damage)}" placeholder="6d10" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-red font-bold"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">МАГ</label><input type="text" data-field="mag" value="${escapeHtmlAttr(w.mag)}" placeholder="100" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-white"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">СКО</label><input type="text" data-field="sko" value="${escapeHtmlAttr(w.sko)}" placeholder="20" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-white"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">ДИС</label><input type="text" data-field="range" value="${escapeHtmlAttr(w.range)}" placeholder="600м" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-cyan"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">НАД</label><input type="text" data-field="nad" value="${escapeHtmlAttr(w.nad)}" placeholder="ОН" class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-green"></div>
+                  <div><label class="block text-[9px] text-gray-400 text-center">Цена</label><input type="text" data-field="cost" value="${escapeHtmlAttr(w.cost)}" placeholder="Вкл." class="w-full bg-cp-panel border border-gray-700 p-1 text-[11px] text-center text-cp-green"></div>
+                </div>
+                <textarea data-field="desc" rows="2" placeholder="Описание оружия, боезапас, расположение на корпусе..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white outline-none">${w.desc || ""}</textarea>
+              </div>
+            `).join("");
+      }
+    }
     // =========================================================================
     // КОНСТРУКТОР КАРТОЧЕК (ВСЕ 12 РАЗДЕЛОВ)
     // =========================================================================
@@ -3732,7 +4032,40 @@
         renderBorgCyberwareBuilderList();
         return;
       }
+      if (type === "acpa") {
+        initAcpaBuilderState(itemToEdit);
+        const fields = SCHEMAS.acpa || [];
+        const inputsHtml = fields.map(f => {
+          const listAttr = f.isCat ? 'list="dl-builder-cat"' : f.isBook ? 'list="dl-builder-book"' : '';
+          const labelColor = f.isCat ? 'text-cp-cyan font-bold' : f.isBook ? 'text-cp-yellow font-bold' : 'text-gray-400';
+          return `<div><label class="text-[11px] ${labelColor}">${f.l}</label><input name="${f.k}" ${listAttr} value="${escapeHtmlAttr(v[f.k] || '')}" placeholder="${f.ph || ''}" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>`;
+        }).join("");
 
+        container.innerHTML = `
+          ${datalistHtml}
+          <div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>
+          <div class="bg-cp-panel border border-cp-cyan/40 p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase text-cp-cyan">🔧 Особое снаряжение</span>
+              <button type="button" onclick="addAcpaGearBlock()" class="px-3 py-1 bg-cp-cyan text-black text-[11px] font-bold uppercase">+ Добавить снаряжение</button>
+            </div>
+            <div id="acpa-gearList-container" class="space-y-2"></div>
+          </div>
+          <div class="bg-cp-panel border border-cp-red/40 p-3.5 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase text-cp-red">🔫 Встроенное вооружение</span>
+              <button type="button" onclick="addAcpaWeaponBlock()" class="px-3 py-1 bg-cp-red text-white text-[11px] font-bold uppercase">+ Добавить вооружение</button>
+            </div>
+            <div id="acpaWeaponsBuilderList" class="space-y-2.5"></div>
+          </div>
+          <div>
+            <label class="text-[11px] text-gray-400">Описание</label>
+            <textarea name="desc" rows="4" placeholder="Общее описание модели ACPA, история разработки, особенности пилотирования..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea>
+          </div>
+        `;
+        renderAcpaBuilderLists();
+        return;
+      }
       const isDeck = type === "netrunning" && activeNetBuilderKind === "deck";
       const schemaKey = type === "netrunning" ? (isDeck ? "net_deck" : "net_program") : type;
       const fields = SCHEMAS[schemaKey] || [];
@@ -3824,6 +4157,7 @@
       if (activeBuilderType === "roles") window.updateHiddenRoleSalaryRangeInput();
       if (activeBuilderType === "characters") syncCharBuilderStateFromDOM();
       if (activeBuilderType === "borging") syncBorgBuilderFromDOM();
+      if (activeBuilderType === "acpa") syncAcpaBuilderFromDOM();
 
       const fd = new FormData(e.target);
       const raw = Object.fromEntries(fd.entries());
@@ -3872,7 +4206,18 @@
         };
         data.cyberwareList = borgBuilderCyberwareList.filter(x => x.name.trim() !== "" || x.desc.trim() !== "").map(x => ({ name: dash(x.name), desc: x.desc.trim() }));
       }
+      if (activeBuilderType === "acpa") {
+        data.acpaGearList = acpaBuilderState.gearList
+          .filter(g => g.name.trim() !== "" || g.desc.trim() !== "")
+          .map(g => ({ name: dash(g.name), desc: g.desc.trim() }));
 
+        data.acpaWeaponsList = acpaBuilderState.weaponsList
+          .filter(w => w.name.trim() !== "" || w.desc.trim() !== "" || w.damage.trim() !== "")
+          .map(w => ({
+            name: dash(w.name), type: dash(w.type), skr: dash(w.skr), to: dash(w.to), damage: dash(w.damage),
+            mag: dash(w.mag), sko: dash(w.sko), range: dash(w.range), nad: dash(w.nad), cost: dash(w.cost), desc: w.desc.trim()
+          }));
+      }
       if (activeBuilderType === "roles") {
         const rawSk = String(raw.skills || "").trim();
         data.skills = rawSk ? rawSk.split(",").map(s => s.trim()).filter(Boolean) : ["—"];
@@ -4837,7 +5182,136 @@
       baseRenderDetailForCloud(item);
       if (item && item.id) loadCommentsForCardFromCloud(item.id, false);
     };
+    const SMASHER_COOLDOWN_KEY = "cp2020_smasher_last_call_ts";
+    const SMASHER_COOLDOWN_MS = 3 * 60 * 1000; // 3 минуты
 
+    async function triggerAdamSmasherIfSummoned(itemId, summonerUser, summonerCommentObj, repliedTargetInfo) {
+      if (!summonerCommentObj || !summonerCommentObj.text) return;
+      const lowerText = summonerCommentObj.text.toLowerCase();
+      if (!lowerText.includes("@adamsmasher")) return;
+
+      // Проверяем кулдаун 3 минуты для текущего пользователя
+      const lastCallTs = Number(localStorage.getItem(SMASHER_COOLDOWN_KEY) || 0);
+      const nowMs = Date.now();
+      if (nowMs - lastCallTs < SMASHER_COOLDOWN_MS) {
+        const remSec = Math.ceil((SMASHER_COOLDOWN_MS - (nowMs - lastCallTs)) / 1000);
+        const mins = Math.floor(remSec / 60);
+        const secs = remSec % 60;
+        showNetwatchAlert(`
+          <div class="space-y-1.5">
+            <div class="text-cp-yellow font-bold uppercase">⚠️ КАНАЛ СВЯЗИ ARASAKA ПЕРЕГРУЖЕН</div>
+            <div><b>Adam Smasher</b> сейчас перезаряжает боекомплект и отмывает броню DaiOni от прошлого вызова.</div>
+            <div class="text-cp-cyan font-bold pt-1">Повторный призыв @adamsmasher будет доступен через: ${mins > 0 ? mins + ' мин. ' : ''}${secs} сек.</div>
+          </div>
+        `);
+        return;
+      }
+
+      // Фиксируем таймер кулдауна (3 минуты)
+      localStorage.setItem(SMASHER_COOLDOWN_KEY, String(nowMs));
+
+      const cardComments = COMMENTS[itemId] || [];
+      // Все остальные комментарии под карточкой (кроме самого призыва и прошлых реплик Смэшера)
+      const otherComments = cardComments.filter(c => c.id !== summonerCommentObj.id && c.userId !== "u-smasher");
+
+      let smasherText = "";
+      let smasherReplyToId = null;
+      let smasherReplyToName = null;
+      let smasherReplyToSnippet = null;
+      let notifyTargetUserId = null;
+
+      // СЦЕНАРИЙ 1: Призвали ОТВЕТОМ (↩) на чей-то конкретный комментарий -> Смэшер отвечает ТОМУ пользователю!
+      if (repliedTargetInfo && repliedTargetInfo.commentId) {
+        const randomQuote = SMASHER_TARGET_QUOTES[Math.floor(Math.random() * SMASHER_TARGET_QUOTES.length)];
+        smasherText = `@${repliedTargetInfo.authorName}, ${randomQuote}`;
+        smasherReplyToId = repliedTargetInfo.commentId;
+        smasherReplyToName = repliedTargetInfo.authorName;
+        smasherReplyToSnippet = repliedTargetInfo.snippet;
+        notifyTargetUserId = repliedTargetInfo.targetUserId;
+      }
+      // СЦЕНАРИЙ 2: Призвали БЕЗ ответа в ветку, где УЖЕ БОЛЕЕ 2 чужих комментариев -> Смэшер расстреливает всех остальных!
+      else if (otherComments.length > 2) {
+        const victimNames = [...new Set(otherComments.map(c => {
+          const u = USERS.find(x => x && x.id === c.userId);
+          return u ? u.displayName : (c.fallbackName || "Раннер");
+        }).filter(name => name !== summonerUser.displayName))];
+
+        const victimsListStr = victimNames.length > 0 ? victimNames.join(", ") : "всех вокруг";
+        const randomMassacre = SMASHER_MASSACRE_QUOTES[Math.floor(Math.random() * SMASHER_MASSACRE_QUOTES.length)];
+        smasherText = `${randomMassacre} *Под шквальный огонь попадают: ${victimsListStr}!*`;
+        smasherReplyToId = summonerCommentObj.id;
+        smasherReplyToName = summonerUser.displayName;
+        smasherReplyToSnippet = truncateQuote(summonerCommentObj.text, 100);
+      }
+      // СЦЕНАРИЙ 3: Призвали БЕЗ ответа в пустую/маленькую ветку (2 или меньше комментов) -> Смэшер злится и расстреливает самого призывателя!
+      else {
+        const randomAngry = SMASHER_ANGRY_SUMMONER_QUOTES[Math.floor(Math.random() * SMASHER_ANGRY_SUMMONER_QUOTES.length)];
+        smasherText = `@${summonerUser.displayName}, ${randomAngry}`;
+        smasherReplyToId = summonerCommentObj.id;
+        smasherReplyToName = summonerUser.displayName;
+        smasherReplyToSnippet = truncateQuote(summonerCommentObj.text, 100);
+      }
+
+      // Небольшая задержка (700 мс), чтобы ответ Смэшера эффектно прилетал следом за комментарием игрока
+      setTimeout(async () => {
+        const smasherCommId = "cm-" + Date.now() + "-smasher";
+        const smasherCommentObj = {
+          id: smasherCommId,
+          itemId: itemId,
+          userId: "u-smasher",
+          fallbackName: "Adam Smasher",
+          text: smasherText,
+          createdAt: getMoscowTimeFormatted(false),
+          edited: false,
+          replyToId: smasherReplyToId,
+          replyToName: smasherReplyToName,
+          replyToSnippet: smasherReplyToSnippet
+        };
+
+        if (!Array.isArray(COMMENTS[itemId])) COMMENTS[itemId] = [];
+        COMMENTS[itemId].push(smasherCommentObj);
+        safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
+        refreshCurrentCardOrRuleView({ itemId, scrollToBottom: true });
+
+        if (sbClient) {
+          try {
+            await sbClient.from("cp2020_comments").insert({
+              id: smasherCommentObj.id,
+              item_id: itemId,
+              user_id: smasherCommentObj.userId,
+              fallback_name: smasherCommentObj.fallbackName,
+              text: smasherCommentObj.text,
+              created_at: smasherCommentObj.createdAt,
+              edited: false,
+              reply_to_id: smasherCommentObj.replyToId,
+              reply_to_name: smasherCommentObj.replyToName,
+              reply_to_snippet: smasherCommentObj.replyToSnippet,
+              updated_at: new Date().toISOString()
+            });
+            if (liveChannel) {
+              liveChannel.send({
+                type: "broadcast",
+                event: "comment_op",
+                payload: { sender: CLIENT_TAB_ID, op: "insert", itemId, comment: smasherCommentObj }
+              });
+            }
+          } catch (err) {}
+        }
+
+        // Если Смэшера натравили на конкретного игрока — присылаем жертве уведомление в колокольчик!
+        if (notifyTargetUserId && notifyTargetUserId !== "u-smasher") {
+          const foundObj = findItemAcrossAllSections(itemId);
+          const cardTitle = foundObj ? (foundObj.item.name || foundObj.item.title) : "карточке";
+          const secKey = foundObj ? foundObj.section : activeCatalogTab;
+          await window.createNotification(
+            notifyTargetUserId,
+            "reply",
+            `💀 На ваш комментарий к «<b>${cardTitle}</b>» натравили <b>Adam Smasher</b>: «${truncateQuote(smasherText, 65)}»`,
+            { sectionKey: secKey, itemId, commentId: smasherCommId }
+          );
+        }
+      }, 700);
+    }
     window.submitNewComment = async function(e, itemId) {
       if (e) e.preventDefault();
       const u = getCurrentUser();
@@ -4858,6 +5332,7 @@
 
       if (!Array.isArray(COMMENTS[itemId])) COMMENTS[itemId] = [];
       COMMENTS[itemId].push(newCommentObj);
+      const savedReplyInfo = isReplying ? { ...activeReplyToComment } : null;
       const replyTargetUserId = isReplying ? activeReplyToComment.targetUserId : null;
       activeReplyToComment = null;
       safeLocalSet(STORAGE_COMMENTS_KEY, JSON.stringify(COMMENTS));
@@ -4881,6 +5356,7 @@
         const secKey = foundObj ? foundObj.section : activeCatalogTab;
         await window.createNotification(replyTargetUserId, "reply", `Пользователь <b>${u.displayName}</b> ответил на ваш комментарий к «<b>${cardTitle}</b>»: «${truncateQuote(textVal, 60)}»`, { sectionKey: secKey, itemId, commentId: newCommId });
       }
+      triggerAdamSmasherIfSummoned(itemId, u, newCommentObj, savedReplyInfo);
     };
 
     window.saveEditedComment = async function(itemId, commentId) {
@@ -4964,6 +5440,7 @@
           populateFavCorpSelects();
           safeLocalSet(STORAGE_DB_KEY, JSON.stringify(DB));
           safeLocalSet(STORAGE_CAT_KEY, JSON.stringify(CATEGORIES));
+          updateCounts();
           isApplyingRemoteUpdate = false;
         }
 
@@ -4996,6 +5473,7 @@
             const { data: mRow } = await sbClient.from("cp2020_state").select("db,categories").eq("id", "main_state").maybeSingle();
             if (mRow && mRow.db) {
               mergeExternalDataIntoMemory({ db: mRow.db, categories: mRow.categories }, true);
+              updateCounts();
               if (activeMainView === "catalog") renderCatalog();
               else if (activeMainView === "rules") renderRulesView();
             }
