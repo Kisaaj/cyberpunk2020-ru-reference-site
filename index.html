@@ -4664,47 +4664,256 @@
       }).join("");
     }
 
+    async function switchAdminLogsSubtab(sub) {
+      activeAdminLogsSubtab = sub;
+      // Если открыли лог комментариев и подключено облако — подтягиваем последние 150 комментов со всего сайта
+      if (sub === "comments" && typeof sbClient !== "undefined" && sbClient) {
+        try {
+          const { data } = await sbClient
+            .from("cp2020_comments")
+            .select("*")
+            .order("id", { ascending: false })
+            .limit(150);
+          if (Array.isArray(data)) {
+            COMMENTS = {};
+            data.reverse().forEach(r => {
+              const c = typeof mapRowToComment === "function" ? mapRowToComment(r) : r;
+              if (!Array.isArray(COMMENTS[c.itemId])) COMMENTS[c.itemId] = [];
+              COMMENTS[c.itemId].push(c);
+            });
+          }
+        } catch (e) {}
+      }
+      renderAdminLogsView();
+    }
+
+    function confirmBanUserSubmit(e) {
+      e.preventDefault();
+      const targetId = document.getElementById("banModalTargetId").value;
+      const target = USERS.find(u => u && u.id === targetId);
+      const curAdmin = getCurrentUser();
+      if (!target || !curAdmin || !canCurrentAdminBanTarget(target)) return;
+
+      const durVal = document.getElementById("banDurationSelect").value;
+      const reason = document.getElementById("banReasonInput").value.trim() || "Нарушение правил";
+
+      let untilValue = "PERM";
+      let durationLabel = "Перманентно (Навсегда)";
+
+      if (durVal !== "PERM") {
+        const mins = durVal === "CUSTOM"
+          ? Math.max(1, parseInt(document.getElementById("banCustomMinutesInput").value, 10) || 10)
+          : parseInt(durVal, 10);
+        untilValue = Date.now() + mins * 60 * 1000;
+        const selEl = document.getElementById("banDurationSelect");
+        durationLabel = durVal === "CUSTOM" ? `${mins} мин.` : selEl.options[selEl.selectedIndex].text;
+      }
+
+      target.banInfo = {
+        reason,
+        until: untilValue,
+        durationLabel,
+        bannedAt: typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16).replace("T", " "),
+        bannedBy: curAdmin.displayName
+      };
+
+      closeBanModal();
+      persistUsers();
+      if (typeof saveSingleUserToCloud === "function") saveSingleUserToCloud(target);
+
+      if (currentlyViewedPublicUserId === target.id && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+        openPublicProfileModal(target.id);
+      }
+      if (activeMainView === "admin") {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
+    }
+
+    function unbanUserAccount(targetUserId) {
+      const target = USERS.find(u => u && u.id === targetUserId);
+      if (!target || !canCurrentAdminBanTarget(target)) return;
+      delete target.banInfo;
+      persistUsers();
+      if (typeof saveSingleUserToCloud === "function") saveSingleUserToCloud(target);
+
+      if (currentlyViewedPublicUserId === target.id && !document.getElementById("publicProfileModal").classList.contains("hidden")) {
+        openPublicProfileModal(target.id);
+      }
+      if (activeMainView === "admin") {
+        if (activeAdminSubtab === "users") renderAdminUsersManager();
+        else if (activeAdminSubtab === "logs") renderAdminLogsView();
+      }
+    }
+
     function renderAdminLogsView() {
       ensureMetaArraysInCategories();
       const bansBtn = document.getElementById("logsTabBansBtn");
       const commsBtn = document.getElementById("logsTabCommentsBtn");
       const changesBtn = document.getElementById("logsTabChangesBtn");
+
       const bansBox = document.getElementById("adminLogsBansBox");
       const commsBox = document.getElementById("adminLogsCommentsBox");
       const changesBox = document.getElementById("adminLogsChangesBox");
 
-      bansBtn.className = activeAdminLogsSubtab === "bans" ? "px-4 py-2 text-xs font-bold uppercase border bg-cp-red text-white border-cp-red" : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300";
-      commsBtn.className = activeAdminLogsSubtab === "comments" ? "px-4 py-2 text-xs font-bold uppercase border bg-cp-yellow text-black border-cp-yellow" : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300";
-      changesBtn.className = activeAdminLogsSubtab === "changes" ? "px-4 py-2 text-xs font-bold uppercase border bg-cp-cyan text-black border-cp-cyan" : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300";
+      bansBtn.className = activeAdminLogsSubtab === "bans"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-red text-white border-cp-red"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-red";
+      commsBtn.className = activeAdminLogsSubtab === "comments"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-yellow text-black border-cp-yellow"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-yellow";
+      changesBtn.className = activeAdminLogsSubtab === "changes"
+        ? "px-4 py-2 text-xs font-bold uppercase border transition-all bg-cp-cyan text-black border-cp-cyan"
+        : "px-4 py-2 text-xs font-bold uppercase border border-gray-700 bg-cp-bg text-gray-300 hover:border-cp-cyan";
 
       bansBox.classList.toggle("hidden", activeAdminLogsSubtab !== "bans");
       commsBox.classList.toggle("hidden", activeAdminLogsSubtab !== "comments");
       changesBox.classList.toggle("hidden", activeAdminLogsSubtab !== "changes");
 
+      // 1. Активные баны
       const bannedUsers = USERS.filter(u => isUserCurrentlyBanned(u));
       document.getElementById("cnt-logs-bans").textContent = bannedUsers.length;
-      bansBox.innerHTML = bannedUsers.length === 0 ? `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Активных банов нет.</div>` : bannedUsers.map(u => `<div class="bg-cp-bg border border-cp-red/60 p-4 flex items-center justify-between"><div class="text-xs"><b class="text-white">${u.displayName}</b> — <span class="text-cp-yellow">${u.banInfo.reason}</span> (${formatBanRemainingTime(u.banInfo)})</div><button type="button" onclick="unbanUserAccount('${u.id}')" class="px-3 py-1 bg-cp-green text-black font-bold text-xs uppercase">🔓 Разбанить</button></div>`).join("");
 
+      if (bannedUsers.length === 0) {
+        bansBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Активных банов сейчас нет. Все эджраннеры соблюдают порядок!</div>`;
+      } else {
+        bansBox.innerHTML = bannedUsers.map(u => {
+          const b = u.banInfo;
+          const canUnban = canCurrentAdminBanTarget(u);
+          const av = u.avatar
+            ? `<img onclick="openPublicProfileModal('${u.id}')" src="${escapeHtmlAttr(u.avatar)}" class="w-11 h-11 object-cover border border-cp-red cursor-pointer shrink-0">`
+            : `<div onclick="openPublicProfileModal('${u.id}')" class="w-11 h-11 bg-cp-panel border border-cp-red text-cp-red flex items-center justify-center font-display font-bold text-sm cursor-pointer shrink-0">${(u.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
+          return `
+            <div class="bg-cp-bg border border-cp-red/60 p-4 flex items-center justify-between gap-4">
+              <div class="flex items-start gap-3.5">
+                ${av}
+                <div class="text-xs space-y-1">
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="openPublicProfileModal('${u.id}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline">${u.displayName}</button>
+                    <span class="px-2 py-0.5 bg-cp-red text-white text-[10px] font-bold uppercase">🚫 ЗАБАНЕН</span>
+                    <span class="text-gray-500 text-[11px]">Модератор: <b class="text-gray-300">${b.bannedBy || 'Админ'}</b> (${b.bannedAt || '—'})</span>
+                  </div>
+                  <div class="text-gray-200"><b>Причина бана:</b> <span class="text-cp-yellow">${b.reason}</span></div>
+                  <div class="text-gray-400"><b>Оставшееся время:</b> <span class="text-cp-cyan font-bold">${formatBanRemainingTime(b)}</span></div>
+                </div>
+              </div>
+              <div class="shrink-0">
+                ${canUnban ? `<button type="button" onclick="unbanUserAccount('${u.id}')" class="px-4 py-2 bg-cp-green hover:bg-green-400 text-black font-bold text-xs uppercase transition-colors">🔓 Разбанить</button>` : `<span class="text-[11px] text-gray-500">Забанен Главным Админом</span>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // 2. Все комментарии
       const allComments = [];
-      Object.keys(COMMENTS).forEach(itemId => { (COMMENTS[itemId] || []).forEach(c => allComments.push({ itemId, comment: c })); });
+      Object.keys(COMMENTS).forEach(itemId => {
+        const arr = COMMENTS[itemId];
+        if (Array.isArray(arr)) {
+          arr.forEach(c => allComments.push({ itemId, comment: c }));
+        }
+      });
       allComments.sort((a, b) => (b.comment.id || "").localeCompare(a.comment.id || ""));
       document.getElementById("cnt-logs-comments").textContent = allComments.length;
-      commsBox.innerHTML = allComments.length === 0 ? `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Комментариев нет.</div>` : allComments.map(({ itemId, comment }) => {
-        const foundCard = findItemAcrossAllSections(itemId);
-        const cardTitle = foundCard ? (foundCard.item.name || foundCard.item.title) : itemId;
-        const secKey = foundCard ? foundCard.section : "weapons";
-        return `<div class="bg-cp-bg border border-gray-800 p-3.5 flex items-start justify-between gap-4"><div class="text-xs space-y-1"><div class="text-gray-400"><b class="text-white">${comment.fallbackName || 'Раннер'}</b> • ${comment.createdAt} → <span class="text-cp-cyan font-bold">[${cardTitle}]</span></div><div class="text-gray-200">${comment.text}</div></div><div class="flex gap-2 shrink-0"><button type="button" onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="px-3 py-1 bg-cp-cyan/20 text-cp-cyan text-xs font-bold">↗ Перейти</button><button type="button" onclick="deleteComment('${itemId}', '${comment.id}')" class="px-3 py-1 bg-cp-red/20 text-cp-red text-xs font-bold">🗑️</button></div></div>`;
-      }).join("");
 
+      if (allComments.length === 0) {
+        commsBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">На сайте пока не оставлено ни одного комментария.</div>`;
+      } else {
+        commsBox.innerHTML = allComments.map(({ itemId, comment }) => {
+          const author = USERS.find(u => u && u.id === comment.userId) || { id: comment.userId, displayName: comment.fallbackName || "Раннер", role: "USER", avatar: "" };
+          const foundCard = findItemAcrossAllSections(itemId);
+          const cardTitle = foundCard ? (foundCard.item.name || foundCard.item.title) : itemId;
+          const secKey = foundCard ? foundCard.section : "weapons";
+          const secLabel = SECTION_LABELS[secKey] || secKey;
+
+          return `
+            <div class="bg-cp-bg border border-gray-800 hover:border-gray-600 p-3.5 flex items-start justify-between gap-4 transition-colors">
+              <div class="space-y-1.5 flex-1">
+                <div class="flex items-center gap-2 flex-wrap text-xs">
+                  <button type="button" onclick="openPublicProfileModal('${author.id}')" class="font-bold text-white hover:text-cp-yellow hover:underline">${author.displayName}</button>
+                  <span class="text-gray-500">• ${comment.createdAt}</span>
+                  <span class="text-gray-600">→</span>
+                  <button type="button" onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="text-cp-cyan hover:text-cp-yellow font-bold hover:underline">
+                    [${secLabel}: ${cardTitle}]
+                  </button>
+                </div>
+                <div onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="text-xs text-gray-200 bg-black/40 border-l-2 border-cp-cyan p-2.5 cursor-pointer hover:bg-cp-cyan/5 whitespace-pre-line">
+                  ${comment.text}
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button type="button" onclick="jumpToCommentFromAdminLog('${secKey}', '${itemId}', '${comment.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/40 text-xs font-bold transition-colors">
+                  ↗ Перейти
+                </button>
+                <button type="button" onclick="deleteComment('${itemId}', '${comment.id}')" class="px-3 py-1.5 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/40 text-xs font-bold transition-colors">
+                  🗑️ Удалить
+                </button>
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
+
+      // 3. История изменений карточек (создание / редактирование / удаление)
       const changeLogs = CATEGORIES._changeLogs || [];
       document.getElementById("cnt-logs-changes").textContent = changeLogs.length;
-      changesBox.innerHTML = changeLogs.length === 0 ? `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Записей об изменениях пока нет.</div>` : changeLogs.map(log => `<div class="bg-cp-bg border border-gray-800 p-3.5 flex items-center justify-between text-xs"><div><b class="text-cp-yellow">[${log.action.toUpperCase()}]</b> <b class="text-white">${dash(log.itemName)}</b> (${SECTION_LABELS[log.sectionKey] || log.sectionKey}) — <span class="text-gray-400">${dash(log.userName)} • ${dash(log.createdAt)}</span></div></div>`).join("");
+
+      if (changeLogs.length === 0) {
+        changesBox.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Записей о создании или редактировании карточек пока нет.</div>`;
+      } else {
+        changesBox.innerHTML = changeLogs.map(log => {
+          const actionBadge = log.action === "created"
+            ? `<span class="px-2 py-0.5 bg-cp-green/20 border border-cp-green text-cp-green text-[10px] font-bold uppercase">➕ СОЗДАНА</span>`
+            : log.action === "deleted"
+            ? `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red text-cp-red text-[10px] font-bold uppercase">🗑️ УДАЛЕНА</span>`
+            : `<span class="px-2 py-0.5 bg-cp-cyan/20 border border-cp-cyan text-cp-cyan text-[10px] font-bold uppercase">✏️ ИЗМЕНЕНА</span>`;
+
+          const secLabel = SECTION_LABELS[log.sectionKey] || log.sectionKey;
+          const stillExists = Boolean(findItemAcrossAllSections(log.itemId));
+
+          return `
+            <div ${stillExists ? `onclick="jumpToCardFromChangeLog('${log.sectionKey}', '${log.itemId}')"` : ""} class="bg-cp-bg border border-gray-800 ${stillExists ? 'hover:border-cp-yellow cursor-pointer' : 'opacity-70'} p-3.5 flex items-center justify-between gap-4 transition-colors">
+              <div class="space-y-1">
+                <div class="flex items-center gap-2.5 flex-wrap text-xs">
+                  ${actionBadge}
+                  <span class="font-bold text-sm text-white">${dash(log.itemName)}</span>
+                  <span class="text-cp-cyan text-[11px] font-semibold">[${secLabel} • ${dash(log.itemCategory)}]</span>
+                  <span class="text-gray-500 text-[11px]">Источник: ${dash(log.itemBook)}</span>
+                </div>
+                <div class="text-[11px] text-gray-400">
+                  Выполнил: <b class="text-cp-yellow">${dash(log.userName)}</b> • Время: <span class="text-gray-300">${dash(log.createdAt)}</span>
+                </div>
+              </div>
+              <div class="shrink-0">
+                ${stillExists
+                  ? `<button type="button" onclick="event.stopPropagation(); jumpToCardFromChangeLog('${log.sectionKey}', '${log.itemId}')" class="px-3.5 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/40 text-xs font-bold">↗ К карточке</button>`
+                  : `<span class="text-[11px] text-gray-500">Карточка удалена</span>`}
+              </div>
+            </div>
+          `;
+        }).join("");
+      }
     }
 
     function jumpToCommentFromAdminLog(sectionKey, itemId, commentId) {
-      if (sectionKey === "rules") { selectedRuleId = itemId; switchMainView("rules"); }
-      else { selectedItemId = itemId; switchMainView("catalog", sectionKey); }
+      if (sectionKey === "rules") {
+        selectedRuleId = itemId;
+        switchMainView("rules");
+      } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+      }
       setTimeout(() => scrollToAndHighlightComment(commentId), 120);
+    }
+
+    function jumpToCardFromChangeLog(sectionKey, itemId) {
+      if (sectionKey === "rules") {
+        selectedRuleId = itemId;
+        switchMainView("rules");
+      } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+      }
     }
 
     function renderAdminBackupStats() {
