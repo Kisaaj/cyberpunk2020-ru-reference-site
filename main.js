@@ -294,7 +294,8 @@ const SCHEMAS = {
         { k: "skills", l: "10 Профессиональных навыков (через запятую)", ph: "Чувство Боя, Внимательность, Пистолеты..." }
     ],
     weapons: [
-        { k: "name", l: "Название оружия", ph: "Sternmeyer M-95A4" },
+        { k: "name", l: "Название оружия (рус.)", ph: "Sternmeyer M-95A4" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Sternmeyer M-95A4" },
         { k: "category", l: "Категория", isCat: true, ph: "Штурмовые винтовки" },
         { k: "damage", l: "Урон", ph: "5d6", stat: "Урон", c: "text-cp-red", span: 2 },
         { k: "ammo", l: "Боеприпас / Калибр", ph: "5.56мм", stat: "Боеприпас / Калибр", c: "text-cp-yellow", span: 2 },
@@ -310,7 +311,8 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     armor: [
-        { k: "name", l: "Название брони", ph: "Arasaka Combat Armor" },
+        { k: "name", l: "Название брони (рус.)", ph: "Лёгкая бронекуртка" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Light Armor Jacket" },
         { k: "category", l: "Категория брони", isCat: true, ph: "Мягкая броня" },
         { k: "os", l: "ОС (Останавливающая способность)", ph: "18", stat: "ОС (Броня)", c: "text-cp-cyan" },
         { k: "zu", l: "ЗУ (Значение утяжеления)", ph: "-1", stat: "ЗУ (Утяжеление)", c: "text-cp-yellow" },
@@ -319,7 +321,8 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     gear: [
-        { k: "name", l: "Название снаряжения", ph: "Техсканнер" },
+        { k: "name", l: "Название снаряжения (рус.)", ph: "Техсканнер" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Techscanner" },
         { k: "category", l: "Раздел снаряжения", isCat: true, ph: "Инструменты и Ремонт" },
         { k: "weight", l: "Вес / Ноша", ph: "0.5 кг", stat: "Вес / Ноша" },
         { k: "effect", l: "Игровой эффект / Бонус", ph: "+2 к ТЕХ", stat: "Игровой эффект", c: "text-cp-cyan" },
@@ -327,14 +330,16 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     services: [
-        { k: "name", l: "Название услуги / расхода", ph: "Аккаунт Trauma Team" },
+        { k: "name", l: "Название услуги / расхода (рус.)", ph: "Аккаунт Trauma Team" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Trauma Team Account" },
         { k: "category", l: "Категория услуги", isCat: true, ph: "Жильё" },
         { k: "cost", l: "Тариф / Стоимость", ph: "500 eb", stat: "Тариф / Стоимость", c: "text-cp-green", span: 2 },
         { k: "unit", l: "Расчётная единица", ph: "в месяц", stat: "Расчётная единица", span: 1 },
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     cyberware: [
-        { k: "name", l: "Название киберимпланта", ph: "Сердце Pacesetter 2000" },
+        { k: "name", l: "Название киберимпланта (рус.)", ph: "Сердце Pacesetter 2000" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Pacesetter 2000 Heart" },
         { k: "category", l: "Раздел кибернетики", isCat: true, ph: "Импланты" },
         { k: "pch", l: "ПЧ (Потеря Человечности)", ph: "2d6", stat: "ПЧ (Человечность)", c: "text-cp-red" },
         { k: "surg", l: "Код Хирургии (Н, М, С, КР)", ph: "М", stat: "Код Хирургии", c: "text-cp-yellow" },
@@ -342,7 +347,8 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     borging: [
-        { k: "name", l: "Название модели боргирования", ph: "IEC Dragoon" },
+        { k: "name", l: "Название модели боргирования (рус.)", ph: "Штурмовой киборг IEC Dragoon" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "IEC Dragoon" },
         { k: "borgType", l: "Тип боргирования", ph: "Полное боргирование", stat: "Тип", c: "text-cp-cyan" },
         { k: "manufacturer", l: "Производитель", ph: "IEC / Arasaka / Militech", stat: "Производитель", c: "text-cp-yellow" },
         { k: "hc", l: "ПЧ (Потеря Человечности)", ph: "16d6+4", stat: "ПЧ (Человечность)", c: "text-cp-red" },
@@ -351,7 +357,7 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "Chr2 / SOF2", stat: "Источник" }
     ],
     acpa: [
-        { k: "name", l: "Название модели ACPA (рус. / англ.)", ph: "Arasaka «DaiOni» / Militech Commando" },
+        { k: "name", l: "Название модели ACPA (рус.)", ph: "Тяжёлая броня Arasaka DaiOni" },
         { k: "origName", l: "Оригинальное название (англ.)", ph: "Arasaka DaiOni" },
         { k: "category", l: "Тип ACPA", isCat: true, ph: "Тяжёлая штурмовая ACPA", stat: "Тип", c: "text-cp-cyan" },
         { k: "cost", l: "Цена", ph: "160,000 eb", stat: "Цена", c: "text-cp-green", span: 2 },
@@ -362,7 +368,8 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "MM (Max Metal)" }
     ],
     vehicles: [
-        { k: "name", l: "Название модели транспорта", ph: "AV-4 Aerodyne" },
+        { k: "name", l: "Название модели транспорта (рус.)", ph: "Многоцелевой аэродайн AV-4" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "AV-4 Multipurpose Aerodyne" },
         { k: "category", l: "Тип транспорта", isCat: true, ph: "Аэродайн (AV)", stat: "Тип транспорта", c: "text-cp-cyan" },
         { k: "topSpeed", l: "Макс. скорость (км/ч)", ph: "560 км/ч", stat: "Макс. скорость", c: "text-cp-yellow" },
         { k: "accDec", l: "УСК/ТОРМ (Ускорение / Торможение)", ph: "50 / 50", stat: "УСК/ТОРМ" },
@@ -389,13 +396,14 @@ const SCHEMAS = {
         { k: "shareholders", l: "📈 Самые крупные держатели акций", ph: "Сабуро Арасака (48%), Кэй Арасака (23%)" }
     ],
     characters: [
-        { k: "name", l: "Имя / Прозвище на улицах", ph: "Джонни Сильверхенд" },
+        { k: "name", l: "Имя / Прозвище на улицах (рус.)", ph: "Джонни Сильверхенд" },
+        { k: "origName", l: "Оригинальное имя (англ.)", ph: "Johnny Silverhand" },
         { k: "category", l: "Роль персонажа", isCat: true, ph: "Рокербой", stat: "Роль", c: "text-cp-yellow" },
         { k: "reputation", l: "Репутация (от 0 до 10)", ph: "10", stat: "Репутация", c: "text-cp-cyan" },
         { k: "book", l: "Источник", isBook: true, ph: "CP20", stat: "Источник", c: "text-cp-green" }
     ],
     net_program: [
-        { k: "name", l: "Название программы (рус.)", ph: "Адская Стрела (Hellbolt)" },
+        { k: "name", l: "Название программы (рус.)", ph: "Адская Стрела" },
         { k: "origName", l: "Оригинальное название (англ.)", ph: "Hellbolt" },
         { k: "category", l: "Категория программы", isCat: true, ph: "Анти-Личностные" },
         { k: "strength", l: "Сила программы (СИЛ)", ph: "4", stat: "Сила программы (СИЛ)", c: "text-cp-red" },
@@ -404,7 +412,8 @@ const SCHEMAS = {
         { k: "book", l: "Книга-источник", isBook: true, ph: "CP20" }
     ],
     net_deck: [
-        { k: "name", l: "Название модели кибердеки", ph: "SGI Tech Elysia" },
+        { k: "name", l: "Название модели кибердеки (рус.)", ph: "Кибердека SGI Tech Elysia" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "SGI Tech Elysia" },
         { k: "cpu", l: "Количество ЦПУ", ph: "1", stat: "Количество ЦПУ" },
         { k: "dataWall", l: "Стена данных (Data Wall)", ph: "+5", stat: "Стена данных", c: "text-cp-cyan" },
         { k: "codeGate", l: "Сила кодовых врат", ph: "3", stat: "Сила кодовых врат", c: "text-cp-yellow" },
