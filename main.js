@@ -3590,6 +3590,67 @@ window.handleBuilderMultiFilesSelect = async function (inputEl) {
     renderBuilderGalleryPreviewGrid();
 };
 
+// Глобальная вставка картинок из буфера обмена (Ctrl + V) в Конструктор карточек и в Профиль (аватар)
+window.addEventListener("paste", async function (ev) {
+    const clipboard = ev.clipboardData || window.clipboardData;
+    if (!clipboard) return;
+
+    const items = clipboard.items ? Array.from(clipboard.items) : [];
+    const imageItems = items.filter(it => it.type && it.type.startsWith("image/"));
+
+    const isBuilderOpen = (activeMainView === "admin" && activeAdminSubtab === "builder" && isCurrentUserAdmin());
+    const isProfileOpen = (activeMainView === "profile" && Boolean(getCurrentUser()));
+
+    // 1. Если в буфере обмена лежит само изображение (скриншот или скопированная картинка)
+    if (imageItems.length > 0) {
+        if (isBuilderOpen) {
+            ev.preventDefault();
+            for (const item of imageItems) {
+                const file = item.getAsFile();
+                if (!file) continue;
+                if (!validateUploadedFile(file)) continue;
+                const dataUrl = await compressUploadedCardImage(file);
+                if (dataUrl && !builderGalleryImages.includes(dataUrl)) {
+                    builderGalleryImages.push(dataUrl);
+                }
+            }
+            renderBuilderGalleryPreviewGrid();
+            return;
+        }
+
+        if (isProfileOpen) {
+            ev.preventDefault();
+            const file = imageItems[0].getAsFile();
+            if (!file) return;
+            if (typeof window.handleProfileAvatarUpload === "function") {
+                await window.handleProfileAvatarUpload({ target: { files: [file], value: "" } });
+            }
+            return;
+        }
+    }
+
+    // 2. Если в Конструкторе нажали Ctrl + V со скопированной ссылкой на картинку (вне обычных полей ввода текста)
+    if (isBuilderOpen) {
+        const activeEl = document.activeElement;
+        const isUrlInput = activeEl && activeEl.id === "builderMultiImageUrlInput";
+        const isOtherTextInput = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA") && !isUrlInput;
+
+        if (!isOtherTextInput) {
+            const pastedText = (clipboard.getData("text/plain") || "").trim();
+            const looksLikeImgUrl = /^https?:\/\/\S+\.(jpg|jpeg|png|gif|webp|avif|svg)(\?\S*)?$/i.test(pastedText) ||
+                                    pastedText.startsWith("data:image/");
+            if (looksLikeImgUrl) {
+                ev.preventDefault();
+                if (validateImageUrlForRole(pastedText) && !builderGalleryImages.includes(pastedText)) {
+                    builderGalleryImages.push(pastedText);
+                    renderBuilderGalleryPreviewGrid();
+                }
+                if (isUrlInput) activeEl.value = "";
+            }
+        }
+    }
+});
+
 window.removeBuilderGalleryImageAt = function (idx) {
     if (idx < 0 || idx >= builderGalleryImages.length) return;
     builderGalleryImages.splice(idx, 1);
