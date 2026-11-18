@@ -821,6 +821,85 @@ async function initRealtimeCloud() {
     }
 }
 
+// --- АВТОМАТИЧЕСКАЯ ПРОВЕРКА ОБНОВЛЕНИЯ САЙТА НА GITHUB И БЛОКИРОВКА СТАРОЙ ВЕРСИИ ---
+let initialSiteVersionSignature = null;
+let isVersionUpdateLocked = false;
+
+async function computeCurrentSiteSignature() {
+    // Проверяем заголовки и размер ключевых файлов сайта с обходом кэша
+    const filesToWatch = ["index.html", "main.js", "cloud_service.js", "database.js"];
+    const parts = [];
+    for (const file of filesToWatch) {
+        try {
+            const res = await fetch(`${file}?_vcheck=${Date.now()}`, {
+                method: "GET",
+                cache: "no-store"
+            });
+            if (!res.ok) continue;
+            const etag = res.headers.get("etag") || "";
+            const lastMod = res.headers.get("last-modified") || "";
+            const text = await res.text();
+            parts.push(`${file}:${etag}:${lastMod}:${text.length}`);
+        } catch (e) { }
+    }
+    return parts.join("|");
+}
+
+function triggerVersionUpdateLockModal() {
+    if (isVersionUpdateLocked) return;
+    isVersionUpdateLocked = true;
+
+    // 1. Блокируем отправку любых старых данных в облако Supabase
+    isApplyingRemoteUpdate = true;
+
+    // 2. Показываем модальное окно поверх всего интерфейса и блокируем прокрутку
+    const modal = document.getElementById("versionUpdateModal");
+    if (modal) {
+        modal.classList.remove("hidden");
+    }
+    document.body.style.overflow = "hidden";
+}
+
+window.forceReloadFromGithub = function () {
+    const url = new URL(window.location.href);
+    url.searchParams.set("updated", Date.now());
+    window.location.replace(url.toString());
+};
+
+async function startGithubVersionWatcher() {
+    // На локальном диске (file://) проверку не запускаем
+    if (window.location.protocol === "file:") return;
+
+    // Чистим технический параметр ?updated=... из адресной строки после перезагрузки
+    if (window.location.search.includes("updated=")) {
+        const cleanUrl = new URL(window.location.href);
+        cleanUrl.searchParams.delete("updated");
+        window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+    }
+
+    initialSiteVersionSignature = await computeCurrentSiteSignature();
+    if (!initialSiteVersionSignature) return;
+
+    // Проверяем каждые 45 секунд, а также сразу при возвращении на вкладку браузера
+    setInterval(async () => {
+        if (isVersionUpdateLocked || document.hidden) return;
+        const latestSig = await computeCurrentSiteSignature();
+        if (latestSig && initialSiteVersionSignature && latestSig !== initialSiteVersionSignature) {
+            triggerVersionUpdateLockModal();
+        }
+    }, 45000);
+
+    document.addEventListener("visibilitychange", async () => {
+        if (!document.hidden && !isVersionUpdateLocked && initialSiteVersionSignature) {
+            const latestSig = await computeCurrentSiteSignature();
+            if (latestSig && latestSig !== initialSiteVersionSignature) {
+                triggerVersionUpdateLockModal();
+            }
+        }
+    });
+}
+
 window.addEventListener("load", () => {
     setTimeout(initRealtimeCloud, 150);
+    setTimeout(startGithubVersionWatcher, 2000);
 });
