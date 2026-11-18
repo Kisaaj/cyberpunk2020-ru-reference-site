@@ -652,6 +652,9 @@ function mergeExternalDataIntoMemory(extData, overwriteExisting = true) {
     if (srcCats._adminContacts && typeof srcCats._adminContacts === "object") {
         CATEGORIES._adminContacts = { ...(CATEGORIES._adminContacts || {}), ...srcCats._adminContacts };
     }
+    if (Array.isArray(srcCats._pendingSubmissions)) {
+        CATEGORIES._pendingSubmissions = srcCats._pendingSubmissions;
+    }
     if (deletedCardsSet.size > 0) {
         CATEGORIES._deletedCardIds = Array.from(deletedCardsSet);
     }
@@ -1664,6 +1667,8 @@ function saveBuilderItem(e) {
     updateCounts();
     e.target.reset();
 
+    if (typeof updateCommunityToggleUI === "function") updateCommunityToggleUI();
+    if (activeMainView === "admin" && activeAdminSubtab === "moderation" && typeof renderAdminModerationView === "function") renderAdminModerationView();
     if (activeBuilderType === "rules") { selectedRuleId = savedId; switchMainView("rules"); }
     else { selectedItemId = savedId; switchMainView("catalog", activeBuilderType); }
 }
@@ -5112,7 +5117,7 @@ function renderCartDropdownList() {
 
     const { totalCount, totalEb, resolvedItems } = calculateCartTotals();
     if (resolvedItems.length === 0) {
-        listEl.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">Ваша корзина пуста. Нажимайте кнопку <b class="text-cp-green">«🛒 Купить»</b> в карточках оружия, брони, имплантов или услуг!</div>`;
+        listEl.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">Ваша корзина пуста. Нажимайте кнопку <b class="text-cp-green">«🛒 Купить»</b> в карточках оружия, брони, имплантов или услуг! Важно: применимо не ко всем товарам, спрашивайте у своего мастера!</div>`;
         return;
     }
 
@@ -5177,6 +5182,627 @@ document.addEventListener("click", (ev) => {
 });
 
 setTimeout(loadShoppingCartFromStorage, 50);
+
+// =========================================================================
+// РЕЖИМ «ОТ СООБЩЕСТВА», ПРЕДЛОЖКА ИГРОКОВ И МОДЕРАЦИЯ АДМИНИСТРАЦИЕЙ
+// =========================================================================
+
+let isCommunityMode = false;
+let isPlayerSubmissionMode = false;
+let selectedPendingSubId = null;
+
+function ensureCommunityQueueArray() {
+    ensureMetaArraysInCategories();
+    if (!Array.isArray(CATEGORIES._pendingSubmissions)) {
+        CATEGORIES._pendingSubmissions = [];
+    }
+}
+
+function isItemMatchingCurrentMode(item) {
+    if (!item) return false;
+    return isCommunityMode ? Boolean(item.isCommunity) : !item.isCommunity;
+}
+
+function updateCommunityToggleUI() {
+    const box = document.getElementById("communityModeToggleBox");
+    const track = document.getElementById("communityToggleTrack");
+    const knob = document.getElementById("communityToggleKnob");
+    const label = document.getElementById("communityToggleLabel");
+    const pendingCntEl = document.getElementById("cnt-pending-mod");
+
+    ensureCommunityQueueArray();
+    if (pendingCntEl) {
+        pendingCntEl.textContent = CATEGORIES._pendingSubmissions.length;
+    }
+
+    if (!box || !track || !knob || !label) return;
+    if (isCommunityMode) {
+        box.className = "flex items-center gap-2.5 px-3 py-1 bg-cp-purple/20 border border-cp-purple cursor-pointer select-none transition-all shrink-0 shadow-[0_0_12px_rgba(184,41,255,0.35)]";
+        track.className = "w-9 h-4 bg-black border border-cp-purple relative flex items-center p-0.5 transition-all";
+        knob.className = "w-3 h-3 bg-cp-yellow shadow-[0_0_6px_#fcee0a] transition-transform duration-200 translate-x-4";
+        label.className = "font-display font-bold text-[11px] uppercase tracking-wider text-cp-yellow whitespace-nowrap";
+    } else {
+        box.className = "flex items-center gap-2.5 px-3 py-1 bg-cp-panel border border-gray-700 hover:border-cp-purple cursor-pointer select-none transition-all shrink-0";
+        track.className = "w-9 h-4 bg-cp-bg border border-gray-600 relative flex items-center p-0.5 transition-all";
+        knob.className = "w-3 h-3 bg-gray-400 transition-transform duration-200 translate-x-0";
+        label.className = "font-display font-bold text-[11px] uppercase tracking-wider text-gray-300 whitespace-nowrap";
+    }
+}
+
+window.toggleCommunityMode = function () {
+    isCommunityMode = !isCommunityMode;
+    selectedItemId = null;
+    selectedRuleId = null;
+    updateCommunityToggleUI();
+
+    // Закрываем открытый глобальный поиск и пересчитываем его под выбранную базу
+    const gInp = document.getElementById("globalHeaderSearchInput");
+    if (gInp && gInp.value.trim() !== "") {
+        window.handleGlobalHeaderSearch(gInp.value);
+    }
+
+    if (activeMainView === "catalog") {
+        setupCatalogFilters();
+        renderCatalog();
+    } else if (activeMainView === "rules") {
+        renderRulesView();
+    } else if (activeMainView === "home") {
+        updateCounts();
+    }
+};
+
+// Проксируем DB во время рендера каталога, правил и глобального поиска, чтобы разделять Официальную базу и базу От сообщества
+function withModeFilteredDB(callback) {
+    const backup = {};
+    Object.keys(SECTION_LABELS).forEach(sec => {
+        backup[sec] = DB[sec] || [];
+        DB[sec] = backup[sec].filter(it => isItemMatchingCurrentMode(it));
+    });
+    try {
+        return callback();
+    } finally {
+        Object.keys(SECTION_LABELS).forEach(sec => {
+            DB[sec] = backup[sec];
+        });
+    }
+}
+
+const _origRenderCatalogForComm = renderCatalog;
+renderCatalog = function () {
+    withModeFilteredDB(() => {
+        _origRenderCatalogForComm();
+    });
+    injectCommunityProposeButtonInCatalog();
+    updateCommunityToggleUI();
+};
+
+const _origRenderRulesSidebarForComm = renderRulesSidebar;
+renderRulesSidebar = function () {
+    withModeFilteredDB(() => {
+        _origRenderRulesSidebarForComm();
+    });
+    injectCommunityProposeButtonInRules();
+    updateCommunityToggleUI();
+};
+
+const _origGlobalSearchForComm = window.handleGlobalHeaderSearch;
+window.handleGlobalHeaderSearch = function (rawQuery) {
+    withModeFilteredDB(() => {
+        _origGlobalSearchForComm(rawQuery);
+    });
+};
+
+function injectCommunityProposeButtonInCatalog() {
+    const container = document.getElementById("catalogList");
+    if (!container) return;
+    const oldBtn = document.getElementById("communityProposeCatalogBtn");
+    if (oldBtn) oldBtn.remove();
+
+    // Если включён режим «От сообщества» и пользователь НЕ админ (у админа уже есть своя жёлтая кнопка), показываем кнопку предложки
+    if (isCommunityMode && !isCurrentUserAdmin()) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.id = "communityProposeCatalogBtn";
+        btn.onclick = () => window.openCommunitySubmissionBuilder(activeCatalogTab);
+        btn.className = "w-full py-2.5 px-4 mb-1 bg-cp-purple/15 hover:bg-cp-purple text-cp-cyan hover:text-white border border-dashed border-cp-purple font-display font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-[0_0_12px_rgba(184,41,255,0.2)]";
+        btn.innerHTML = `<span>➕ Предложить карточку от сообщества в раздел «${SECTION_LABELS[activeCatalogTab] || activeCatalogTab}»</span>`;
+        container.prepend(btn);
+    }
+}
+
+function injectCommunityProposeButtonInRules() {
+    const addRuleBtn = document.getElementById("addRuleTopBtn");
+    if (!addRuleBtn) return;
+    if (isCurrentUserAdmin()) {
+        addRuleBtn.classList.remove("hidden");
+        addRuleBtn.textContent = "+ Своя механика";
+        addRuleBtn.onclick = openRuleCreatorModal;
+    } else if (isCommunityMode) {
+        addRuleBtn.classList.remove("hidden");
+        addRuleBtn.textContent = "+ Предложить механику";
+        addRuleBtn.onclick = () => window.openCommunitySubmissionBuilder("rules");
+    } else {
+        addRuleBtn.classList.add("hidden");
+    }
+}
+
+// Открытие конструктора для обычного игрока (или админа) в режиме создания карточки от сообщества
+window.openCommunitySubmissionBuilder = function (sectionKey) {
+    const u = getCurrentUser();
+    if (!u) {
+        if (confirm("Чтобы предлагать свои карточки в раздел «От сообщества», необходимо войти в аккаунт. Перейти ко входу?")) {
+            switchMainView("profile");
+        }
+        return;
+    }
+
+    isPlayerSubmissionMode = !isCurrentUserAdmin();
+    const targetSec = sectionKey || activeCatalogTab || "roles";
+    editingItemId = null;
+    activeBuilderType = targetSec;
+
+    // Показываем окно view-admin, но если это обычный игрок — прячем админскую шапку с чужими вкладками
+    activeMainView = "admin";
+    ["home", "catalog", "rules", "profile", "admin"].forEach(v => {
+        const el = document.getElementById("view-" + v);
+        if (el) el.classList.toggle("hidden", v !== "admin");
+    });
+
+    const adminTopHeader = document.querySelector("#view-admin > section:first-child");
+    if (adminTopHeader) {
+        adminTopHeader.classList.toggle("hidden", !isCurrentUserAdmin());
+    }
+
+    ["builder", "moderation", "categories", "books", "users", "logs", "backup"].forEach(s => {
+        const el = document.getElementById("admin-sub-" + s);
+        if (el) el.classList.toggle("hidden", s !== "builder");
+    });
+
+    setBuilderType(targetSec, null);
+
+    if (!isCurrentUserAdmin()) {
+        document.getElementById("builderHeaderTitle").textContent = "🌐 Предложить карточку от сообщества";
+        document.getElementById("builderSubmitBtn").textContent = "📨 Отправить карточку на модерацию администрации";
+        const cancelBtn = document.getElementById("cancelEditBtn");
+        if (cancelBtn) {
+            cancelBtn.classList.remove("hidden");
+            cancelBtn.textContent = "← Вернуться в справочник";
+            cancelBtn.onclick = () => {
+                isPlayerSubmissionMode = false;
+                switchMainView(targetSec === "rules" ? "rules" : "catalog", targetSec === "rules" ? null : targetSec);
+            };
+        }
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+};
+
+// Расширяем switchAdminSubtab для поддержки вкладки "moderation" и возврата шапки админа
+const _origSwitchAdminSubtabForMod = switchAdminSubtab;
+switchAdminSubtab = function (subtab) {
+    const adminTopHeader = document.querySelector("#view-admin > section:first-child");
+    if (adminTopHeader && isCurrentUserAdmin()) adminTopHeader.classList.remove("hidden");
+
+    const modSec = document.getElementById("admin-sub-moderation");
+    if (modSec) modSec.classList.toggle("hidden", subtab !== "moderation");
+
+    _origSwitchAdminSubtabForMod(subtab);
+    if (subtab === "moderation") {
+        renderAdminModerationView();
+    }
+    updateCommunityToggleUI();
+};
+
+// Перехватываем сохранение в Конструкторе (saveBuilderItem):
+// - Если сохраняет обычный игрок -> карточка уходит в очередь модерации + уведомления админам
+// - Если сохраняет Админ при включённом тумблере «От сообщества» -> публикуется сразу в базу сообщества
+const _origSaveBuilderItemForComm = saveBuilderItem;
+saveBuilderItem = async function (e) {
+    if (e) e.preventDefault();
+    const u = getCurrentUser();
+    if (!u) return;
+
+    // Если это обычный пользователь (не админ) — формируем заявку на модерацию
+    if (!isCurrentUserAdmin()) {
+        ensureCommunityQueueArray();
+
+        const pendingUrlInp = document.getElementById("builderMultiImageUrlInput");
+        if (pendingUrlInp && pendingUrlInp.value.trim() !== "") {
+            const pVal = pendingUrlInp.value.trim();
+            if (validateImageUrlForRole(pVal) && !builderGalleryImages.includes(pVal)) {
+                builderGalleryImages.push(pVal);
+            }
+            pendingUrlInp.value = "";
+        }
+
+        if (activeBuilderType === "roles") window.updateHiddenRoleSalaryRangeInput();
+        if (activeBuilderType === "characters") syncCharBuilderStateFromDOM();
+        if (activeBuilderType === "borging") syncBorgBuilderFromDOM();
+        if (activeBuilderType === "acpa") syncAcpaBuilderFromDOM();
+
+        const fd = new FormData(e.target);
+        const raw = Object.fromEntries(fd.entries());
+        const data = {};
+        const freeTextFields = ["desc", "abilityDesc", "content", "summary", "specialEquipment", "charSkills", "ammoCasing"];
+
+        Object.keys(raw).forEach(k => {
+            if (k === "deckTypeCheck" || k === "deckOptionCheck" || k.startsWith("b_") || k.startsWith("s_")) return;
+            const val = String(raw[k] || "").trim();
+            data[k] = freeTextFields.includes(k) ? val : (val === "" ? "—" : val);
+        });
+
+        data.id = "comm-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+        data.origName = data.origName && data.origName !== "—" ? data.origName : data.name;
+        data.isUser = true;
+        data.isCommunity = true;
+        data.authorId = u.id;
+        data.authorName = u.displayName;
+
+        if (activeBuilderType === "characters") {
+            const namedCheck = document.getElementById("builderNamedCharCheck");
+            data.isNamed = namedCheck ? Boolean(namedCheck.checked) : false;
+            data.charWeaponsList = charBuilderState.weaponsList.filter(w => w.name.trim() !== "" || w.desc.trim() !== "" || w.damage.trim() !== "").map(w => ({
+                name: dash(w.name), type: dash(w.type), skr: dash(w.skr), to: dash(w.to), damage: dash(w.damage),
+                mag: dash(w.mag), sko: dash(w.sko), range: dash(w.range), nad: dash(w.nad), cost: dash(w.cost), desc: w.desc.trim()
+            }));
+            const cleanSimple = (arr) => (arr || []).filter(x => x.name.trim() !== "" || x.desc.trim() !== "").map(x => ({ name: dash(x.name), desc: x.desc.trim() }));
+            data.charCyberwareList = cleanSimple(charBuilderState.cyberwareList);
+            data.charArmorList = cleanSimple(charBuilderState.armorList);
+            data.charGearList = cleanSimple(charBuilderState.gearList);
+        }
+
+        if (activeBuilderType === "borging") {
+            data.borgStats = {
+                ref: raw.b_ref || "", cool: raw.b_cool || "", ma: raw.b_ma || "", body: raw.b_body || "",
+                m_m: raw.b_m_m || "", m_kmh: raw.b_m_kmh || "", jump_up: raw.b_jump_up || "", jump_long: raw.b_jump_long || "",
+                lift: raw.b_lift || "", throw: raw.b_throw || "", dmg_mod: raw.b_dmg_mod || "", punch: raw.b_punch || "", kick: raw.b_kick || ""
+            };
+            data.borgStructure = {
+                head_sp: raw.s_head_sp || "", head_ost: raw.s_head_ost || "", head_opt: raw.s_head_opt || "", head_aud: raw.s_head_aud || "",
+                torso_sp: raw.s_torso_sp || "", torso_ost: raw.s_torso_ost || "", torso_opt: raw.s_torso_opt || "",
+                rarm_sp: raw.s_rarm_sp || "", rarm_ost: raw.s_rarm_ost || "", rarm_opt: raw.s_rarm_opt || "",
+                larm_sp: raw.s_larm_sp || "", larm_ost: raw.s_larm_ost || "", larm_opt: raw.s_larm_opt || "",
+                rleg_sp: raw.s_rleg_sp || "", rleg_ost: raw.s_rleg_ost || "", rleg_opt: raw.s_rleg_opt || "",
+                lleg_sp: raw.s_lleg_sp || "", lleg_ost: raw.s_lleg_ost || "", lleg_opt: raw.s_lleg_opt || ""
+            };
+            data.cyberwareList = borgBuilderCyberwareList.filter(x => x.name.trim() !== "" || x.desc.trim() !== "").map(x => ({ name: dash(x.name), desc: x.desc.trim() }));
+        }
+
+        if (activeBuilderType === "acpa") {
+            data.acpaGearList = acpaBuilderState.gearList.filter(g => g.name.trim() !== "" || g.desc.trim() !== "").map(g => ({ name: dash(g.name), desc: g.desc.trim() }));
+            data.acpaWeaponsList = acpaBuilderState.weaponsList.filter(w => w.name.trim() !== "" || w.desc.trim() !== "" || w.damage.trim() !== "").map(w => ({
+                name: dash(w.name), type: dash(w.type), skr: dash(w.skr), to: dash(w.to), damage: dash(w.damage),
+                mag: dash(w.mag), sko: dash(w.sko), range: dash(w.range), nad: dash(w.nad), cost: dash(w.cost), desc: w.desc.trim()
+            }));
+        }
+
+        if (activeBuilderType === "roles") {
+            const rawSk = String(raw.skills || "").trim();
+            data.skills = rawSk ? rawSk.split(",").map(s => s.trim()).filter(Boolean) : ["—"];
+            const grid = document.getElementById("roleSalaryBuilderGrid");
+            if (grid) {
+                data.salaryTable = {};
+                ROLE_SALARY_LEVELS.forEach(lv => {
+                    data.salaryTable[lv.key] = (grid.querySelector(`[data-salary-lvl="${lv.key}"]`)?.value || "").trim() || "—";
+                });
+                data.salary = `${data.salaryTable.lvl1_5} — ${data.salaryTable.lvl10}`;
+            }
+        }
+
+        if (activeBuilderType === "netrunning" && data.itemKind === "deck") {
+            data.category = "Кибердеки";
+            data.deckTypes = fd.getAll("deckTypeCheck");
+            data.deckOptions = fd.getAll("deckOptionCheck");
+        }
+
+        data.images = [...builderGalleryImages];
+        data.image = builderGalleryImages[0] || "";
+
+        const submissionEntry = {
+            subId: "sub-" + Date.now() + "-" + Math.floor(Math.random() * 1000),
+            sectionKey: activeBuilderType,
+            authorId: u.id,
+            authorName: u.displayName,
+            createdAt: typeof getMoscowTimeFormatted === "function" ? getMoscowTimeFormatted(false) : new Date().toISOString().slice(0, 16),
+            cardData: data
+        };
+
+        CATEGORIES._pendingSubmissions.unshift(submissionEntry);
+        await persistDatabase(true);
+
+        // Рассылаем уведомления всем Администраторам (ROOT и ADMIN)
+        const cardTitle = data.name && data.name !== "—" ? data.name : (data.title || "Без названия");
+        const secLabel = SECTION_LABELS[activeBuilderType] || activeBuilderType;
+        const admins = USERS.filter(adm => adm && (adm.role === "ROOT" || adm.role === "ADMIN"));
+        for (const adm of admins) {
+            if (typeof window.createNotification === "function") {
+                await window.createNotification(
+                    adm.id,
+                    "rank",
+                    `📥 Новая карточка от сообщества «<b>${escapeHtmlAttr(cardTitle)}</b>» (${secLabel}) от игрока <b>${escapeHtmlAttr(u.displayName)}</b> ожидает рассмотрения на модерации!`,
+                    { sectionKey: "moderation", itemId: submissionEntry.subId }
+                );
+            }
+        }
+
+        builderGalleryImages = [];
+        e.target.reset();
+        isPlayerSubmissionMode = false;
+        switchMainView(activeBuilderType === "rules" ? "rules" : "catalog", activeBuilderType === "rules" ? null : activeBuilderType);
+
+        // Показываем игроку окно о том, что карточка отправлена на рассмотрение
+        document.getElementById("netwatchModalTitle").textContent = "📨 ОТПРАВЛЕНО НА РАССМОТРЕНИЕ";
+        document.getElementById("netwatchErrorText").innerHTML = `
+          <div class="space-y-2">
+            <div class="text-cp-cyan font-bold uppercase">Ваша карточка «${escapeHtmlAttr(cardTitle)}» успешно отправлена на модерацию!</div>
+            <div class="text-gray-200 leading-relaxed">Отправленная карточка ушла на рассмотрение администрации. Рук у администрации не много, поэтому она будет рассмотрена тогда, когда будет время.</div>
+            <div class="text-[11px] text-cp-yellow pt-1">🔔 Вы получите уведомление в колокольчик сразу после принятия решения.</div>
+          </div>
+        `;
+        document.getElementById("netwatchModal").classList.remove("hidden");
+        return;
+    }
+
+    // Если сохраняет Администратор: сохраняем штатно, но если включён тумблер «От сообщества» — помечаем карточку как isCommunity
+    const wasEditing = editingItemId;
+    const prevObj = wasEditing ? (DB[activeBuilderType] || []).find(i => i.id === wasEditing) : null;
+    const shouldBeCommunity = prevObj ? Boolean(prevObj.isCommunity) : isCommunityMode;
+
+    _origSaveBuilderItemForComm(e);
+
+    const savedCard = (DB[activeBuilderType] || [])[0] || (wasEditing ? (DB[activeBuilderType] || []).find(i => i.id === wasEditing) : null);
+    if (savedCard && shouldBeCommunity) {
+        savedCard.isCommunity = true;
+        persistDatabase(true);
+        if (activeMainView === "catalog") renderCatalog();
+        else if (activeMainView === "rules") renderRulesView();
+    }
+};
+
+// Переход по клику на уведомление о модерации
+const _origOpenNotificationTargetForMod = openNotificationTarget;
+openNotificationTarget = function (notifId) {
+    const n = NOTIFICATIONS.find(x => x.id === notifId);
+    if (n && n.linkData) {
+        if (n.linkData.sectionKey === "moderation" && isCurrentUserAdmin()) {
+            closeNotifDropdown();
+            selectedPendingSubId = n.linkData.itemId || null;
+            switchMainView("admin");
+            switchAdminSubtab("moderation");
+            return;
+        }
+        if (n.linkData.isCommunityCard) {
+            isCommunityMode = true;
+            updateCommunityToggleUI();
+        }
+    }
+    _origOpenNotificationTargetForMod(notifId);
+};
+
+// --- РЕНДЕР ВКЛАДКИ МОДЕРАЦИИ В АДМИН-ПАНЕЛИ ---
+function renderAdminModerationView() {
+    ensureCommunityQueueArray();
+    const queue = CATEGORIES._pendingSubmissions;
+    const cntEl = document.getElementById("cnt-pending-mod");
+    if (cntEl) cntEl.textContent = queue.length;
+
+    const listEl = document.getElementById("adminModQueueList");
+    const previewEl = document.getElementById("adminModPreviewBox");
+    if (!listEl || !previewEl) return;
+
+    if (queue.length === 0) {
+        listEl.innerHTML = `<div class="bg-cp-bg border border-gray-800 p-8 text-center text-xs text-gray-500">Очередь модерации пуста. Все предложенные карточки рассмотрены!</div>`;
+        previewEl.innerHTML = `<div class="text-xs text-gray-500 text-center py-16">Нет карточек, ожидающих проверки.</div>`;
+        return;
+    }
+
+    if (!selectedPendingSubId || !queue.some(s => s.subId === selectedPendingSubId)) {
+        selectedPendingSubId = queue[0].subId;
+    }
+
+    listEl.innerHTML = queue.map(sub => {
+        const isSel = sub.subId === selectedPendingSubId;
+        const c = sub.cardData || {};
+        const title = dash(c.name !== "—" ? c.name : c.title);
+        const cat = dash(c.category !== "—" ? c.category : c.subsection);
+        const secLabel = SECTION_LABELS[sub.sectionKey] || sub.sectionKey;
+        const imgs = getItemImagesArray(c);
+
+        return `
+          <div onclick="selectPendingSubmission('${sub.subId}')"
+            class="border ${isSel ? 'cp-border-active bg-cp-card' : 'border-gray-800 bg-cp-bg hover:border-gray-600'} p-3.5 cursor-pointer transition-all space-y-2.5">
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-purple/20 text-cp-cyan border border-cp-purple/50">${secLabel}</span>
+                  <span class="text-[11px] text-gray-400 truncate">${cat}</span>
+                  ${imgs.length > 0 ? `<span class="text-[10px] text-cp-yellow border border-cp-yellow/40 px-1">🖼️ ${imgs.length}</span>` : ""}
+                </div>
+                <div class="font-display font-bold text-sm text-white mt-1 truncate">${escapeHtmlAttr(title)}</div>
+                <div class="text-[11px] text-gray-400 mt-0.5">
+                  Автор: <b class="text-cp-yellow">${escapeHtmlAttr(sub.authorName || "Игрок")}</b> • <span>${dash(sub.createdAt)}</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 pt-2 border-t border-gray-800/80" onclick="event.stopPropagation()">
+              <button type="button" onclick="approvePendingSubmission('${sub.subId}')"
+                class="flex-1 py-1.5 bg-cp-green hover:bg-green-400 text-black font-display font-bold text-[11px] uppercase tracking-wider transition-colors">
+                ✓ Принять
+              </button>
+              <button type="button" onclick="openRejectSubmissionModal('${sub.subId}')"
+                class="flex-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red font-display font-bold text-[11px] uppercase tracking-wider transition-colors">
+                ✕ Отклонить
+              </button>
+            </div>
+          </div>
+        `;
+    }).join("");
+
+    const activeSub = queue.find(s => s.subId === selectedPendingSubId) || queue[0];
+    renderPendingSubmissionPreview(activeSub, previewEl);
+}
+
+window.selectPendingSubmission = function (subId) {
+    selectedPendingSubId = subId;
+    renderAdminModerationView();
+};
+
+function renderPendingSubmissionPreview(sub, previewEl) {
+    if (!sub || !sub.cardData) return;
+    const c = sub.cardData;
+    const secKey = sub.sectionKey;
+    const secLabel = SECTION_LABELS[secKey] || secKey;
+    const title = dash(c.name !== "—" ? c.name : c.title);
+    const cat = dash(c.category !== "—" ? c.category : c.subsection);
+    const statsPreviewHtml = typeof buildCardStatsPreviewHTML === "function" ? buildCardStatsPreviewHTML(secKey, c) : "";
+    const mainText = c.desc || c.content || "";
+    const abilityText = c.abilityDesc && c.abilityDesc !== "—" ? c.abilityDesc : "";
+    const summaryText = c.summary && c.summary !== "—" ? c.summary : "";
+
+    const imgs = getItemImagesArray(c);
+    const galleryHtml = imgs.length === 0 ? "" : `
+      <div class="pt-3 border-t border-gray-800">
+        <div class="text-[11px] font-bold uppercase text-cp-cyan mb-2">🖼️ Прикреплённые изображения (${imgs.length}):</div>
+        <div class="grid grid-cols-2 gap-2.5">
+          ${imgs.map((src, i) => `
+            <div class="bg-black/60 border border-gray-800 p-2 flex items-center justify-center h-48 overflow-hidden">
+              <img src="${escapeHtmlAttr(src)}" class="max-w-full max-h-full object-contain">
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    `;
+
+    previewEl.innerHTML = `
+      <div class="space-y-4">
+        <div class="flex items-center justify-between gap-3 bg-cp-panel border border-cp-purple/50 p-3.5">
+          <div class="text-xs">
+            <div class="text-[10px] text-cp-cyan font-bold uppercase">Кандидат на публикацию в «От сообщества»</div>
+            <div class="text-gray-300 mt-0.5">Отправил: <b class="text-cp-yellow">${escapeHtmlAttr(sub.authorName)}</b> (${dash(sub.createdAt)})</div>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <button type="button" onclick="approvePendingSubmission('${sub.subId}')"
+              class="px-4 py-2 bg-cp-green hover:bg-green-400 text-black font-display font-black text-xs uppercase tracking-wider">
+              ✓ Принять карточку
+            </button>
+            <button type="button" onclick="openRejectSubmissionModal('${sub.subId}')"
+              class="px-4 py-2 bg-cp-red hover:bg-red-600 text-white font-display font-bold text-xs uppercase tracking-wider">
+              ✕ Отклонить
+            </button>
+          </div>
+        </div>
+
+        <div class="border-b border-gray-800 pb-3">
+          <div class="text-xs text-cp-cyan uppercase font-bold">${secLabel} // ${cat} // Источник: ${dash(c.book)}</div>
+          <h2 class="font-display text-2xl font-black text-white mt-1">${escapeHtmlAttr(title)}</h2>
+          ${c.origName && c.origName !== "—" ? `<div class="text-xs text-gray-400">Оригинал: ${escapeHtmlAttr(c.origName)}</div>` : ""}
+        </div>
+
+        ${statsPreviewHtml}
+
+        ${summaryText ? `<div class="bg-cp-panel border-l-2 border-cp-yellow p-3 text-xs text-gray-200"><b>Краткая суть:</b> ${formatRichTextWithLinks(summaryText)}</div>` : ""}
+        ${abilityText ? `<div class="bg-cp-panel border-l-2 border-cp-cyan p-3 text-xs text-gray-200 whitespace-pre-line"><b class="text-cp-cyan uppercase block mb-1">Описание особой способности:</b>${formatRichTextWithLinks(abilityText)}</div>` : ""}
+        ${mainText ? `<div class="bg-cp-panel border-l-2 border-cp-yellow p-3.5 text-xs text-gray-200 leading-relaxed whitespace-pre-line"><b class="text-cp-yellow uppercase block mb-1">Полное описание / Текст карточки:</b>${formatRichTextWithLinks(mainText)}</div>` : `<div class="text-xs text-gray-500 italic">Текстовое описание отсутствует.</div>`}
+
+        ${galleryHtml}
+      </div>
+    `;
+}
+
+window.approvePendingSubmission = async function (subId) {
+    if (!isCurrentUserAdmin()) return;
+    ensureCommunityQueueArray();
+    const idx = CATEGORIES._pendingSubmissions.findIndex(s => s.subId === subId);
+    if (idx === -1) return;
+
+    const sub = CATEGORIES._pendingSubmissions[idx];
+    const card = sub.cardData;
+    const secKey = sub.sectionKey;
+
+    card.isCommunity = true;
+    card.isUser = true;
+
+    if (!Array.isArray(DB[secKey])) DB[secKey] = [];
+    DB[secKey].unshift(card);
+
+    const catField = secKey === "rules" ? card.subsection : card.category;
+    if (catField && catField !== "—" && !CATEGORIES[secKey].includes(catField)) {
+        CATEGORIES[secKey].push(catField);
+    }
+
+    CATEGORIES._pendingSubmissions.splice(idx, 1);
+    addChangeLogEntry("created", secKey, card);
+    await persistDatabase(true);
+    updateCounts();
+    renderAdminModerationView();
+
+    // Уведомляем автора об одобрении карточки
+    const cardTitle = card.name && card.name !== "—" ? card.name : (card.title || "Карточка");
+    const secLabel = SECTION_LABELS[secKey] || secKey;
+    if (sub.authorId && typeof window.createNotification === "function") {
+        await window.createNotification(
+            sub.authorId,
+            "rank",
+            `✅ Ваша карточка «<b>${escapeHtmlAttr(cardTitle)}</b>» одобрена администрацией и опубликована в разделе «<b>${secLabel}</b>» (От сообщества)!`,
+            { sectionKey: secKey, itemId: card.id, isCommunityCard: true }
+        );
+    }
+};
+
+window.openRejectSubmissionModal = function (subId) {
+    if (!isCurrentUserAdmin()) return;
+    ensureCommunityQueueArray();
+    const sub = CATEGORIES._pendingSubmissions.find(s => s.subId === subId);
+    if (!sub) return;
+    const c = sub.cardData || {};
+    const title = c.name && c.name !== "—" ? c.name : (c.title || "Карточка");
+
+    document.getElementById("rejectModalSubId").value = sub.subId;
+    document.getElementById("rejectModalCardTitle").textContent = title;
+    document.getElementById("rejectReasonTextarea").value = "";
+    document.getElementById("rejectSubmissionModal").classList.remove("hidden");
+    setTimeout(() => document.getElementById("rejectReasonTextarea")?.focus(), 40);
+};
+
+window.closeRejectSubmissionModal = function () {
+    document.getElementById("rejectSubmissionModal")?.classList.add("hidden");
+};
+
+window.confirmRejectSubmission = async function (e) {
+    e.preventDefault();
+    if (!isCurrentUserAdmin()) return;
+    ensureCommunityQueueArray();
+
+    const subId = document.getElementById("rejectModalSubId").value;
+    const reason = document.getElementById("rejectReasonTextarea").value.trim();
+    if (!reason) return;
+
+    const idx = CATEGORIES._pendingSubmissions.findIndex(s => s.subId === subId);
+    if (idx === -1) {
+        closeRejectSubmissionModal();
+        return;
+    }
+
+    const sub = CATEGORIES._pendingSubmissions[idx];
+    const c = sub.cardData || {};
+    const cardTitle = c.name && c.name !== "—" ? c.name : (c.title || "Карточка");
+    const secLabel = SECTION_LABELS[sub.sectionKey] || sub.sectionKey;
+
+    CATEGORIES._pendingSubmissions.splice(idx, 1);
+    closeRejectSubmissionModal();
+    await persistDatabase(true);
+    renderAdminModerationView();
+
+    if (sub.authorId && typeof window.createNotification === "function") {
+        await window.createNotification(
+            sub.authorId,
+            "reply",
+            `❌ Ваша карточка «<b>${escapeHtmlAttr(cardTitle)}</b>» (${secLabel}) была отклонена модерацией. <b>Причина:</b> «${escapeHtmlAttr(reason)}»`,
+            null
+        );
+    }
+};
+
+setTimeout(updateCommunityToggleUI, 100);
 
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
