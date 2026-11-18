@@ -33,9 +33,10 @@ function getMoscowTimeFormatted(onlyDate = false) {
     }
 }
 
-async function compressImageForStorage(dataUrl, maxDim = 240, quality = 0.82) {
+async function compressImageForStorage(dataUrl, maxDim = 240, quality = 0.85) {
     if (!dataUrl || !dataUrl.startsWith("data:image/")) return dataUrl;
-    if (dataUrl.startsWith("data:image/gif") && dataUrl.length < 350000) return dataUrl;
+    // ВАЖНО: Никогда не пропускаем GIF через обычный статичный canvas.toDataURL('image/webp'), иначе пропадёт анимация!
+    if (dataUrl.startsWith("data:image/gif")) return dataUrl;
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
@@ -74,28 +75,734 @@ async function saveAvatarToCloudEverywhere(userId, avatarDataStr) {
     } catch (err) { }
 }
 
+// =========================================================================
+// СИСТЕМА КВАДРАТНОЙ ОБРЕЗКИ АВАТАРА (1:1) С АВТОСОЗДАНИЕМ ОКНА И GIF
+// =========================================================================
+const CROP_VIEWPORT_SIZE = 280; // Размер квадратного окна предпросмотра (px)
+const AVATAR_FINAL_SIZE = 240;  // Итоговый размер отсечённого квадрата аватара (240x240 px)
+
+let avatarCropState = {
+    rawDataUrl: "",
+    rawFile: null,
+    isGif: false,
+    natW: 1,
+    natH: 1,
+    baseScale: 1,
+    zoom: 1,
+    offsetX: 0,
+    offsetY: 0,
+    isDragging: false,
+    dragStartX: 0,
+    dragStartY: 0
+};
+let isAvatarCropEventsBound = false;
+
+// Гарантирует, что модальное окно обрезки существует в DOM и привязано к мыши
+function ensureAvatarCropModalInDOM() {
+    let modal = document.getElementById("avatarCropModal");
+    if (!modal) {
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `
+          <div id="avatarCropModal"
+            class="hidden fixed inset-0 z-[95] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 select-none"
+            onclick="if(event.target===this) cancelAvatarCropModal()">
+            <div class="max-w-md w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_40px_rgba(0,240,255,0.35)] p-5 flex flex-col gap-4 cp-clip"
+              onclick="event.stopPropagation()">
+              <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+                <div>
+                  <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ТЕРМИНАЛ БИОМЕТРИИ // КАДРИРОВАНИЕ</div>
+                  <h3 class="font-display text-base font-black text-white uppercase mt-0.5">✂️ Обрезка аватара (1:1)</h3>
+                </div>
+                <button type="button" onclick="cancelAvatarCropModal()"
+                  class="text-gray-400 hover:text-white text-lg font-bold px-1.5">✕</button>
+              </div>
+
+              <div class="text-[11px] text-gray-300 leading-relaxed bg-cp-bg border-l-2 border-cp-yellow px-3 py-2">
+                Перетаскивайте картинку мышкой и крутите колёсико (или ползунок ниже), чтобы выбрать нужный квадрат. Всё за пределами рамки будет безвозвратно отсечено.
+              </div>
+
+              <div class="flex flex-col items-center justify-center bg-black/80 border border-gray-800 p-4">
+                <div id="avatarCropViewport"
+                  class="relative w-[280px] h-[280px] overflow-hidden border-2 border-cp-yellow shadow-[0_0_20px_rgba(252,238,10,0.25)] cursor-move bg-cp-bg">
+                  <img id="avatarCropPreviewImg" src="" alt="Crop preview" draggable="false"
+                    style="position:absolute; top:0; left:0; max-width:none; user-select:none; pointer-events:none; transform-origin:0 0;">
+                  <div class="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
+                    <div class="border-r border-b border-white/15"></div>
+                    <div class="border-r border-b border-white/15"></div>
+                    <div class="border-b border-white/15"></div>
+                    <div class="border-r border-b border-white/15"></div>
+                    <div class="border-r border-b border-white/15"></div>
+                    <div class="border-b border-white/15"></div>
+                    <div class="border-r border-white/15"></div>
+                    <div class="border-r border-white/15"></div>
+                    <div></div>
+                  </div>
+                  <span id="avatarCropGifBadge"
+                    class="hidden absolute top-2 right-2 px-2 py-0.5 bg-cp-purple text-white font-display font-black text-[10px] uppercase shadow">GIF-Анимация</span>
+                </div>
+              </div>
+
+              <div class="space-y-1.5 px-1">
+                <div class="flex items-center justify-between text-xs">
+                  <span class="text-gray-400 font-bold uppercase text-[10px]">🔍 Масштаб (Зум):</span>
+                  <span id="avatarCropZoomLabel" class="text-cp-cyan font-bold font-mono">100%</span>
+                </div>
+                <input type="range" id="avatarCropZoomSlider" min="100" max="400" value="100" step="1"
+                  oninput="handleAvatarCropZoomSlider(this.value)"
+                  class="w-full accent-cyan-400 cursor-pointer">
+              </div>
+
+              <div class="flex items-center gap-2.5 pt-2 border-t border-gray-800">
+                <button type="button" id="avatarCropApplyBtn" onclick="applyAvatarCropAndSave()"
+                  class="flex-1 py-2.5 bg-cp-green hover:bg-green-400 text-black font-display font-black text-xs uppercase tracking-wider transition-all cp-clip">
+                  ✓ Применить аватар
+                </button>
+                <button type="button" onclick="cancelAvatarCropModal()"
+                  class="px-4 py-2.5 bg-gray-800 hover:bg-cp-red text-gray-200 hover:text-white font-display font-bold text-xs uppercase border border-gray-700 transition-colors">
+                  ✕ Отмена
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(wrap.firstElementChild);
+        modal = document.getElementById("avatarCropModal");
+    }
+
+    // Привязываем события перетаскивания и зума колёсиком сразу к элементу
+    const vp = document.getElementById("avatarCropViewport");
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    if (previewImg) {
+        previewImg.style.position = "absolute";
+        previewImg.style.top = "0";
+        previewImg.style.left = "0";
+        previewImg.style.maxWidth = "none";
+        previewImg.style.transformOrigin = "0 0";
+    }
+
+    if (vp && !isAvatarCropEventsBound) {
+        isAvatarCropEventsBound = true;
+
+        vp.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            avatarCropState.isDragging = true;
+            avatarCropState.dragStartX = e.clientX - avatarCropState.offsetX;
+            avatarCropState.dragStartY = e.clientY - avatarCropState.offsetY;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!avatarCropState.isDragging) return;
+            avatarCropState.offsetX = e.clientX - avatarCropState.dragStartX;
+            avatarCropState.offsetY = e.clientY - avatarCropState.dragStartY;
+            clampAndRenderAvatarCropPreview();
+        });
+
+        window.addEventListener("mouseup", () => {
+            avatarCropState.isDragging = false;
+        });
+
+        vp.addEventListener("touchstart", (e) => {
+            if (e.touches.length !== 1) return;
+            avatarCropState.isDragging = true;
+            avatarCropState.dragStartX = e.touches[0].clientX - avatarCropState.offsetX;
+            avatarCropState.dragStartY = e.touches[0].clientY - avatarCropState.offsetY;
+        }, { passive: true });
+
+        vp.addEventListener("touchmove", (e) => {
+            if (!avatarCropState.isDragging || e.touches.length !== 1) return;
+            avatarCropState.offsetX = e.touches[0].clientX - avatarCropState.dragStartX;
+            avatarCropState.offsetY = e.touches[0].clientY - avatarCropState.dragStartY;
+            clampAndRenderAvatarCropPreview();
+        }, { passive: true });
+
+        window.addEventListener("touchend", () => {
+            avatarCropState.isDragging = false;
+        });
+
+        vp.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            const slider = document.getElementById("avatarCropZoomSlider");
+            if (!slider) return;
+            const step = e.deltaY < 0 ? 12 : -12;
+            const nextVal = Math.max(100, Math.min(400, Number(slider.value) + step));
+            slider.value = String(nextVal);
+            window.handleAvatarCropZoomSlider(nextVal);
+        }, { passive: false });
+    }
+
+    return modal;
+}
+
 window.handleProfileAvatarUpload = async function (ev) {
-    const file = ev.target.files && ev.target.files[0];
+    const file = ev && ev.target && ev.target.files && ev.target.files[0];
     const u = getCurrentUser();
     if (!file || !u) return;
-    if (!validateUploadedFile(file)) { ev.target.value = ""; return; }
+    if (!validateUploadedFile(file)) {
+        if (ev.target) ev.target.value = "";
+        return;
+    }
+
     const rawDataUrl = await new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onload = e => resolve(e.target.result);
+        reader.onload = e => resolve(e.target.result || "");
         reader.onerror = () => resolve("");
         reader.readAsDataURL(file);
     });
+    if (ev && ev.target) ev.target.value = "";
     if (!rawDataUrl) return;
-    const optimizedAvatar = await compressImageForStorage(rawDataUrl, 240, 0.82);
-    u.avatar = optimizedAvatar;
-    AVATAR_CACHE[u.id] = optimizedAvatar;
-    const urlInp = document.getElementById("editProfAvatarUrl");
-    if (urlInp) urlInp.value = "";
-    updateAuthHeaderUI();
-    renderProfileView();
-    await saveAvatarToCloudEverywhere(u.id, optimizedAvatar);
-    ev.target.value = "";
+
+    openAvatarCropModal(rawDataUrl, file);
 };
+
+window.openAvatarCropModal = function (dataUrl, fileObj = null) {
+    const modal = ensureAvatarCropModalInDOM();
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    const gifBadge = document.getElementById("avatarCropGifBadge");
+    const slider = document.getElementById("avatarCropZoomSlider");
+    const zoomLabel = document.getElementById("avatarCropZoomLabel");
+    if (!previewImg || !modal) return;
+
+    const isGif = (fileObj && fileObj.type === "image/gif") || dataUrl.startsWith("data:image/gif");
+
+    const probe = new Image();
+    probe.onload = () => {
+        const natW = probe.naturalWidth || probe.width || CROP_VIEWPORT_SIZE;
+        const natH = probe.naturalHeight || probe.height || CROP_VIEWPORT_SIZE;
+
+        const baseScale = Math.max(CROP_VIEWPORT_SIZE / natW, CROP_VIEWPORT_SIZE / natH);
+        const dispW = natW * baseScale;
+        const dispH = natH * baseScale;
+
+        avatarCropState = {
+            rawDataUrl: dataUrl,
+            rawFile: fileObj,
+            isGif,
+            natW,
+            natH,
+            baseScale,
+            zoom: 1,
+            offsetX: (CROP_VIEWPORT_SIZE - dispW) / 2,
+            offsetY: (CROP_VIEWPORT_SIZE - dispH) / 2,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0
+        };
+
+        previewImg.src = dataUrl;
+        previewImg.classList.remove("hidden");
+        if (gifBadge) gifBadge.classList.toggle("hidden", !isGif);
+        if (slider) slider.value = "100";
+        if (zoomLabel) zoomLabel.textContent = "100%";
+
+        clampAndRenderAvatarCropPreview();
+        modal.classList.remove("hidden");
+    };
+    probe.src = dataUrl;
+};
+
+function clampAndRenderAvatarCropPreview() {
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    if (!previewImg) return;
+
+    const totalScale = avatarCropState.baseScale * avatarCropState.zoom;
+    const dispW = avatarCropState.natW * totalScale;
+    const dispH = avatarCropState.natH * totalScale;
+
+    const minX = CROP_VIEWPORT_SIZE - dispW;
+    const minY = CROP_VIEWPORT_SIZE - dispH;
+    avatarCropState.offsetX = Math.min(0, Math.max(minX, avatarCropState.offsetX));
+    avatarCropState.offsetY = Math.min(0, Math.max(minY, avatarCropState.offsetY));
+
+    previewImg.style.width = `${dispW}px`;
+    previewImg.style.height = `${dispH}px`;
+    previewImg.style.transform = `translate3d(${avatarCropState.offsetX}px, ${avatarCropState.offsetY}px, 0)`;
+}
+
+window.handleAvatarCropZoomSlider = function (val) {
+    const newZoom = Math.max(1, Math.min(4, Number(val) / 100));
+    const oldScale = avatarCropState.baseScale * avatarCropState.zoom;
+    const newScale = avatarCropState.baseScale * newZoom;
+
+    const center = CROP_VIEWPORT_SIZE / 2;
+    const imgCenterX = (center - avatarCropState.offsetX) / oldScale;
+    const imgCenterY = (center - avatarCropState.offsetY) / oldScale;
+
+    avatarCropState.zoom = newZoom;
+    avatarCropState.offsetX = center - imgCenterX * newScale;
+    avatarCropState.offsetY = center - imgCenterY * newScale;
+
+    const zoomLabel = document.getElementById("avatarCropZoomLabel");
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(newZoom * 100)}%`;
+
+    clampAndRenderAvatarCropPreview();
+};
+
+window.cancelAvatarCropModal = function () {
+    const modal = document.getElementById("avatarCropModal");
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    if (modal) modal.classList.add("hidden");
+    if (previewImg) previewImg.src = "";
+    avatarCropState.rawDataUrl = "";
+    avatarCropState.rawFile = null;
+};
+
+async function cropAnimatedGifToSquare(dataUrl, srcX, srcY, srcSize, outSize) {
+    if (typeof GifReader === "undefined" || typeof GIF === "undefined") {
+        return dataUrl;
+    }
+    try {
+        const resp = await fetch(dataUrl);
+        const buf = await resp.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const reader = new GifReader(bytes);
+        const numFrames = reader.numFrames();
+        if (numFrames <= 1) return null;
+
+        const workerRes = await fetch("https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js");
+        const workerBlob = new Blob([await workerRes.text()], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(workerBlob);
+
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = reader.width;
+        fullCanvas.height = reader.height;
+        const fullCtx = fullCanvas.getContext("2d");
+
+        const frameImageData = fullCtx.createImageData(reader.width, reader.height);
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = outSize;
+        cropCanvas.height = outSize;
+        const cropCtx = cropCanvas.getContext("2d");
+
+        const gifEncoder = new GIF({
+            workers: 2,
+            quality: 10,
+            width: outSize,
+            height: outSize,
+            workerScript: workerUrl
+        });
+
+        for (let i = 0; i < numFrames; i++) {
+            const frameInfo = reader.frameInfo(i);
+            const prevBackup = frameInfo.disposal === 3
+                ? fullCtx.getImageData(0, 0, reader.width, reader.height)
+                : null;
+
+            reader.decodeAndBlitFrameRGBA(i, frameImageData.data);
+            fullCtx.putImageData(frameImageData, 0, 0);
+
+            cropCtx.clearRect(0, 0, outSize, outSize);
+            cropCtx.drawImage(fullCanvas, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
+
+            const delayMs = Math.max(20, (frameInfo.delay || 10) * 10);
+            gifEncoder.addFrame(cropCtx, { copy: true, delay: delayMs });
+
+            if (frameInfo.disposal === 2) {
+                fullCtx.clearRect(frameInfo.x, frameInfo.y, frameInfo.width, frameInfo.height);
+                const cleared = fullCtx.getImageData(0, 0, reader.width, reader.height);
+                frameImageData.data.set(cleared.data);
+            } else if (frameInfo.disposal === 3 && prevBackup) {
+                fullCtx.putImageData(prevBackup, 0, 0);
+                frameImageData.data.set(prevBackup.data);
+            }
+        }
+
+        return await new Promise((resolve) => {
+            gifEncoder.on("finished", (blob) => {
+                URL.revokeObjectURL(workerUrl);
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(dataUrl);
+                fr.readAsDataURL(blob);
+            });
+            gifEncoder.render();
+        });
+    } catch (err) {
+        return dataUrl;
+    }
+}
+
+window.applyAvatarCropAndSave = async function () {
+    const u = getCurrentUser();
+    if (!u || !avatarCropState.rawDataUrl) return;
+
+    const applyBtn = document.getElementById("avatarCropApplyBtn");
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = "⏳ ОБРЕЗКА...";
+    }
+
+    try {
+        const totalScale = avatarCropState.baseScale * avatarCropState.zoom;
+        const srcX = Math.max(0, -avatarCropState.offsetX / totalScale);
+        const srcY = Math.max(0, -avatarCropState.offsetY / totalScale);
+        const srcSize = CROP_VIEWPORT_SIZE / totalScale;
+
+        let finalAvatarDataUrl = "";
+
+        if (avatarCropState.isGif) {
+            const croppedGif = await cropAnimatedGifToSquare(
+                avatarCropState.rawDataUrl,
+                srcX,
+                srcY,
+                srcSize,
+                AVATAR_FINAL_SIZE
+            );
+            if (croppedGif) finalAvatarDataUrl = croppedGif;
+        }
+
+        if (!finalAvatarDataUrl) {
+            finalAvatarDataUrl = await new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = AVATAR_FINAL_SIZE;
+                    canvas.height = AVATAR_FINAL_SIZE;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, AVATAR_FINAL_SIZE, AVATAR_FINAL_SIZE);
+                    let out = canvas.toDataURL("image/webp", 0.86);
+                    if (!out || out.length < 50) out = canvas.toDataURL("image/jpeg", 0.86);
+                    resolve(out);
+                };
+                img.onerror = () => resolve("");
+                img.src = avatarCropState.rawDataUrl;
+            });
+        }
+
+        if (!finalAvatarDataUrl) return;
+
+        u.avatar = finalAvatarDataUrl;
+        AVATAR_CACHE[u.id] = finalAvatarDataUrl;
+        const urlInp = document.getElementById("editProfAvatarUrl");
+        if (urlInp) urlInp.value = "";
+
+        cancelAvatarCropModal();
+        updateAuthHeaderUI();
+        renderProfileView();
+        await saveAvatarToCloudEverywhere(u.id, finalAvatarDataUrl);
+    } finally {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = "✓ Применить аватар";
+        }
+    }
+};
+
+window.handleProfileAvatarUpload = async function (ev) {
+    const file = ev.target && ev.target.files && ev.target.files[0];
+    const u = getCurrentUser();
+    if (!file || !u) return;
+    if (!validateUploadedFile(file)) {
+        if (ev.target) ev.target.value = "";
+        return;
+    }
+
+    const rawDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = e => resolve(e.target.result || "");
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+    });
+    if (ev.target) ev.target.value = "";
+    if (!rawDataUrl) return;
+
+    openAvatarCropModal(rawDataUrl, file);
+};
+
+function openAvatarCropModal(dataUrl, fileObj = null) {
+    const isGif = (fileObj && fileObj.type === "image/gif") || dataUrl.startsWith("data:image/gif");
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    const modal = document.getElementById("avatarCropModal");
+    const gifBadge = document.getElementById("avatarCropGifBadge");
+    const slider = document.getElementById("avatarCropZoomSlider");
+    const zoomLabel = document.getElementById("avatarCropZoomLabel");
+    if (!previewImg || !modal) return;
+
+    const probe = new Image();
+    probe.onload = () => {
+        const natW = probe.naturalWidth || probe.width || CROP_VIEWPORT_SIZE;
+        const natH = probe.naturalHeight || probe.height || CROP_VIEWPORT_SIZE;
+
+        // Базовый масштаб такой, чтобы меньшая сторона картинки ровно закрыла квадрат 280x280
+        const baseScale = Math.max(CROP_VIEWPORT_SIZE / natW, CROP_VIEWPORT_SIZE / natH);
+        const dispW = natW * baseScale;
+        const dispH = natH * baseScale;
+
+        avatarCropState = {
+            rawDataUrl: dataUrl,
+            rawFile: fileObj,
+            isGif,
+            natW,
+            natH,
+            baseScale,
+            zoom: 1,
+            offsetX: (CROP_VIEWPORT_SIZE - dispW) / 2,
+            offsetY: (CROP_VIEWPORT_SIZE - dispH) / 2,
+            isDragging: false,
+            dragStartX: 0,
+            dragStartY: 0
+        };
+
+        previewImg.src = dataUrl;
+        previewImg.classList.remove("hidden");
+        if (gifBadge) gifBadge.classList.toggle("hidden", !isGif);
+        if (slider) slider.value = "100";
+        if (zoomLabel) zoomLabel.textContent = "100%";
+
+        clampAndRenderAvatarCropPreview();
+        modal.classList.remove("hidden");
+    };
+    probe.src = dataUrl;
+}
+
+function clampAndRenderAvatarCropPreview() {
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    if (!previewImg) return;
+
+    const totalScale = avatarCropState.baseScale * avatarCropState.zoom;
+    const dispW = avatarCropState.natW * totalScale;
+    const dispH = avatarCropState.natH * totalScale;
+
+    // Не даём увести картинку так, чтобы внутри квадрата появились пустые дыры
+    const minX = CROP_VIEWPORT_SIZE - dispW;
+    const minY = CROP_VIEWPORT_SIZE - dispH;
+    avatarCropState.offsetX = Math.min(0, Math.max(minX, avatarCropState.offsetX));
+    avatarCropState.offsetY = Math.min(0, Math.max(minY, avatarCropState.offsetY));
+
+    previewImg.style.width = `${dispW}px`;
+    previewImg.style.height = `${dispH}px`;
+    previewImg.style.transform = `translate3d(${avatarCropState.offsetX}px, ${avatarCropState.offsetY}px, 0)`;
+}
+
+window.handleAvatarCropZoomSlider = function (val) {
+    const newZoom = Math.max(1, Math.min(4, Number(val) / 100));
+    const oldScale = avatarCropState.baseScale * avatarCropState.zoom;
+    const newScale = avatarCropState.baseScale * newZoom;
+
+    // Зуммируем относительно центра квадрата (140, 140)
+    const center = CROP_VIEWPORT_SIZE / 2;
+    const imgCenterX = (center - avatarCropState.offsetX) / oldScale;
+    const imgCenterY = (center - avatarCropState.offsetY) / oldScale;
+
+    avatarCropState.zoom = newZoom;
+    avatarCropState.offsetX = center - imgCenterX * newScale;
+    avatarCropState.offsetY = center - imgCenterY * newScale;
+
+    const zoomLabel = document.getElementById("avatarCropZoomLabel");
+    if (zoomLabel) zoomLabel.textContent = `${Math.round(newZoom * 100)}%`;
+
+    clampAndRenderAvatarCropPreview();
+};
+
+window.cancelAvatarCropModal = function () {
+    const modal = document.getElementById("avatarCropModal");
+    const previewImg = document.getElementById("avatarCropPreviewImg");
+    if (modal) modal.classList.add("hidden");
+    if (previewImg) previewImg.src = "";
+    avatarCropState.rawDataUrl = "";
+    avatarCropState.rawFile = null;
+};
+
+// Перетаскивание картинки мышкой, пальцем и зум колёсиком внутри квадрата
+(function initAvatarCropInteractions() {
+    window.addEventListener("DOMContentLoaded", () => {
+        const vp = document.getElementById("avatarCropViewport");
+        if (!vp) return;
+
+        vp.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            avatarCropState.isDragging = true;
+            avatarCropState.dragStartX = e.clientX - avatarCropState.offsetX;
+            avatarCropState.dragStartY = e.clientY - avatarCropState.offsetY;
+        });
+
+        window.addEventListener("mousemove", (e) => {
+            if (!avatarCropState.isDragging) return;
+            avatarCropState.offsetX = e.clientX - avatarCropState.dragStartX;
+            avatarCropState.offsetY = e.clientY - avatarCropState.dragStartY;
+            clampAndRenderAvatarCropPreview();
+        });
+
+        window.addEventListener("mouseup", () => {
+            avatarCropState.isDragging = false;
+        });
+
+        vp.addEventListener("touchstart", (e) => {
+            if (e.touches.length !== 1) return;
+            avatarCropState.isDragging = true;
+            avatarCropState.dragStartX = e.touches[0].clientX - avatarCropState.offsetX;
+            avatarCropState.dragStartY = e.touches[0].clientY - avatarCropState.offsetY;
+        }, { passive: true });
+
+        window.addEventListener("touchmove", (e) => {
+            if (!avatarCropState.isDragging || e.touches.length !== 1) return;
+            avatarCropState.offsetX = e.touches[0].clientX - avatarCropState.dragStartX;
+            avatarCropState.offsetY = e.touches[0].clientY - avatarCropState.dragStartY;
+            clampAndRenderAvatarCropPreview();
+        }, { passive: true });
+
+        window.addEventListener("touchend", () => {
+            avatarCropState.isDragging = false;
+        });
+
+        vp.addEventListener("wheel", (e) => {
+            e.preventDefault();
+            const slider = document.getElementById("avatarCropZoomSlider");
+            if (!slider) return;
+            const step = e.deltaY < 0 ? 12 : -12;
+            const nextVal = Math.max(100, Math.min(400, Number(slider.value) + step));
+            slider.value = String(nextVal);
+            window.handleAvatarCropZoomSlider(nextVal);
+        }, { passive: false });
+    });
+})();
+
+// Покадровая обрезка анимированного GIF по выбранному квадрату (с полным уничтожением отсечённых краёв)
+async function cropAnimatedGifToSquare(dataUrl, srcX, srcY, srcSize, outSize) {
+    if (typeof GifReader === "undefined" || typeof GIF === "undefined") {
+        // Если внешние библиотеки ещё не подгрузились, возвращаем исходный GIF, чтобы не сломать анимацию
+        return dataUrl;
+    }
+    try {
+        const resp = await fetch(dataUrl);
+        const buf = await resp.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        const reader = new GifReader(bytes);
+        const numFrames = reader.numFrames();
+        if (numFrames <= 1) return null;
+
+        // Загружаем код воркера gif.js через Blob URL, чтобы он работал без CORS на любом домене
+        const workerRes = await fetch("https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js");
+        const workerBlob = new Blob([await workerRes.text()], { type: "application/javascript" });
+        const workerUrl = URL.createObjectURL(workerBlob);
+
+        const fullCanvas = document.createElement("canvas");
+        fullCanvas.width = reader.width;
+        fullCanvas.height = reader.height;
+        const fullCtx = fullCanvas.getContext("2d");
+
+        const frameImageData = fullCtx.createImageData(reader.width, reader.height);
+        const cropCanvas = document.createElement("canvas");
+        cropCanvas.width = outSize;
+        cropCanvas.height = outSize;
+        const cropCtx = cropCanvas.getContext("2d");
+
+        const gifEncoder = new GIF({
+            workers: 2,
+            quality: 10,
+            width: outSize,
+            height: outSize,
+            workerScript: workerUrl
+        });
+
+        for (let i = 0; i < numFrames; i++) {
+            const frameInfo = reader.frameInfo(i);
+            const prevBackup = frameInfo.disposal === 3
+                ? fullCtx.getImageData(0, 0, reader.width, reader.height)
+                : null;
+
+            reader.decodeAndBlitFrameRGBA(i, frameImageData.data);
+            fullCtx.putImageData(frameImageData, 0, 0);
+
+            cropCtx.clearRect(0, 0, outSize, outSize);
+            cropCtx.drawImage(fullCanvas, srcX, srcY, srcSize, srcSize, 0, 0, outSize, outSize);
+
+            const delayMs = Math.max(20, (frameInfo.delay || 10) * 10);
+            gifEncoder.addFrame(cropCtx, { copy: true, delay: delayMs });
+
+            if (frameInfo.disposal === 2) {
+                fullCtx.clearRect(frameInfo.x, frameInfo.y, frameInfo.width, frameInfo.height);
+                const cleared = fullCtx.getImageData(0, 0, reader.width, reader.height);
+                frameImageData.data.set(cleared.data);
+            } else if (frameInfo.disposal === 3 && prevBackup) {
+                fullCtx.putImageData(prevBackup, 0, 0);
+                frameImageData.data.set(prevBackup.data);
+            }
+        }
+
+        return await new Promise((resolve) => {
+            gifEncoder.on("finished", (blob) => {
+                URL.revokeObjectURL(workerUrl);
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(dataUrl);
+                fr.readAsDataURL(blob);
+            });
+            gifEncoder.render();
+        });
+    } catch (err) {
+        return dataUrl;
+    }
+}
+
+window.applyAvatarCropAndSave = async function () {
+    const u = getCurrentUser();
+    if (!u || !avatarCropState.rawDataUrl) return;
+
+    const applyBtn = document.getElementById("avatarCropApplyBtn");
+    if (applyBtn) {
+        applyBtn.disabled = true;
+        applyBtn.textContent = "⏳ ОБРЕЗКА...";
+    }
+
+    try {
+        const totalScale = avatarCropState.baseScale * avatarCropState.zoom;
+        const srcX = Math.max(0, -avatarCropState.offsetX / totalScale);
+        const srcY = Math.max(0, -avatarCropState.offsetY / totalScale);
+        const srcSize = CROP_VIEWPORT_SIZE / totalScale;
+
+        let finalAvatarDataUrl = "";
+
+        if (avatarCropState.isGif) {
+            const croppedGif = await cropAnimatedGifToSquare(
+                avatarCropState.rawDataUrl,
+                srcX,
+                srcY,
+                srcSize,
+                AVATAR_FINAL_SIZE
+            );
+            if (croppedGif) finalAvatarDataUrl = croppedGif;
+        }
+
+        // Если это обычная картинка (JPG/PNG/WebP) или однокадровый GIF — отсекаем всё лишнее через квадратный Canvas 240x240
+        if (!finalAvatarDataUrl) {
+            finalAvatarDataUrl = await new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = AVATAR_FINAL_SIZE;
+                    canvas.height = AVATAR_FINAL_SIZE;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, srcX, srcY, srcSize, srcSize, 0, 0, AVATAR_FINAL_SIZE, AVATAR_FINAL_SIZE);
+                    let out = canvas.toDataURL("image/webp", 0.86);
+                    if (!out || out.length < 50) out = canvas.toDataURL("image/jpeg", 0.86);
+                    resolve(out);
+                };
+                img.onerror = () => resolve("");
+                img.src = avatarCropState.rawDataUrl;
+            });
+        }
+
+        if (!finalAvatarDataUrl) return;
+
+        // Уничтожаем исходный буфер и сохраняем только обрезанный квадрат 240x240
+        u.avatar = finalAvatarDataUrl;
+        AVATAR_CACHE[u.id] = finalAvatarDataUrl;
+        const urlInp = document.getElementById("editProfAvatarUrl");
+        if (urlInp) urlInp.value = "";
+
+        cancelAvatarCropModal();
+        updateAuthHeaderUI();
+        renderProfileView();
+        await saveAvatarToCloudEverywhere(u.id, finalAvatarDataUrl);
+    } finally {
+        if (applyBtn) {
+            applyBtn.disabled = false;
+            applyBtn.textContent = "✓ Применить аватар";
+        }
+    }
+};
+
+
 
 window.saveUserProfileChanges = async function (e) {
     e.preventDefault();
@@ -107,6 +814,9 @@ window.saveUserProfileChanges = async function (e) {
     const newPass = document.getElementById("editProfPassword").value;
     const chosenCorp = document.getElementById("editProfFavCorp")?.value || "Независимый (Без корпорации)";
 
+    const prevCorp = getUserFavCorp(u);
+    const prevAvatar = u.avatar;
+
     if (newName) u.displayName = newName;
     u.favRole = document.getElementById("editProfFavRole").value;
     setUserFavCorp(u, chosenCorp);
@@ -115,25 +825,37 @@ window.saveUserProfileChanges = async function (e) {
     if (newUrl !== "") { u.avatar = newUrl; AVATAR_CACHE[u.id] = newUrl; }
     else if (AVATAR_CACHE[u.id]) { u.avatar = AVATAR_CACHE[u.id]; }
 
-    if (newPass.trim() !== "" && window.updatePasswordByIdInVault) {
-        await window.updatePasswordByIdInVault(u.id, newPass.trim());
-    }
-
+    // 1. МГНОВЕННО обновляем интерфейс и кнопку без ожидания ответов от сервера
+    persistUsers();
     updateAuthHeaderUI();
     renderProfileView();
-    await saveSingleUserToCloud(u);
-    await persistDatabase(true);
-    if (u.avatar) await saveAvatarToCloudEverywhere(u.id, u.avatar);
 
     const btn = document.getElementById("saveProfileBtn");
     if (btn) {
-        btn.disabled = true; btn.textContent = "✓ СОХРАНЕНО!";
-        btn.className = "w-full py-2.5 bg-cp-green text-black font-display font-black uppercase tracking-wider";
+        btn.disabled = true;
+        btn.textContent = "✓ СОХРАНЕНО!";
+        btn.className = "w-full py-2.5 bg-cp-green text-black font-display font-black uppercase tracking-wider transition-all";
         setTimeout(() => {
-            btn.disabled = false; btn.textContent = "💾 Сохранить профиль";
+            btn.disabled = false;
+            btn.textContent = "💾 Сохранить профиль";
             btn.className = "w-full py-2.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold uppercase tracking-wider transition-all";
         }, 2000);
     }
+
+    // 2. Параллельно в фоне отправляем изменения в облако Supabase (только то, что реально изменилось)
+    const cloudTasks = [saveSingleUserToCloud(u)];
+
+    if (newPass.trim() !== "" && window.updatePasswordByIdInVault) {
+        cloudTasks.push(window.updatePasswordByIdInVault(u.id, newPass.trim()));
+    }
+    if (u.avatar && u.avatar !== prevAvatar) {
+        cloudTasks.push(saveAvatarToCloudEverywhere(u.id, u.avatar));
+    }
+    if (chosenCorp !== prevCorp) {
+        cloudTasks.push(persistDatabase(true));
+    }
+
+    await Promise.allSettled(cloudTasks);
 };
 
 async function syncAllAvatarsFromStore(specificUserId = null) {

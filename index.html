@@ -11,6 +11,8 @@
     rel="stylesheet">
   <script src="database.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/omggif@1.0.10/omggif.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js"></script>
   <script>
     tailwind.config = {
       darkMode: 'class',
@@ -347,7 +349,72 @@
       </div>
     </div>
   </div>
+  <!-- МОДАЛЬНОЕ ОКНО: КВАДРАТНАЯ ОБРЕЗКА АВАТАРКИ ПРОФИЛЯ -->
+  <div id="avatarCropModal"
+    class="hidden fixed inset-0 z-[85] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 select-none"
+    onclick="if(event.target===this) cancelAvatarCropModal()">
+    <div class="max-w-md w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_40px_rgba(0,240,255,0.35)] p-5 flex flex-col gap-4 cp-clip"
+      onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ТЕРМИНАЛ БИОМЕТРИИ // КАДРИРОВАНИЕ</div>
+          <h3 class="font-display text-base font-black text-white uppercase mt-0.5">✂️ Обрезка аватара (1:1)</h3>
+        </div>
+        <button type="button" onclick="cancelAvatarCropModal()"
+          class="text-gray-400 hover:text-white text-lg font-bold px-1.5">✕</button>
+      </div>
 
+      <div class="text-[11px] text-gray-300 leading-relaxed bg-cp-bg border-l-2 border-cp-yellow px-3 py-2">
+        Перетаскивайте картинку мышкой и крутите колёсико (или ползунок ниже), чтобы выбрать нужный квадрат. Всё за пределами рамки будет безвозвратно отсечено.
+      </div>
+
+      <!-- Рабочая зона 1:1 (280x280) -->
+      <div class="flex flex-col items-center justify-center bg-black/80 border border-gray-800 p-4">
+        <div id="avatarCropViewport"
+          class="relative w-[280px] h-[280px] overflow-hidden border-2 border-cp-yellow shadow-[0_0_20px_rgba(252,238,10,0.25)] cursor-move bg-cp-bg flex items-center justify-center">
+          <img id="avatarCropPreviewImg" src="" alt="Crop preview" draggable="false"
+            style="position:absolute; top:0; left:0; max-width:none; user-select:none; pointer-events:none; transform-origin:0 0;"
+            class="hidden max-w-none select-none pointer-events-none origin-top-left">
+          <!-- Прицельная сетка третей -->
+          <div class="absolute inset-0 pointer-events-none grid grid-cols-3 grid-rows-3">
+            <div class="border-r border-b border-white/15"></div>
+            <div class="border-r border-b border-white/15"></div>
+            <div class="border-b border-white/15"></div>
+            <div class="border-r border-b border-white/15"></div>
+            <div class="border-r border-b border-white/15"></div>
+            <div class="border-b border-white/15"></div>
+            <div class="border-r border-white/15"></div>
+            <div class="border-r border-white/15"></div>
+            <div></div>
+          </div>
+          <span id="avatarCropGifBadge"
+            class="hidden absolute top-2 right-2 px-2 py-0.5 bg-cp-purple text-white font-display font-black text-[10px] uppercase shadow">GIF-Анимация</span>
+        </div>
+      </div>
+
+      <!-- Ползунок масштаба -->
+      <div class="space-y-1.5 px-1">
+        <div class="flex items-center justify-between text-xs">
+          <span class="text-gray-400 font-bold uppercase text-[10px]">🔍 Масштаб (Зум):</span>
+          <span id="avatarCropZoomLabel" class="text-cp-cyan font-bold font-mono">100%</span>
+        </div>
+        <input type="range" id="avatarCropZoomSlider" min="100" max="400" value="100" step="1"
+          oninput="handleAvatarCropZoomSlider(this.value)"
+          class="w-full accent-cyan-400 cursor-pointer">
+      </div>
+
+      <div class="flex items-center gap-2.5 pt-2 border-t border-gray-800">
+        <button type="button" id="avatarCropApplyBtn" onclick="applyAvatarCropAndSave()"
+          class="flex-1 py-2.5 bg-cp-green hover:bg-green-400 text-black font-display font-black text-xs uppercase tracking-wider transition-all cp-clip">
+          ✓ Применить аватар
+        </button>
+        <button type="button" onclick="cancelAvatarCropModal()"
+          class="px-4 py-2.5 bg-gray-800 hover:bg-cp-red text-gray-200 hover:text-white font-display font-bold text-xs uppercase border border-gray-700 transition-colors">
+          ✕ Отмена
+        </button>
+      </div>
+    </div>
+  </div>
   <!-- ШАПКА САЙТА (FULL HD 1920x1080) -->
   <header class="sticky top-0 z-40 bg-cp-bg/95 backdrop-blur-md border-b border-cp-red/60">
     <div class="max-w-[1880px] mx-auto px-5 py-3 flex items-center justify-between gap-3">
