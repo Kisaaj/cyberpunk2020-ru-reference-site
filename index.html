@@ -421,8 +421,8 @@
           class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">⚙️ Игровые
           механики</button>
 
-        <!-- ГЛОБАЛЬНЫЙ ПОИСК ПО ВСЕМУ СПРАВОЧНИКУ -->
-        <div id="globalSearchWrapper" class="relative ml-auto w-64 sm:w-80 xl:w-96 shrink-0">
+        <!-- ГЛОБАЛЬНЫЙ ПОИСК ПО ВСЕМУ СПРАВОЧНИКУ (СДВИНУТ ЛЕВЕЕ В ЗЕЛЁНУЮ РАМКУ) -->
+        <div id="globalSearchWrapper" class="relative ml-auto mr-2 w-64 sm:w-80 xl:w-96 shrink-0">
           <div class="relative flex items-center">
             <span class="absolute left-2.5 text-[11px] text-gray-500 pointer-events-none select-none">🔍</span>
             <input type="text" id="globalHeaderSearchInput"
@@ -440,10 +440,55 @@
           </div>
         </div>
       </nav>
-      </nav>
 
-      <!-- ПРАВЫЙ УГОЛ: КВАДРАТНАЯ КНОПКА «ВОЙТИ» ИЛИ АВАТАР + КОЛОКОЛЬЧИК -->
+      <!-- ПРАВЫЙ УГОЛ: КОРЗИНА + КНОПКА «ВОЙТИ» ИЛИ АВАТАР + КОЛОКОЛЬЧИК -->
       <div class="relative shrink-0 pl-2.5 border-l border-gray-800 flex items-center gap-2" id="userCornerContainer">
+
+        <!-- КОРЗИНА СНАРЯЖЕНИЯ И УСЛУГ (НА МЕСТЕ КРАСНОЙ РАМКИ) -->
+        <div class="relative" id="cartCornerWrapper">
+          <button type="button" id="cartHeaderBtn" onclick="toggleCartDropdown(event)" title="Корзина покупок"
+            class="h-10 px-3 bg-cp-panel border border-gray-700 hover:border-cp-green text-gray-400 hover:text-white flex items-center gap-2 transition-all relative select-none">
+            <svg class="w-4 h-4 fill-current shrink-0" viewBox="0 0 24 24">
+              <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1.003 1.003 0 0 0 20 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+            <span class="font-display font-bold text-[11px] uppercase tracking-wider">Корзина</span>
+          </button>
+
+          <!-- ВЫПАДАЮЩЕЕ ОКНО КОРЗИНЫ -->
+          <div id="cartDropdownMenu"
+            class="hidden absolute right-0 mt-2 w-[430px] max-w-[94vw] bg-cp-panel border-2 border-cp-green shadow-[0_14px_40px_rgba(0,0,0,0.95)] z-50"
+            onclick="event.stopPropagation()">
+            <div class="px-3.5 py-2.5 bg-cp-bg border-b border-gray-800 flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">🛒</span>
+                <span class="font-display font-bold text-xs uppercase text-cp-green tracking-wider">Корзина</span>
+                <span id="cartDropdownCountBadge"
+                  class="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-cp-panel border border-cp-green/50 text-cp-green">Товаров: 0</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <button type="button" onclick="clearShoppingCart()"
+                  class="text-[11px] font-bold text-gray-400 hover:text-cp-red underline underline-offset-2 transition-colors">
+                  🗑️ Очистить корзину
+                </button>
+                <button type="button" onclick="closeCartDropdown()" title="Закрыть"
+                  class="text-gray-400 hover:text-white text-sm font-bold px-1">✕</button>
+              </div>
+            </div>
+
+            <div id="cartItemsList" class="max-h-80 overflow-y-auto divide-y divide-gray-800/80"></div>
+
+            <div class="p-3 bg-cp-bg border-t border-gray-800 flex items-center justify-between gap-2 flex-wrap">
+              <button type="button" onclick="clearShoppingCart()"
+                class="px-3 py-2 bg-gray-800 hover:bg-cp-red text-gray-300 hover:text-white border border-gray-700 text-xs font-bold uppercase transition-colors shrink-0">
+                Очистить
+              </button>
+              <button type="button" id="cartBuySubmitBtn" onclick="checkoutShoppingCart()"
+                class="flex-1 min-w-fit px-4 py-2 bg-cp-green hover:bg-green-400 text-black font-display font-black text-xs uppercase tracking-wider transition-all text-center whitespace-nowrap cp-clip shadow-[0_0_12px_rgba(0,255,102,0.25)]">
+                💳 Купить (0 eb)
+              </button>
+            </div>
+          </div>
+        </div>
         <button type="button" id="guestLoginSquareBtn" onclick="switchMainView('profile')"
           title="Войти в аккаунт или зарегистрироваться"
           class="w-10 h-10 bg-cp-panel hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/70 flex flex-col items-center justify-center transition-all shadow-[0_0_10px_rgba(252,238,10,0.15)]">

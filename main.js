@@ -1896,10 +1896,20 @@ function selectCatalogItem(id) {
     renderCatalog();
 }
 
+const PURCHASABLE_SECTIONS = new Set([
+    "weapons", "armor", "gear", "services", "cyberware", "borging", "acpa", "netrunning", "vehicles"
+]);
+
 function renderCardActionButtons(sectionKey, itemId) {
+    const canBuy = PURCHASABLE_SECTIONS.has(sectionKey);
+    const inCart = canBuy && isItemInCart(itemId);
+    const buyBtn = canBuy
+        ? `<button type="button" onclick="toggleCartItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${inCart ? 'bg-cp-red text-white border-cp-red hover:bg-red-600' : 'bg-cp-green/15 text-cp-green border-cp-green/60 hover:bg-cp-green hover:text-black'}">${inCart ? '✕ Убрать' : '🛒 Купить'}</button>`
+        : "";
+
     const fav = isItemFavorited(itemId);
     const favBtn = `<button type="button" onclick="toggleFavoriteItem('${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${fav ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow'}">${fav ? '★ В избранном' : '☆ В избранное'}</button>`;
-    if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${favBtn}</div>`;
+    if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${buyBtn}${favBtn}</div>`;
 
     const targetObj = (DB[sectionKey] || []).find(i => i.id === itemId);
     const isAddedChecked = Boolean(targetObj && targetObj.isUser);
@@ -1908,6 +1918,7 @@ function renderCardActionButtons(sectionKey, itemId) {
     return `
         <div class="flex flex-col items-end gap-1.5 shrink-0">
           <div class="flex items-center gap-1.5 flex-wrap justify-end">
+            ${buyBtn}
             ${favBtn}
             <button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
             <button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
@@ -4911,6 +4922,261 @@ function hideCardHoverPreviewImmediately() {
     const pop = document.getElementById("cardHoverPreviewPopover");
     if (pop) pop.classList.add("hidden");
 }
+
+// =========================================================================
+// СИСТЕМА КОРЗИНЫ ПОКУПОК (ПОДСЧЁТ ЦЕНЫ, КОЛИЧЕСТВО +/- И ПОКУПКА)
+// =========================================================================
+
+const STORAGE_CART_KEY = "cp2020_shopping_cart_v1";
+let SHOPPING_CART = []; // [{ sectionKey, itemId, qty }]
+
+function loadShoppingCartFromStorage() {
+    try {
+        const raw = localStorage.getItem(STORAGE_CART_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+                SHOPPING_CART = parsed.filter(x => x && x.itemId && x.qty > 0);
+            }
+        }
+    } catch (e) { SHOPPING_CART = []; }
+    updateCartHeaderUI();
+}
+
+function saveShoppingCartToStorage() {
+    try {
+        localStorage.setItem(STORAGE_CART_KEY, JSON.stringify(SHOPPING_CART));
+    } catch (e) { }
+    updateCartHeaderUI();
+}
+
+// Умное извлечение числовой цены в евробаксах из строки вида "1,500 eb", "50 – 200 eb", "40 eb / доза"
+function parseItemUnitPriceEb(costStr) {
+    if (!costStr || costStr === "—") return 0;
+    const clean = String(costStr).replace(/\s+/g, "").replace(/,/g, "");
+    const match = clean.match(/\d+(\.\d+)?/);
+    if (!match) return 0;
+    const val = parseFloat(match[0]);
+    return isNaN(val) ? 0 : val;
+}
+
+function formatEbAmount(num) {
+    const rounded = Math.round(num * 100) / 100;
+    return rounded.toLocaleString("ru-RU") + " eb";
+}
+
+function isItemInCart(itemId) {
+    return SHOPPING_CART.some(c => c.itemId === itemId);
+}
+
+window.toggleCartItem = function (sectionKey, itemId) {
+    const idx = SHOPPING_CART.findIndex(c => c.itemId === itemId);
+    if (idx !== -1) {
+        SHOPPING_CART.splice(idx, 1);
+    } else {
+        SHOPPING_CART.push({ sectionKey, itemId, qty: 1 });
+    }
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    if (activeMainView === "catalog") renderCatalog();
+};
+
+window.changeCartItemQty = function (itemId, delta) {
+    const entry = SHOPPING_CART.find(c => c.itemId === itemId);
+    if (!entry) return;
+    const nextQty = (Number(entry.qty) || 1) + delta;
+    if (nextQty <= 0) {
+        SHOPPING_CART = SHOPPING_CART.filter(c => c.itemId !== itemId);
+    } else {
+        entry.qty = Math.min(9999, nextQty);
+    }
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    if (activeMainView === "catalog") renderCatalog();
+};
+
+window.setCartItemQtyDirect = function (itemId, rawVal) {
+    const entry = SHOPPING_CART.find(c => c.itemId === itemId);
+    if (!entry) return;
+    const parsed = parseInt(String(rawVal).replace(/[^\d]/g, ""), 10);
+    if (isNaN(parsed) || parsed <= 0) {
+        entry.qty = 1;
+    } else {
+        entry.qty = Math.min(9999, parsed);
+    }
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+};
+
+window.removeCartItemById = function (itemId) {
+    SHOPPING_CART = SHOPPING_CART.filter(c => c.itemId !== itemId);
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    if (activeMainView === "catalog") renderCatalog();
+};
+
+window.clearShoppingCart = function () {
+    if (SHOPPING_CART.length === 0) return;
+    SHOPPING_CART = [];
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    if (activeMainView === "catalog") renderCatalog();
+};
+
+window.checkoutShoppingCart = function () {
+    if (SHOPPING_CART.length === 0) return;
+    SHOPPING_CART = [];
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    closeCartDropdown();
+    if (activeMainView === "catalog") renderCatalog();
+};
+
+window.toggleCartDropdown = function (e) {
+    if (e) e.stopPropagation();
+    closeUserDropdown();
+    closeNotifDropdown();
+    const menu = document.getElementById("cartDropdownMenu");
+    if (!menu) return;
+    if (menu.classList.contains("hidden")) {
+        renderCartDropdownList();
+        menu.classList.remove("hidden");
+    } else {
+        menu.classList.add("hidden");
+    }
+};
+
+window.closeCartDropdown = function () {
+    const menu = document.getElementById("cartDropdownMenu");
+    if (menu) menu.classList.add("hidden");
+};
+
+function calculateCartTotals() {
+    let totalCount = 0;
+    let totalEb = 0;
+    const resolvedItems = [];
+
+    SHOPPING_CART.forEach(entry => {
+        const found = findItemAcrossAllSections(entry.itemId);
+        if (!found || !found.item) return;
+        const unitPrice = parseItemUnitPriceEb(found.item.cost);
+        const qty = Math.max(1, Number(entry.qty) || 1);
+        const lineTotal = unitPrice * qty;
+        totalCount += qty;
+        totalEb += lineTotal;
+        resolvedItems.push({
+            sectionKey: found.section,
+            item: found.item,
+            qty,
+            unitPrice,
+            lineTotal
+        });
+    });
+
+    return { totalCount, totalEb, resolvedItems };
+}
+
+function updateCartHeaderUI() {
+    const headerBtn = document.getElementById("cartHeaderBtn");
+    const buyBtn = document.getElementById("cartBuySubmitBtn");
+    const dropdownBadge = document.getElementById("cartDropdownCountBadge");
+    const { totalCount, totalEb } = calculateCartTotals();
+
+    // Обновляем плашку в шапке выпадашки (если она есть в index.html)
+    if (dropdownBadge) {
+        dropdownBadge.textContent = `Товаров: ${totalCount}`;
+    }
+
+    // Если в index.html остался старый бейдж на кнопке — прячем его навсегда
+    const oldBtnBadge = document.getElementById("cartHeaderBadge");
+    if (oldBtnBadge) {
+        oldBtnBadge.classList.add("hidden");
+    }
+
+    // Подсвечиваем саму кнопку Корзины зелёным, когда внутри есть товары
+    if (headerBtn) {
+        headerBtn.className = totalCount > 0
+            ? "h-10 px-3 bg-cp-green/15 border border-cp-green text-cp-green hover:bg-cp-green hover:text-black flex items-center gap-2 transition-all relative select-none shadow-[0_0_14px_rgba(0,255,102,0.35)]"
+            : "h-10 px-3 bg-cp-panel border border-gray-700 hover:border-cp-green text-gray-400 hover:text-white flex items-center gap-2 transition-all relative select-none";
+    }
+
+    if (buyBtn) {
+        buyBtn.textContent = `💳 Купить (${formatEbAmount(totalEb)})`;
+    }
+}
+
+function renderCartDropdownList() {
+    const listEl = document.getElementById("cartItemsList");
+    updateCartHeaderUI();
+    if (!listEl) return;
+
+    const { totalCount, totalEb, resolvedItems } = calculateCartTotals();
+    if (resolvedItems.length === 0) {
+        listEl.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">Ваша корзина пуста. Нажимайте кнопку <b class="text-cp-green">«🛒 Купить»</b> в карточках оружия, брони, имплантов или услуг!</div>`;
+        return;
+    }
+
+    // Верхняя инфо-строка прямо внутри выпадашки (гарантированно показывает живое число товаров!)
+    const summaryBarHtml = `
+      <div class="px-3.5 py-2 bg-black/50 border-b border-gray-800 flex items-center justify-between text-[11px]">
+        <span class="text-gray-400">Всего в корзине: <b class="text-cp-green font-mono text-xs">${totalCount} шт.</b> <span class="text-gray-500">(позиций: ${resolvedItems.length})</span></span>
+        <span class="text-gray-400">Итого: <b class="text-cp-yellow font-mono">${formatEbAmount(totalEb)}</b></span>
+      </div>
+    `;
+
+    const itemsHtml = resolvedItems.map(({ sectionKey, item, qty, unitPrice, lineTotal }) => {
+        const secLabel = SECTION_LABELS[sectionKey] || sectionKey;
+        const priceNote = unitPrice > 0 ? formatEbAmount(lineTotal) : dash(item.cost);
+        return `
+          <div class="p-3 bg-cp-panel hover:bg-cp-card/90 transition-colors flex items-center justify-between gap-3">
+            <div onclick="openCartItemCard('${sectionKey}', '${escapeHtmlAttr(item.id)}')" class="min-w-0 flex-1 cursor-pointer group">
+              <div class="text-[10px] text-cp-cyan font-bold uppercase truncate">${secLabel} • ${dash(item.category)}</div>
+              <div class="text-xs font-bold text-white group-hover:text-cp-yellow truncate mt-0.5">${escapeHtmlAttr(item.name || item.title)}</div>
+              <div class="text-[11px] text-gray-400 mt-0.5">
+                Цена за шт.: <span class="text-gray-200 font-semibold">${dash(item.cost)}</span>
+              </div>
+            </div>
+
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="changeCartItemQty('${escapeHtmlAttr(item.id)}', -1)"
+                  class="w-6 h-6 bg-cp-bg hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 font-bold text-xs flex items-center justify-center transition-colors">−</button>
+                <input type="text" value="${qty}"
+                  onchange="setCartItemQtyDirect('${escapeHtmlAttr(item.id)}', this.value)"
+                  class="w-11 h-6 bg-cp-bg border border-gray-700 focus:border-cp-cyan text-center text-xs font-bold text-white outline-none">
+                <button type="button" onclick="changeCartItemQty('${escapeHtmlAttr(item.id)}', 1)"
+                  class="w-6 h-6 bg-cp-bg hover:bg-cp-green text-gray-200 hover:text-black border border-gray-700 font-bold text-xs flex items-center justify-center transition-colors">+</button>
+                <button type="button" onclick="removeCartItemById('${escapeHtmlAttr(item.id)}')" title="Убрать из корзины"
+                  class="w-6 h-6 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/40 text-xs font-bold flex items-center justify-center ml-1 transition-colors">✕</button>
+              </div>
+              <div class="text-xs font-display font-bold text-cp-green">${priceNote}</div>
+            </div>
+          </div>
+        `;
+    }).join("");
+
+    listEl.innerHTML = summaryBarHtml + itemsHtml;
+}
+
+window.openCartItemCard = function (sectionKey, itemId) {
+    closeCartDropdown();
+    if (typeof window.selectGlobalSearchResult === "function") {
+        window.selectGlobalSearchResult(sectionKey, itemId);
+    } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+    }
+};
+
+// Закрываем корзину при клике вне её области
+document.addEventListener("click", (ev) => {
+    const cartWrap = document.getElementById("cartCornerWrapper");
+    if (cartWrap && !cartWrap.contains(ev.target)) {
+        closeCartDropdown();
+    }
+});
+
+setTimeout(loadShoppingCartFromStorage, 50);
 
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
