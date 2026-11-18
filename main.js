@@ -4433,6 +4433,146 @@ function renderHomeView() {
     mainCol.innerHTML = `${headerBannerHtml}${adminEditorHtml}<div class="space-y-4">${postsCardsHtml}</div>`;
 }
 
+// =========================================================================
+// ГЛОБАЛЬНЫЙ ПОИСК В ШАПКЕ САЙТА (ПО ВСЕМ РАЗДЕЛАМ СРАЗУ)
+// =========================================================================
+
+window.handleGlobalHeaderSearch = function (rawQuery) {
+    const dropdown = document.getElementById("globalSearchDropdown");
+    const clearBtn = document.getElementById("globalSearchClearBtn");
+    if (!dropdown) return;
+
+    const q = (rawQuery || "").trim().toLowerCase();
+    if (clearBtn) clearBtn.classList.toggle("hidden", q.length === 0);
+
+    if (q.length < 1) {
+        dropdown.classList.add("hidden");
+        dropdown.innerHTML = "";
+        return;
+    }
+
+    const matches = [];
+    Object.keys(SECTION_LABELS).forEach(secKey => {
+        const list = DB[secKey] || [];
+        list.forEach(item => {
+            if (!item) return;
+            const title = String(item.name || item.title || "").trim();
+            const orig = String(item.origName || "").trim();
+            const cat = String(item.category || item.subsection || "").trim();
+            const book = String(item.book || "").trim();
+            const desc = String(item.desc || item.summary || item.content || "").trim();
+
+            const titleLow = title.toLowerCase();
+            const origLow = orig.toLowerCase();
+            const catLow = cat.toLowerCase();
+            const descLow = desc.toLowerCase();
+
+            // Приоритет сортировки: 3 — начинается с запроса, 2 — совпадение в названии/оригинале, 1 — в категории/описании
+            let score = 0;
+            if (titleLow.startsWith(q) || origLow.startsWith(q)) score = 3;
+            else if (titleLow.includes(q) || origLow.includes(q)) score = 2;
+            else if (catLow.includes(q) || descLow.includes(q) || book.toLowerCase().includes(q)) score = 1;
+
+            if (score > 0) {
+                matches.push({ secKey, item, title, orig, cat, book, score });
+            }
+        });
+    });
+
+    matches.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, "ru"));
+    const topMatches = matches.slice(0, 30);
+
+    if (topMatches.length === 0) {
+        dropdown.innerHTML = `<div class="p-4 text-center text-xs text-gray-500">По запросу «<b class="text-gray-300">${escapeHtmlAttr(rawQuery.trim())}</b>» ничего не найдено</div>`;
+        dropdown.classList.remove("hidden");
+        return;
+    }
+
+    dropdown.innerHTML = topMatches.map(m => {
+        const secLabel = SECTION_LABELS[m.secKey] || m.secKey;
+        const origSub = (m.orig && m.orig !== "—" && m.orig.toLowerCase() !== m.title.toLowerCase())
+            ? `<span class="text-gray-500 font-normal ml-1">(${escapeHtmlAttr(m.orig)})</span>`
+            : "";
+        return `
+          <div onclick="selectGlobalSearchResult('${m.secKey}', '${escapeHtmlAttr(m.item.id)}')"
+            class="px-3.5 py-2.5 bg-cp-panel hover:bg-cp-cyan/15 cursor-pointer transition-colors flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white truncate">${escapeHtmlAttr(m.title)}${origSub}</div>
+              <div class="text-[10px] text-gray-400 truncate mt-0.5">
+                <span class="text-cp-cyan font-bold">${secLabel}</span> • ${escapeHtmlAttr(m.cat || "—")}
+              </div>
+            </div>
+            <span class="text-[10px] px-1.5 py-0.5 bg-cp-bg border border-gray-700 text-cp-yellow font-bold shrink-0">${escapeHtmlAttr(m.book || "CP20")}</span>
+          </div>
+        `;
+    }).join("");
+
+    dropdown.classList.remove("hidden");
+};
+
+window.selectGlobalSearchResult = function (sectionKey, itemId) {
+    const dropdown = document.getElementById("globalSearchDropdown");
+    if (dropdown) dropdown.classList.add("hidden");
+
+    if (sectionKey === "rules") {
+        activeRuleSubsection = "ALL";
+        const ruleSearch = document.getElementById("ruleSearchInput");
+        if (ruleSearch) ruleSearch.value = "";
+        selectedRuleId = itemId;
+        switchMainView("rules");
+        setTimeout(() => {
+            const activeRuleEl = document.querySelector(`#ruleArticlesList [onclick="openRuleArticle('${itemId}')"]`);
+            if (activeRuleEl) activeRuleEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 60);
+    } else {
+        // Сбрасываем локальные фильтры вкладки, чтобы выбранная карточка гарантированно отобразилась в списке
+        const sInp = document.getElementById("searchInput");
+        if (sInp) sInp.value = "";
+        ["subFilter", "extraFilter", "relFilter", "availFilter", "bookFilter"].forEach(fid => {
+            const el = document.getElementById(fid);
+            if (el) el.value = "ALL";
+        });
+
+        selectedItemId = itemId;
+        switchMainView("catalog", sectionKey);
+        setTimeout(() => {
+            const activeCardEl = document.querySelector(`#catalogList [onclick="selectCatalogItem('${itemId}')"]`);
+            if (activeCardEl) activeCardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 60);
+    }
+};
+
+window.clearGlobalHeaderSearch = function () {
+    const inp = document.getElementById("globalHeaderSearchInput");
+    const dropdown = document.getElementById("globalSearchDropdown");
+    const clearBtn = document.getElementById("globalSearchClearBtn");
+    if (inp) { inp.value = ""; inp.focus(); }
+    if (clearBtn) clearBtn.classList.add("hidden");
+    if (dropdown) { dropdown.classList.add("hidden"); dropdown.innerHTML = ""; }
+};
+
+window.handleGlobalSearchKeydown = function (ev) {
+    if (ev.key === "Escape") {
+        const dropdown = document.getElementById("globalSearchDropdown");
+        if (dropdown) dropdown.classList.add("hidden");
+    } else if (ev.key === "Enter") {
+        const firstItem = document.querySelector("#globalSearchDropdown > div[onclick]");
+        if (firstItem) {
+            ev.preventDefault();
+            firstItem.click();
+        }
+    }
+};
+
+// Закрываем выпадающий список глобального поиска при клике мимо него
+document.addEventListener("click", (ev) => {
+    const wrap = document.getElementById("globalSearchWrapper");
+    const dropdown = document.getElementById("globalSearchDropdown");
+    if (wrap && dropdown && !wrap.contains(ev.target)) {
+        dropdown.classList.add("hidden");
+    }
+});
+
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
         mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA, false);

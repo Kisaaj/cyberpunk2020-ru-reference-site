@@ -373,6 +373,26 @@
         <button type="button" onclick="switchMainView('rules')" data-view="rules"
           class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all">⚙️ Игровые
           механики</button>
+
+        <!-- ГЛОБАЛЬНЫЙ ПОИСК ПО ВСЕМУ СПРАВОЧНИКУ -->
+        <div id="globalSearchWrapper" class="relative ml-auto w-64 sm:w-80 xl:w-96 shrink-0">
+          <div class="relative flex items-center">
+            <span class="absolute left-2.5 text-[11px] text-gray-500 pointer-events-none select-none">🔍</span>
+            <input type="text" id="globalHeaderSearchInput"
+              placeholder="Глобальный поиск"
+              autocomplete="off"
+              oninput="handleGlobalHeaderSearch(this.value)"
+              onfocus="handleGlobalHeaderSearch(this.value)"
+              onkeydown="handleGlobalSearchKeydown(event)"
+              class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan text-white placeholder-gray-500 pl-7 pr-7 py-1.5 text-xs outline-none transition-colors">
+            <button type="button" id="globalSearchClearBtn" onclick="clearGlobalHeaderSearch()"
+              class="hidden absolute right-2 text-xs text-gray-500 hover:text-white font-bold">✕</button>
+          </div>
+          <div id="globalSearchDropdown"
+            class="hidden absolute right-0 left-0 mt-1.5 bg-cp-panel border-2 border-cp-cyan shadow-[0_14px_35px_rgba(0,0,0,0.95)] max-h-96 overflow-y-auto z-50 divide-y divide-gray-800/80">
+          </div>
+        </div>
+      </nav>
       </nav>
 
       <!-- ПРАВЫЙ УГОЛ: КВАДРАТНАЯ КНОПКА «ВОЙТИ» ИЛИ АВАТАР + КОЛОКОЛЬЧИК -->
