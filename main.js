@@ -4151,15 +4151,26 @@ function getRichToolbarHTML(textareaId) {
       `;
 }
 
-function startEditHomePost(postId) {
+window.startEditHomePost = function (postId) {
     if (!isCurrentUserAdmin()) return;
-    editingHomePostId = postId;
+    editingHomePostId = String(postId);
     renderHomeView();
-}
-function cancelEditHomePost() {
+    setTimeout(() => {
+        const editorBox = document.getElementById("homeAdminEditorBox");
+        if (editorBox) {
+            editorBox.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        const area = document.getElementById("homeEditorTextarea");
+        if (area) area.focus();
+    }, 40);
+};
+startEditHomePost = window.startEditHomePost;
+
+window.cancelEditHomePost = function () {
     editingHomePostId = null;
     renderHomeView();
-}
+};
+cancelEditHomePost = window.cancelEditHomePost;
 
 function startEditAdminContact(userId) {
     const cur = getCurrentUser();
@@ -4372,7 +4383,9 @@ function renderHomeView() {
     // 3. ВКЛАДКИ «НОВОСТИ» И «ПРАВИЛА САЙТА»
     const isNews = (activeHomeSubtab === "news");
     const postsList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-    const postToEdit = editingHomePostId ? postsList.find(p => p.id === editingHomePostId) : null;
+    const postToEdit = editingHomePostId
+        ? postsList.find(p => p && String(p.id) === String(editingHomePostId))
+        : null;
 
     const headerBannerHtml = isNews
         ? `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-yellow"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ИНФОРМАЦИОННЫЙ КАНАЛ NIGHT CITY NETWORK</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📰 Новости и обновления сайта</h2><p class="text-xs text-gray-400 mt-1">Свежие патчноуты, добавленные книги-источники, новые разделы и объявления администрации.</p></div></div>`

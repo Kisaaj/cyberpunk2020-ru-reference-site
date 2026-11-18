@@ -1150,7 +1150,10 @@ window.saveHomePostSubmit = async function (e) {
     const isNews = (activeHomeSubtab === "news");
     const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
 
-    let postObj = editingHomePostId ? targetList.find(x => x.id === editingHomePostId) : null;
+    let postObj = editingHomePostId
+        ? targetList.find(x => x && String(x.id) === String(editingHomePostId))
+        : null;
+
     if (postObj) {
         postObj.title = titleVal;
         postObj.content = contentVal;
@@ -1187,12 +1190,15 @@ window.deleteHomePost = async function (postId) {
     if (!isCurrentUserAdmin()) return;
     const isNews = (activeHomeSubtab === "news");
     const targetList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-    const target = targetList.find(x => x.id === postId);
+    const target = targetList.find(x => x && String(x.id) === String(postId));
     if (!target || !confirm(`Удалить запись «${target.title}»?`)) return;
-    if (isNews) HOME_NEWS_LIST = HOME_NEWS_LIST.filter(x => x.id !== postId);
-    else HOME_RULES_LIST = HOME_RULES_LIST.filter(x => x.id !== postId);
+    if (isNews) HOME_NEWS_LIST = HOME_NEWS_LIST.filter(x => String(x.id) !== String(postId));
+    else HOME_RULES_LIST = HOME_RULES_LIST.filter(x => String(x.id) !== String(postId));
+    if (editingHomePostId && String(editingHomePostId) === String(postId)) {
+        editingHomePostId = null;
+    }
     renderHomeView();
-    if (sbClient) { try { await sbClient.from("cp2020_home_content").delete().eq("id", postId); } catch (e) { } }
+    if (sbClient) { try { await sbClient.from("cp2020_home_content").delete().eq("id", target.id); } catch (e) { } }
 };
 
 // --- ЗАЩИЩЁННОЕ СОХРАНЕНИЕ БАЗЫ В ОБЛАКО (БЕЗ ПЕРЕЗАПИСИ ПРИ СТАРТЕ) ---
