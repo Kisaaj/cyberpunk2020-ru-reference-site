@@ -3786,9 +3786,103 @@ window.addEventListener("keydown", (ev) => {
 //
 
 // =========================================================================
-// НАВИГАЦИЯ ПО САЙТУ И ГЛАВНАЯ СТРАНИЦА (4 ВКЛАДКИ БЕЗ СЧЁТЧИКОВ)
+// НАВИГАЦИЯ ПО САЙТУ, ИСТОРИЯ ПЕРЕХОДОВ И ГЛАВНАЯ СТРАНИЦА
 // =========================================================================
 
+let navHistoryStack = [];
+let navHistoryIndex = -1;
+let isNavigatingHistory = false;
+
+function captureCurrentNavState() {
+    return {
+        view: activeMainView,
+        catalogTab: activeCatalogTab,
+        selectedItemId: selectedItemId,
+        selectedRuleId: selectedRuleId,
+        homeSubtab: activeHomeSubtab,
+        adminSubtab: activeAdminSubtab,
+        adminLogsSubtab: activeAdminLogsSubtab
+    };
+}
+
+function isSameNavState(a, b) {
+    if (!a || !b) return false;
+    if (a.view !== b.view) return false;
+    if (a.view === "catalog") return a.catalogTab === b.catalogTab && a.selectedItemId === b.selectedItemId;
+    if (a.view === "rules") return a.selectedRuleId === b.selectedRuleId;
+    if (a.view === "home") return a.homeSubtab === b.homeSubtab;
+    if (a.view === "admin") return a.adminSubtab === b.adminSubtab && a.adminLogsSubtab === b.adminLogsSubtab;
+    return true;
+}
+
+function updateNavHistoryButtonsUI() {
+    const backBtn = document.getElementById("navHistoryBackBtn");
+    const fwdBtn = document.getElementById("navHistoryFwdBtn");
+    const canBack = navHistoryIndex > 0;
+    const canFwd = navHistoryIndex >= 0 && navHistoryIndex < navHistoryStack.length - 1;
+
+    const activeCls = "w-7 h-9 bg-cp-panel hover:bg-cp-yellow text-cp-cyan hover:text-black border border-cp-cyan hover:border-cp-yellow flex items-center justify-center font-display font-black text-xs transition-all cursor-pointer shadow-[0_0_8px_rgba(0,240,255,0.25)]";
+    const disabledCls = "w-7 h-9 bg-cp-panel border border-gray-800 text-gray-600 flex items-center justify-center font-display font-black text-xs transition-all opacity-40 cursor-not-allowed";
+
+    if (backBtn) {
+        backBtn.disabled = !canBack;
+        backBtn.className = canBack ? activeCls : disabledCls;
+    }
+    if (fwdBtn) {
+        fwdBtn.disabled = !canFwd;
+        fwdBtn.className = canFwd ? activeCls : disabledCls;
+    }
+}
+
+function recordNavHistoryState() {
+    if (isNavigatingHistory) return;
+    const snap = captureCurrentNavState();
+    const currentTop = navHistoryStack[navHistoryIndex];
+    if (currentTop && isSameNavState(currentTop, snap)) {
+        updateNavHistoryButtonsUI();
+        return;
+    }
+
+    if (navHistoryIndex < navHistoryStack.length - 1) {
+        navHistoryStack = navHistoryStack.slice(0, navHistoryIndex + 1);
+    }
+    navHistoryStack.push(snap);
+    if (navHistoryStack.length > 60) {
+        navHistoryStack.shift();
+    }
+    navHistoryIndex = navHistoryStack.length - 1;
+    updateNavHistoryButtonsUI();
+}
+
+window.navigateHistory = function (delta) {
+    const targetIdx = navHistoryIndex + delta;
+    if (targetIdx < 0 || targetIdx >= navHistoryStack.length) return;
+
+    navHistoryIndex = targetIdx;
+    const st = navHistoryStack[navHistoryIndex];
+    isNavigatingHistory = true;
+    try {
+        activeHomeSubtab = st.homeSubtab || "news";
+        activeAdminSubtab = st.adminSubtab || "builder";
+        activeAdminLogsSubtab = st.adminLogsSubtab || "bans";
+        selectedItemId = st.selectedItemId || null;
+        selectedRuleId = st.selectedRuleId || null;
+        switchMainView(st.view, st.catalogTab);
+    } finally {
+        isNavigatingHistory = false;
+        updateNavHistoryButtonsUI();
+    }
+};
+
+window.addEventListener("keydown", (ev) => {
+    if (ev.altKey && ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        window.navigateHistory(-1);
+    } else if (ev.altKey && ev.key === "ArrowRight") {
+        ev.preventDefault();
+        window.navigateHistory(1);
+    }
+});
 
 function updateAuthHeaderUI() {
     const u = getCurrentUser();
@@ -3879,7 +3973,28 @@ function switchMainView(view, catalogTab = null) {
     else if (view === "rules") renderRulesView();
     else if (view === "profile") renderProfileView();
     else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
+
+    recordNavHistoryState();
 }
+
+// При клике по карточке в каталоге или механике тоже сохраняем шаг в историю
+const _baseSelectCatalogItem = selectCatalogItem;
+selectCatalogItem = function (id) {
+    _baseSelectCatalogItem(id);
+    recordNavHistoryState();
+};
+
+const _baseOpenRuleArticle = openRuleArticle;
+openRuleArticle = function (id) {
+    _baseOpenRuleArticle(id);
+    recordNavHistoryState();
+};
+
+const _baseSwitchAdminSubtab = switchAdminSubtab;
+switchAdminSubtab = function (subtab) {
+    _baseSwitchAdminSubtab(subtab);
+    recordNavHistoryState();
+};
 
 // --- ЛОГИКА ГЛАВНОЙ СТРАНИЦЫ ---
 function switchHomeSubtab(subtab) {
@@ -3887,6 +4002,7 @@ function switchHomeSubtab(subtab) {
     editingHomePostId = null;
     editingContactUserId = null;
     renderHomeView();
+    recordNavHistoryState();
 }
 
 function getPlainTextLength(htmlStr) {
@@ -3910,18 +4026,15 @@ function toggleExpandHomePost(postId) {
     renderHomeView();
 }
 
-// Автоматическое превращение голых URL (http/https) в кликабельные ссылки (не трогает уже готовые теги <a> и атрибуты)
 function formatRichTextWithLinks(rawText) {
     if (rawText === undefined || rawText === null) return "";
     const str = String(rawText);
     if (str.trim() === "" || str.trim() === "—") return str;
 
-    // Разбиваем строку по существующим HTML-тегам <a ...>...</a> и прочим тегам, чтобы не ломать их атрибуты href/src
     const parts = str.split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/gi);
     return parts.map(part => {
         if (part.startsWith("<")) return part;
         return part.replace(/(https?:\/\/[^\s<>"']+)/gi, (url) => {
-            // Убираем случайную точку, запятую или скобку в самом конце ссылки
             const cleanUrl = url.replace(/[.,;!?)]+$/, "");
             const trailing = url.slice(cleanUrl.length);
             return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-cp-cyan hover:text-cp-yellow underline underline-offset-2 font-bold transition-colors">${cleanUrl}</a>${trailing}`;
@@ -3929,7 +4042,6 @@ function formatRichTextWithLinks(rawText) {
     }).join("");
 }
 
-// Список эмодзи для быстрой вставки в новости и описания карточек
 const CP_EMOJI_LIST = [
     "⚡", "🔥", "💀", "🦾", "🦿", "🧠", "🔫", "🛡️", "⚔️", "💣",
     "💉", "💊", "🧬", "💻", "🌐", "📡", "🔒", "🔓", "⚠️", "🚨",
@@ -3937,7 +4049,6 @@ const CP_EMOJI_LIST = [
     "❌", "📌", "📋", "🔧", "⚙️", "🕶️", "🎭", "🎸", "🍺", "❤️"
 ];
 
-// Универсальная вставка тега в любое текстовое поле (по его ID)
 function insertRichFormatTag(textareaId, openTag, closeTag) {
     const area = document.getElementById(textareaId);
     if (!area) return;
@@ -3951,12 +4062,10 @@ function insertRichFormatTag(textareaId, openTag, closeTag) {
     area.setSelectionRange(newCursorPos, newCursorPos);
 }
 
-// Совместимость со старым вызовом
 function insertHomeFormatTag(openTag, closeTag) {
     insertRichFormatTag("homeEditorTextarea", openTag, closeTag);
 }
 
-// Вставка оформленной гиперссылки (спрашивает URL и текст ссылки)
 function insertRichHyperlink(textareaId) {
     const area = document.getElementById(textareaId);
     if (!area) return;
@@ -3981,14 +4090,12 @@ function insertRichHyperlink(textareaId) {
     area.focus();
 }
 
-// Открытие/закрытие палитры эмодзи над конкретным текстовым полем
 function toggleRichEmojiPicker(textareaId) {
     const picker = document.getElementById("emoji-picker-" + textareaId);
     if (!picker) return;
     picker.classList.toggle("hidden");
 }
 
-// Вставка выбранного эмодзи на место курсора
 function insertEmojiAtCursor(textareaId, emojiChar) {
     const area = document.getElementById(textareaId);
     if (!area) return;
@@ -4001,546 +4108,6 @@ function insertEmojiAtCursor(textareaId, emojiChar) {
     area.setSelectionRange(pos, pos);
 }
 
-// Генератор готовой панели инструментов форматирования для любого textarea по его ID
-function getRichToolbarHTML(textareaId) {
-    const emojiButtons = CP_EMOJI_LIST.map(em =>
-        `<button type="button" onclick="insertEmojiAtCursor('${textareaId}', '${em}')" class="w-7 h-7 flex items-center justify-center bg-cp-bg hover:bg-cp-yellow/20 border border-gray-800 hover:border-cp-yellow text-sm transition-colors" title="Вставить ${em}">${em}</button>`
-    ).join("");
-
-    return `
-        <div class="space-y-1 mb-1">
-          <div class="flex flex-wrap items-center gap-1 bg-cp-bg border border-gray-800 p-1.5">
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<b>', '</b>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs font-bold" title="Жирный текст"><b>B</b></button>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<i>', '</i>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs italic" title="Курсив">I</button>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<u>', '</u>')" class="px-2 py-0.5 bg-cp-panel hover:bg-cp-yellow hover:text-black border border-gray-700 text-xs underline" title="Подчёркнутый">U</button>
-            <span class="text-gray-700 px-0.5">|</span>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-yellow font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-yellow font-bold">Жёлтый</button>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-cyan font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-cyan font-bold">Циан</button>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный</button>
-            <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-green font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-green font-bold">Зелёный</button>
-            <span class="text-gray-700 px-0.5">|</span>
-            <button type="button" onclick="insertRichHyperlink('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-[11px] font-bold transition-colors" title="Вставить оформленную гиперссылку">🔗 Ссылка</button>
-            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button>
-          </div>
-          <div id="emoji-picker-${textareaId}" class="hidden bg-cp-panel border border-cp-yellow/60 p-2 grid grid-cols-10 gap-1 shadow-lg">
-            ${emojiButtons}
-          </div>
-        </div>
-      `;
-}
-
-function startEditHomePost(postId) {
-    if (!isCurrentUserAdmin()) return;
-    editingHomePostId = postId;
-    renderHomeView();
-}
-function cancelEditHomePost() {
-    editingHomePostId = null;
-    renderHomeView();
-}
-
-function startEditAdminContact(userId) {
-    const cur = getCurrentUser();
-    if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
-    editingContactUserId = userId;
-    renderHomeView();
-}
-function cancelEditAdminContact() {
-    editingContactUserId = null;
-    renderHomeView();
-}
-
-function addAdminSocialLinkRow() {
-    const list = document.getElementById("adminSocialLinksEditList");
-    if (!list) return;
-    const row = document.createElement("div");
-    row.className = "admin-social-link-row grid grid-cols-12 gap-2 items-center";
-    row.innerHTML = `
-        <input type="text" data-sfield="label" placeholder="Название (ВК, Telegram, Discord...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-        <input type="text" data-sfield="url" placeholder="https://... или ник" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-        <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 hover:bg-cp-red text-cp-red hover:text-white text-xs font-bold">✕</button>
-      `;
-    list.appendChild(row);
-}
-
-function saveAdminContactSubmit(e, userId) {
-    e.preventDefault();
-    const cur = getCurrentUser();
-    if (!cur || (!isCurrentUserRoot() && cur.id !== userId)) return;
-    ensureMetaArraysInCategories();
-
-    const roleTitle = document.getElementById("admContactRoleTitle")?.value.trim() || "";
-    const note = document.getElementById("admContactNote")?.value.trim() || "";
-    const rows = document.querySelectorAll("#adminSocialLinksEditList .admin-social-link-row");
-    const links = Array.from(rows).map(r => ({
-        label: r.querySelector('[data-sfield="label"]')?.value.trim() || "",
-        url: r.querySelector('[data-sfield="url"]')?.value.trim() || ""
-    })).filter(l => l.label !== "" || l.url !== "");
-
-    CATEGORIES._adminContacts[userId] = { roleTitle, note, links };
-    editingContactUserId = null;
-    persistDatabase();
-    renderHomeView();
-}
-
-function renderHomeView() {
-    ensureMetaArraysInCategories();
-
-    ["news", "rules", "legal", "contacts"].forEach(tab => {
-        const btn = document.getElementById("homeNavBtn-" + tab);
-        if (!btn) return;
-        const isCur = (activeHomeSubtab === tab);
-        btn.className = isCur
-            ? "w-full text-left px-4 py-3 border transition-all flex items-center gap-3 bg-cp-yellow text-black border-cp-yellow shadow-[0_0_15px_rgba(252,238,10,0.25)]"
-            : "w-full text-left px-4 py-3 border border-gray-800 bg-cp-bg text-gray-300 hover:border-cp-cyan transition-all flex items-center gap-3";
-    });
-
-    const mainCol = document.getElementById("homeMainColumn");
-    if (!mainCol) return;
-    const isAdmin = isCurrentUserAdmin();
-
-    // 1. ВКЛАДКА «ПРАВОВАЯ ЧАСТЬ»
-    if (activeHomeSubtab === "legal") {
-        mainCol.innerHTML = `
-          <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan">
-            <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">NETWATCH LEGAL COMPLIANCE // DISCLAIMER</div>
-            <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">🛡️ Правовая часть и юридический статус</h2>
-            <p class="text-xs text-gray-400 mt-1">Официальное уведомление о некоммерческом статусе справочника и защите авторских прав правообладателей.</p>
-          </div>
-
-          <article class="bg-cp-panel cp-border p-6 space-y-4 text-xs text-gray-200 leading-relaxed">
-            <div class="border-b border-gray-800 pb-3">
-              <h3 class="font-display text-base font-bold text-cp-yellow">1. Некоммерческий фанатский статус проекта</h3>
-              <p class="text-gray-300 mt-1">
-                Интерактивный справочник и база данных <b>Cyberpunk 2020 // Помогалка</b> (далее — <i>«Сайт», «Терминал DataTerm»</i>) является исключительно некоммерческим, любительским фанатским проектом, созданным силами сообщества <span class="text-cp-cyan font-bold">Село ДнДшеское</span> для поддержки русскоязычных игроков и Рефери настольной ролевой игры (НРИ) <i>Cyberpunk 2020</i>. Проект не извлекает никакой прямой или косвенной финансовой выгоды, не осуществляет продажу игровых материалов, книг или цифровых копий и не содержит монетизации, коммерческой рекламы или платных подписок.
-              </p>
-            </div>
-
-            <div class="border-b border-gray-800 pb-3">
-              <h3 class="font-display text-base font-bold text-cp-yellow">2. Защита интеллектуальной собственности и торговых марок</h3>
-              <p class="text-gray-300 mt-1">
-                Все права на настольную ролевую игру <b>Cyberpunk®</b>, оригинальный сеттинг, игровую механику <i>Interlock System / Friday Night Firefight</i>, терминологию, логотипы, лор и сопутствующие печатные материалы принадлежат компании <b>R. Talsorian Games, Inc.</b><br><br>
-                Торговые марки <i>Cyberpunk®</i>, <i>Cyberpunk 2020™</i>, а также фирменные наименования корпораций (<i>Arasaka, Militech, Trauma Team, Biotechnica</i> и др.), образцов вооружения и киберимплантов являются собственностью <b>R. Talsorian Games, Inc.</b> Все материалы, представленные на сайте (любительские переводы описаний, сводки правил, таблицы и характеристики снаряжения), размещены исключительно в справочных, ознакомительных и информационных целях в рамках добросовестного использования (Fair Use).
-              </p>
-            </div>
-
-            <div class="border-b border-gray-800 pb-3">
-              <h3 class="font-display text-base font-bold text-cp-yellow">3. Отсутствие пиратства и распространения копий</h3>
-              <p class="text-gray-300 mt-1">
-                Администрация сайта строго заявляет: <b>на данном ресурсе не размещаются, не хранятся и не распространяются пиратские цифровые копии книг правил, официальных руководств, сканированные страницы или PDF-файлы</b> изданий R. Talsorian Games. Сайт функционирует как интерактивный каталог-шпаргалка для удобства ведения игровых сессий теми игроками и ведущими, которые уже обладают легальными копиями книг правил.
-              </p>
-              <div class="mt-2.5 p-3 bg-cp-bg border-l-2 border-cp-yellow text-[11px] text-gray-300">
-                📌 Мы настоятельно призываем поддерживать авторов игры и приобретать официальные печатные и цифровые книги правил в магазине <b>R. Talsorian Games</b> или на площадке <b>DriveThruRPG</b>.
-              </div>
-            </div>
-
-            <div>
-              <h3 class="font-display text-base font-bold text-cp-yellow">4. Официальные ресурсы правообладателя и обратная связь</h3>
-              <p class="text-gray-300 mt-1">Ознакомиться с оригинальной продукцией, приобрести официальные издания и связаться с правообладателями или администрацией справочника вы можете по ссылкам ниже:</p>
-              <div class="mt-3 flex flex-wrap items-center gap-2.5">
-                <a href="https://rtalsoriangames.com/" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
-                  <span>🌐</span><span>Официальный сайт R. Talsorian Games</span>
-                </a>
-                <a href="https://www.drivethrurpg.com/en/publisher/13/r-talsorian-games-inc" target="_blank" rel="noopener noreferrer" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
-                  <span>🛒</span><span>Каталог R. Talsorian Games на DriveThruRPG</span>
-                </a>
-                <button type="button" onclick="switchHomeSubtab('contacts')" class="px-3.5 py-2 bg-cp-bg hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 text-xs font-bold transition-colors inline-flex items-center gap-1.5">
-                  <span>📡</span><span>Контакты администрации сайта</span>
-                </button>
-              </div>
-            </div>
-          </article>
-        `;
-        return;
-    }
-
-    // 2. ВКЛАДКА «КОНТАКТЫ АДМИНИСТРАЦИИ»
-    if (activeHomeSubtab === "contacts") {
-        const curUser = getCurrentUser();
-        const isRootCur = isCurrentUserRoot();
-        const rawAdmins = USERS.filter(u => u && (u.role === "ROOT" || u.role === "ADMIN"));
-        const effectiveAdmins = rawAdmins.length > 0 ? rawAdmins : [HARDCODED_ROOT_USER];
-
-        const contactsCardsHtml = effectiveAdmins.map(adm => {
-            const isRoot = (adm.role === "ROOT" || adm.id === "u-root");
-            const cInfo = (CATEGORIES._adminContacts && CATEGORIES._adminContacts[adm.id])
-                ? CATEGORIES._adminContacts[adm.id]
-                : { roleTitle: "", note: "", links: [] };
-            const canEditThis = Boolean(curUser && (isRootCur || curUser.id === adm.id));
-            const isEditingThis = (editingContactUserId === adm.id);
-
-            const avHtml = adm.avatar
-                ? `<img src="${escapeHtmlAttr(adm.avatar)}" onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 object-cover border-2 ${isRoot ? 'border-cp-red' : 'border-cp-cyan'} cursor-pointer shrink-0">`
-                : `<div onclick="openPublicProfileModal('${adm.id}')" class="w-16 h-16 bg-cp-bg border-2 ${isRoot ? 'border-cp-red text-cp-red' : 'border-cp-cyan text-cp-cyan'} flex items-center justify-center font-display font-black text-xl cursor-pointer shrink-0">${(adm.displayName || "CP").slice(0, 2).toUpperCase()}</div>`;
-
-            const linksList = Array.isArray(cInfo.links) ? cInfo.links : [];
-            const linksHtml = linksList.length === 0
-                ? `<span class="text-xs text-gray-500 italic">Ссылки на соцсети пока не указаны</span>`
-                : linksList.map(l => {
-                    const urlStr = String(l.url || "").trim();
-                    const labelStr = String(l.label || urlStr).trim();
-                    const isHttp = urlStr.startsWith("http://") || urlStr.startsWith("https://");
-                    return isHttp
-                        ? `<a href="${escapeHtmlAttr(urlStr)}" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold transition-colors inline-flex items-center gap-1.5"><span>🔗</span><span>${escapeHtmlAttr(labelStr)}</span></a>`
-                        : `<span class="px-3 py-1.5 bg-cp-bg border border-gray-700 text-xs text-gray-200 inline-flex items-center gap-1.5"><b class="text-cp-yellow">${escapeHtmlAttr(labelStr)}:</b> <span>${escapeHtmlAttr(urlStr)}</span></span>`;
-                }).join("");
-
-            const editFormHtml = !isEditingThis ? "" : `
-            <form onsubmit="saveAdminContactSubmit(event, '${adm.id}')" class="mt-4 pt-4 border-t border-gray-800 space-y-3 bg-cp-bg/90 p-4 border border-cp-cyan/50">
-              <div class="text-xs font-bold text-cp-cyan uppercase">✏️ Настройка контактов (${escapeHtmlAttr(adm.displayName)})</div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><label class="block text-[11px] text-gray-400 mb-1">Должность на проекте:</label><input type="text" id="admContactRoleTitle" value="${escapeHtmlAttr(cInfo.roleTitle || '')}" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
-                <div><label class="block text-[11px] text-gray-400 mb-1">По каким вопросам обращаться:</label><input type="text" id="admContactNote" value="${escapeHtmlAttr(cInfo.note || '')}" class="w-full bg-cp-panel border border-gray-700 px-3 py-1.5 text-xs text-white outline-none"></div>
-              </div>
-              <div class="space-y-2">
-                <div class="flex items-center justify-between"><label class="text-[11px] text-cp-yellow font-bold uppercase">Соцсети и ссылки для связи:</label><button type="button" onclick="addAdminSocialLinkRow()" class="px-2.5 py-1 bg-cp-cyan text-black font-bold text-[11px] uppercase">+ Добавить ссылку</button></div>
-                <div id="adminSocialLinksEditList" class="space-y-2">
-                  ${(linksList.length > 0 ? linksList : [{ label: "", url: "" }]).map(l => `
-                    <div class="admin-social-link-row grid grid-cols-12 gap-2 items-center">
-                      <input type="text" data-sfield="label" value="${escapeHtmlAttr(l.label || '')}" placeholder="Название (ВК, Telegram...)" class="col-span-5 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-                      <input type="text" data-sfield="url" value="${escapeHtmlAttr(l.url || '')}" placeholder="https://... или ник" class="col-span-6 bg-cp-panel border border-gray-700 px-2.5 py-1.5 text-xs text-white outline-none">
-                      <button type="button" onclick="this.parentElement.remove()" class="col-span-1 py-1.5 bg-cp-red/20 text-cp-red text-xs font-bold">✕</button>
-                    </div>
-                  `).join("")}
-                </div>
-              </div>
-              <div class="flex items-center gap-2 pt-2"><button type="submit" class="px-5 py-2 bg-cp-green text-black font-bold text-xs uppercase">💾 Сохранить</button><button type="button" onclick="cancelEditAdminContact()" class="px-4 py-2 bg-gray-800 text-gray-300 text-xs font-bold border border-gray-700">Отмена</button></div>
-            </form>
-          `;
-
-            return `
-            <div class="bg-cp-panel cp-border p-5 space-y-3">
-              <div class="flex items-start justify-between gap-4 flex-wrap">
-                <div class="flex items-center gap-4">
-                  ${avHtml}
-                  <div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="font-display text-lg font-black text-white hover:text-cp-yellow hover:underline">${escapeHtmlAttr(adm.displayName)}</button>
-                      <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isRoot ? 'bg-cp-red text-white' : 'bg-cp-cyan text-black'}">${isRoot ? '👑 ГЛАВНЫЙ АДМИН (ROOT)' : '🛡️ АДМИНИСТРАТОР'}</span>
-                    </div>
-                    <div class="text-xs text-cp-yellow font-bold mt-0.5">${escapeHtmlAttr(cInfo.roleTitle || (isRoot ? "Создатель и Главный Администратор проекта" : "Администратор проекта"))}</div>
-                    <div class="text-xs text-gray-400 mt-1">${escapeHtmlAttr(cInfo.note || adm.bio || "Связь с администрацией справочника.")}</div>
-                  </div>
-                </div>
-                <div class="flex items-center gap-2 shrink-0">
-                  <button type="button" onclick="openPublicProfileModal('${adm.id}')" class="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 text-xs font-bold">👁️ Профиль</button>
-                  ${canEditThis ? `<button type="button" onclick="startEditAdminContact('${adm.id}')" class="px-3 py-1.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Мои ссылки</button>` : ""}
-                </div>
-              </div>
-              <div class="pt-3 border-t border-gray-800 flex items-center flex-wrap gap-2">
-                <span class="text-[11px] font-bold uppercase text-gray-400 mr-1">Соцсети и связь:</span>
-                ${linksHtml}
-              </div>
-              ${editFormHtml}
-            </div>
-          `;
-        }).join("");
-
-        mainCol.innerHTML = `
-          <div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-red">
-            <div class="text-[10px] font-bold uppercase tracking-widest text-cp-red">КОМАНДНЫЙ ЦЕНТР СПРАВОЧНИКА</div>
-            <h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📡 Контакты Администрации</h2>
-            <p class="text-xs text-gray-400 mt-1">Список администраторов проекта и прямые ссылки для связи.</p>
-          </div>
-          <div class="space-y-4">${contactsCardsHtml}</div>
-        `;
-        return;
-    }
-
-    // 3. ВКЛАДКИ «НОВОСТИ» И «ПРАВИЛА САЙТА»
-    const isNews = (activeHomeSubtab === "news");
-    const postsList = isNews ? HOME_NEWS_LIST : HOME_RULES_LIST;
-    const postToEdit = editingHomePostId ? postsList.find(p => p.id === editingHomePostId) : null;
-
-    const headerBannerHtml = isNews
-        ? `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-yellow"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-yellow">ИНФОРМАЦИОННЫЙ КАНАЛ NIGHT CITY NETWORK</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">📰 Новости и обновления сайта</h2><p class="text-xs text-gray-400 mt-1">Свежие патчноуты, добавленные книги-источники, новые разделы и объявления администрации.</p></div></div>`
-        : `<div class="bg-cp-panel cp-border p-5 border-l-4 border-l-cp-cyan"><div><div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ДИРЕКТИВЫ БЕЗОПАСНОСТИ СЕТЕВОГО ДОЗОРА</div><h2 class="font-display text-xl font-black text-white uppercase mt-0.5">⚖️ Правила сайта и сообщества</h2><p class="text-xs text-gray-400 mt-1">Обязательный свод правил для всех пользователей терминала DataTerm.</p></div></div>`;
-
-    const adminEditorHtml = !isAdmin ? "" : `
-        <div id="homeAdminEditorBox" class="bg-cp-panel cp-border p-5 space-y-3.5 border-t-2 ${postToEdit ? 'border-t-cp-cyan' : 'border-t-cp-yellow'}">
-          <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
-            <div class="flex items-center gap-2">
-              <span class="text-sm">${postToEdit ? '✏️' : '➕'}</span>
-              <h3 class="font-display text-xs font-bold uppercase ${postToEdit ? 'text-cp-cyan' : 'text-cp-yellow'}">
-                ${postToEdit ? `Редактирование записи: ${escapeHtmlAttr(postToEdit.title)}` : (isNews ? 'Опубликовать новую новость' : 'Добавить новое правило')}
-              </h3>
-            </div>
-            ${postToEdit ? `<button type="button" onclick="cancelEditHomePost()" class="px-3 py-1 bg-gray-800 hover:bg-gray-700 text-xs font-bold text-gray-200 border border-gray-600">✕ Отмена</button>` : ""}
-          </div>
-          <form onsubmit="saveHomePostSubmit(event)" class="space-y-3">
-            <div>
-              <label class="block text-[11px] text-gray-400 font-bold uppercase mb-1">Заголовок*:</label>
-              <input type="text" id="homeEditorTitle" required value="${postToEdit ? escapeHtmlAttr(postToEdit.title) : ''}" placeholder="Введите заголовок..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3.5 py-2 text-xs text-white font-bold outline-none">
-            </div>
-            <div class="space-y-1.5">
-              ${getRichToolbarHTML('homeEditorTextarea')}
-              <textarea id="homeEditorTextarea" required rows="6" placeholder="Введите текст (обычные ссылки https://... станут кликабельными автоматически, либо используйте кнопку 🔗 Ссылка)..." class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs text-gray-100 leading-relaxed outline-none">${postToEdit ? postToEdit.content : ''}</textarea>
-            </div>
-            <div class="flex items-center justify-end pt-1">
-              <button type="submit" class="px-6 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
-                ${postToEdit ? '💾 Сохранить изменения' : (isNews ? '📢 Опубликовать новость' : '➕ Добавить правило')}
-              </button>
-            </div>
-          </form>
-        </div>
-      `;
-
-    const postsCardsHtml = postsList.length === 0
-        ? `<div class="bg-cp-panel cp-border p-8 text-center text-xs text-gray-500">Записей пока нет.</div>`
-        : postsList.map(post => {
-            const charLen = getPlainTextLength(post.content);
-            const isLong = charLen > 1000;
-            const isExpanded = expandedHomePosts.has(post.id);
-            const rawDisplayed = (isLong && !isExpanded) ? getTruncatedPreviewHtml(post.content, 1000) : post.content;
-            const displayedContent = formatRichTextWithLinks(rawDisplayed);
-
-            return `
-              <article class="bg-cp-panel cp-border p-6 space-y-3.5 transition-all hover:border-gray-600">
-                <div class="flex items-start justify-between gap-4 border-b border-gray-800 pb-3">
-                  <div>
-                    <div class="flex items-center gap-2 text-[11px] text-gray-400 mb-1">
-                      <span class="px-2 py-0.5 text-[10px] font-bold uppercase ${isNews ? 'bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40' : 'bg-cp-cyan/20 text-cp-cyan border border-cp-cyan/40'}">${isNews ? 'НОВОСТЬ' : 'ПРАВИЛО'}</span>
-                      <span>Автор: <b class="text-white">${dash(post.authorName)}</b></span>
-                      <span>• ${dash(post.createdAt)}</span>
-                    </div>
-                    <h3 class="font-display text-lg font-black text-white">${post.title}</h3>
-                  </div>
-                  ${isAdmin ? `
-                    <div class="flex items-center gap-1.5 shrink-0">
-                      <button type="button" onclick="startEditHomePost('${post.id}')" class="px-3 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
-                      <button type="button" onclick="deleteHomePost('${post.id}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
-                    </div>
-                  ` : ""}
-                </div>
-                <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line bg-cp-bg/70 border-l-2 ${isNews ? 'border-cp-yellow' : 'border-cp-cyan'} p-4">${displayedContent}</div>
-                ${isLong ? `
-                  <div class="pt-1 flex items-center justify-end">
-                    <button type="button" onclick="toggleExpandHomePost('${post.id}')" class="px-4 py-1.5 bg-cp-bg hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/60 text-xs font-bold uppercase transition-colors">
-                      ${isExpanded ? '▲ Свернуть текст' : '▼ Развернуть полностью'}
-                    </button>
-                  </div>
-                ` : ""}
-              </article>
-            `;
-        }).join("");
-
-    mainCol.innerHTML = `${headerBannerHtml}${adminEditorHtml}<div class="space-y-4">${postsCardsHtml}</div>`;
-}
-
-//
-//S_RENDERHANDLER
-//
-
-// =========================================================================
-// НАВИГАЦИЯ ПО САЙТУ И ГЛАВНАЯ СТРАНИЦА (4 ВКЛАДКИ БЕЗ СЧЁТЧИКОВ)
-// =========================================================================
-
-
-function updateAuthHeaderUI() {
-    const u = getCurrentUser();
-    const guestBtn = document.getElementById("guestLoginSquareBtn");
-    const loggedWrap = document.getElementById("loggedAvatarWrapper");
-    const avatarContent = document.getElementById("headerAvatarContent");
-    const roleDot = document.getElementById("headerRoleDot");
-    const dropName = document.getElementById("dropdownUserName");
-    const dropRole = document.getElementById("dropdownUserRole");
-    const dropAdminBtn = document.getElementById("dropdownAdminBtn");
-    const addRuleBtn = document.getElementById("addRuleTopBtn");
-    const cntUsersEl = document.getElementById("cnt-users");
-    if (cntUsersEl) cntUsersEl.textContent = USERS.length;
-
-    if (!u) {
-        guestBtn.classList.remove("hidden");
-        loggedWrap.classList.add("hidden");
-        closeUserDropdown(); closeNotifDropdown();
-        if (addRuleBtn) addRuleBtn.classList.add("hidden");
-    } else {
-        guestBtn.classList.add("hidden");
-        loggedWrap.classList.remove("hidden");
-        avatarContent.innerHTML = u.avatar ? `<img src="${escapeHtmlAttr(u.avatar)}" class="w-full h-full object-cover">` : (u.displayName || "CP").slice(0, 2).toUpperCase();
-        dropName.textContent = u.displayName || "Эджраннер";
-        roleDot.className = u.role === "ROOT" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-red border border-black" : u.role === "ADMIN" ? "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-cyan border border-black" : "absolute bottom-0 right-0 w-2.5 h-2.5 bg-cp-green border border-black";
-        dropRole.textContent = u.role === "ROOT" ? "👑 Главный Админ (ROOT)" : u.role === "ADMIN" ? "🛡️ Администратор (ADMIN)" : `👤 Игрок (${u.favRole || 'Соло'})`;
-        const isAdm = isCurrentUserAdmin();
-        dropAdminBtn.classList.toggle("hidden", !isAdm);
-        if (addRuleBtn) addRuleBtn.classList.toggle("hidden", !isAdm);
-        updateNotifBellUI();
-    }
-}
-
-function toggleUserDropdown(e) { e.stopPropagation(); closeNotifDropdown(); document.getElementById("userDropdownMenu").classList.toggle("hidden"); }
-function closeUserDropdown() { const m = document.getElementById("userDropdownMenu"); if (m) m.classList.add("hidden"); }
-function openViewFromDropdown(v) { closeUserDropdown(); switchMainView(v); }
-function logoutFromDropdown() { closeUserDropdown(); logoutCurrentUser(); }
-
-document.addEventListener("click", e => {
-    const wrap = document.getElementById("loggedAvatarWrapper");
-    if (wrap && !wrap.contains(e.target)) { closeUserDropdown(); closeNotifDropdown(); }
-});
-
-function updateCounts() {
-    updateAuthHeaderUI();
-
-    const cardsEl = document.getElementById("homeStatTotalCards");
-    if (cardsEl) {
-        const totalCards = Object.keys(SECTION_LABELS).reduce((sum, key) => {
-            return sum + (Array.isArray(DB[key]) ? DB[key].length : 0);
-        }, 0);
-        cardsEl.textContent = totalCards;
-    }
-
-    const usersEl = document.getElementById("homeStatTotalUsers");
-    if (usersEl) {
-        usersEl.textContent = Array.isArray(USERS) ? USERS.length : 1;
-    }
-}
-
-function getAllCategoriesForSection(secKey) {
-    const fromList = CATEGORIES[secKey] || [];
-    const prop = secKey === "rules" ? "subsection" : "category";
-    const fromItems = (DB[secKey] || []).map(i => i[prop]).filter(Boolean);
-    return [...new Set([...fromList, ...fromItems])];
-}
-
-function switchMainView(view, catalogTab = null) {
-    if (view === "admin" && !isCurrentUserAdmin()) view = "profile";
-    activeMainView = view;
-    if (catalogTab) activeCatalogTab = catalogTab;
-
-    ["home", "catalog", "rules", "profile", "admin"].forEach(v => {
-        const el = document.getElementById("view-" + v);
-        if (el) el.classList.toggle("hidden", view !== v);
-    });
-
-    const targetKey = view === "catalog" ? activeCatalogTab : view;
-    document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
-        const isCur = (view !== "home") && (btn.getAttribute("data-view") === targetKey);
-        btn.className = isCur
-            ? "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all bg-cp-yellow text-black border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.3)]"
-            : "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan";
-    });
-
-    if (view === "home") renderHomeView();
-    else if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
-    else if (view === "rules") renderRulesView();
-    else if (view === "profile") renderProfileView();
-    else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
-}
-
-// --- ЛОГИКА ГЛАВНОЙ СТРАНИЦЫ ---
-function switchHomeSubtab(subtab) {
-    activeHomeSubtab = subtab || "news";
-    editingHomePostId = null;
-    editingContactUserId = null;
-    renderHomeView();
-}
-
-function getPlainTextLength(htmlStr) {
-    if (!htmlStr) return 0;
-    const d = document.createElement("div");
-    d.innerHTML = htmlStr;
-    return (d.textContent || d.innerText || "").length;
-}
-
-function getTruncatedPreviewHtml(htmlStr, maxChars = 1000) {
-    const d = document.createElement("div");
-    d.innerHTML = htmlStr || "";
-    const plain = d.textContent || d.innerText || "";
-    if (plain.length <= maxChars) return htmlStr;
-    return escapeHtmlAttr(plain.slice(0, maxChars)) + "…";
-}
-
-function toggleExpandHomePost(postId) {
-    if (expandedHomePosts.has(postId)) expandedHomePosts.delete(postId);
-    else expandedHomePosts.add(postId);
-    renderHomeView();
-}
-
-// Автоматическое превращение голых URL (http/https) в кликабельные ссылки (не трогает уже готовые теги <a> и атрибуты)
-function formatRichTextWithLinks(rawText) {
-    if (rawText === undefined || rawText === null) return "";
-    const str = String(rawText);
-    if (str.trim() === "" || str.trim() === "—") return str;
-
-    // Разбиваем строку по существующим HTML-тегам <a ...>...</a> и прочим тегам, чтобы не ломать их атрибуты href/src
-    const parts = str.split(/(<a\b[^>]*>[\s\S]*?<\/a>|<[^>]+>)/gi);
-    return parts.map(part => {
-        if (part.startsWith("<")) return part;
-        return part.replace(/(https?:\/\/[^\s<>"']+)/gi, (url) => {
-            // Убираем случайную точку, запятую или скобку в самом конце ссылки
-            const cleanUrl = url.replace(/[.,;!?)]+$/, "");
-            const trailing = url.slice(cleanUrl.length);
-            return `<a href="${cleanUrl}" target="_blank" rel="noopener noreferrer" class="text-cp-cyan hover:text-cp-yellow underline underline-offset-2 font-bold transition-colors">${cleanUrl}</a>${trailing}`;
-        });
-    }).join("");
-}
-
-
-// Универсальная вставка тега в любое текстовое поле (по его ID)
-function insertRichFormatTag(textareaId, openTag, closeTag) {
-    const area = document.getElementById(textareaId);
-    if (!area) return;
-    const start = area.selectionStart || 0;
-    const end = area.selectionEnd || 0;
-    const val = area.value;
-    const selected = val.slice(start, end) || "текст";
-    area.value = val.slice(0, start) + openTag + selected + closeTag + val.slice(end);
-    area.focus();
-    const newCursorPos = start + openTag.length + selected.length + closeTag.length;
-    area.setSelectionRange(newCursorPos, newCursorPos);
-}
-
-// Совместимость со старым вызовом
-function insertHomeFormatTag(openTag, closeTag) {
-    insertRichFormatTag("homeEditorTextarea", openTag, closeTag);
-}
-
-// Вставка оформленной гиперссылки (спрашивает URL и текст ссылки)
-function insertRichHyperlink(textareaId) {
-    const area = document.getElementById(textareaId);
-    if (!area) return;
-    const start = area.selectionStart || 0;
-    const end = area.selectionEnd || 0;
-    const val = area.value;
-    const selectedText = val.slice(start, end).trim();
-
-    const rawUrl = prompt("Введите адрес ссылки (URL):", "https://");
-    if (!rawUrl || !rawUrl.trim() || rawUrl.trim() === "https://") return;
-    let cleanUrl = rawUrl.trim();
-    if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
-        cleanUrl = "https://" + cleanUrl;
-    }
-
-    const linkLabel = prompt("Введите отображаемый текст ссылки:", selectedText || "Перейти по ссылке");
-    if (linkLabel === null) return;
-    const finalLabel = linkLabel.trim() || cleanUrl;
-
-    const linkHtml = `<a href="${escapeHtmlAttr(cleanUrl)}" target="_blank" rel="noopener noreferrer" class="text-cp-cyan hover:text-cp-yellow underline font-bold">${finalLabel}</a>`;
-    area.value = val.slice(0, start) + linkHtml + val.slice(end);
-    area.focus();
-}
-
-// Открытие/закрытие палитры эмодзи над конкретным текстовым полем
-function toggleRichEmojiPicker(textareaId) {
-    const picker = document.getElementById("emoji-picker-" + textareaId);
-    if (!picker) return;
-    picker.classList.toggle("hidden");
-}
-
-// Вставка выбранного эмодзи на место курсора
-function insertEmojiAtCursor(textareaId, emojiChar) {
-    const area = document.getElementById(textareaId);
-    if (!area) return;
-    const start = area.selectionStart || 0;
-    const end = area.selectionEnd || 0;
-    const val = area.value;
-    area.value = val.slice(0, start) + emojiChar + val.slice(end);
-    area.focus();
-    const pos = start + emojiChar.length;
-    area.setSelectionRange(pos, pos);
-}
-
-// Генератор готовой панели инструментов форматирования для любого textarea по его ID
 function getRichToolbarHTML(textareaId) {
     const emojiButtons = CP_EMOJI_LIST.map(em =>
         `<button type="button" onclick="insertEmojiAtCursor('${textareaId}', '${em}')" class="w-7 h-7 flex items-center justify-center bg-cp-bg hover:bg-cp-yellow/20 border border-gray-800 hover:border-cp-yellow text-sm transition-colors" title="Вставить ${em}">${em}</button>`

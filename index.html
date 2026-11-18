@@ -305,9 +305,18 @@
   <header class="sticky top-0 z-40 bg-cp-bg/95 backdrop-blur-md border-b border-cp-red/60">
     <div class="max-w-[1880px] mx-auto px-5 py-3 flex items-center justify-between gap-3">
       <div class="flex items-center gap-3 shrink-0">
-        <div onclick="switchMainView('home')" title="Перейти на Главную страницу"
-          class="w-10 h-10 bg-cp-red flex items-center justify-center font-display font-black text-black text-lg cp-clip shadow-[0_0_12px_#ff003c] cursor-pointer hover:scale-105 transition-transform select-none">
-          CP</div>
+        <div class="flex items-center gap-1 shrink-0 select-none">
+          <button type="button" id="navHistoryBackBtn" onclick="window.navigateHistory(-1)" disabled
+            title="Назад (Alt + ←)"
+            class="w-7 h-9 bg-cp-panel border border-gray-800 text-gray-600 flex items-center justify-center font-display font-black text-xs transition-all opacity-40 cursor-not-allowed">
+            ◀
+          </button>
+          <button type="button" id="navHistoryFwdBtn" onclick="window.navigateHistory(1)" disabled
+            title="Вперёд (Alt + →)"
+            class="w-7 h-9 bg-cp-panel border border-gray-800 text-gray-600 flex items-center justify-center font-display font-black text-xs transition-all opacity-40 cursor-not-allowed">
+            ▶
+          </button>
+        </div>
         <div>
           <div class="flex items-center gap-2">
             <h1 onclick="switchMainView('home')" title="Перейти на Главную страницу"
