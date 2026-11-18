@@ -1546,25 +1546,44 @@ async function initRealtimeCloud() {
 // --- АВТОМАТИЧЕСКАЯ ПРОВЕРКА ОБНОВЛЕНИЯ САЙТА НА GITHUB И БЛОКИРОВКА СТАРОЙ ВЕРСИИ ---
 let initialSiteVersionSignature = null;
 let isVersionUpdateLocked = false;
+let isCheckingSiteVersion = false;
+
+// Быстрый детерминированный хеш содержимого файла (алгоритм djb2)
+function hashTextContent(str) {
+    let h = 5381;
+    for (let i = 0; i < str.length; i++) {
+        h = ((h << 5) + h) ^ str.charCodeAt(i);
+    }
+    return (h >>> 0).toString(36);
+}
 
 async function computeCurrentSiteSignature() {
-    // Проверяем заголовки и размер ключевых файлов сайта с обходом кэша
     const filesToWatch = ["index.html", "main.js", "cloud_service.js", "database.js"];
     const parts = [];
+
     for (const file of filesToWatch) {
         try {
             const res = await fetch(`${file}?_vcheck=${Date.now()}`, {
                 method: "GET",
                 cache: "no-store"
             });
-            if (!res.ok) continue;
-            const etag = res.headers.get("etag") || "";
-            const lastMod = res.headers.get("last-modified") || "";
-            const text = await res.text();
-            parts.push(`${file}:${etag}:${lastMod}:${text.length}`);
-        } catch (e) { }
+            // Если сервер вернул ошибку по любому из файлов — прерываем проверку, чтобы не было ложного срабатывания
+            if (!res.ok) return null;
+
+            const rawText = await res.text();
+            // Нормализуем переносы строк (\r\n -> \n), чтобы Git/CDN не влиял на хеш
+            const normalized = rawText.replace(/\r\n/g, "\n").trim();
+            if (!normalized) return null;
+
+            parts.push(`${file}:${normalized.length}:${hashTextContent(normalized)}`);
+        } catch (e) {
+            // При любой сетевой ошибке просто пропускаем этот цикл проверки
+            return null;
+        }
     }
-    return parts.join("|");
+
+    // Возвращаем подпись только если успешно проверены ВСЕ 4 файла
+    return parts.length === filesToWatch.length ? parts.join("|") : null;
 }
 
 function triggerVersionUpdateLockModal() {
@@ -1588,9 +1607,32 @@ window.forceReloadFromGithub = function () {
     window.location.replace(url.toString());
 };
 
+async function checkSiteVersionOnce() {
+    if (isVersionUpdateLocked || isCheckingSiteVersion || document.hidden) return;
+    if (!initialSiteVersionSignature) return;
+
+    isCheckingSiteVersion = true;
+    try {
+        const latestSig = await computeCurrentSiteSignature();
+        // Срабатываем только если оба слепка валидны и реально отличаются по коду
+        if (latestSig && latestSig !== initialSiteVersionSignature) {
+            // Контрольная перепроверка через 1.5 сек (защита от незавершённого деплоя на GitHub Pages)
+            await new Promise(r => setTimeout(r, 1500));
+            const confirmSig = await computeCurrentSiteSignature();
+            if (confirmSig && confirmSig !== initialSiteVersionSignature) {
+                triggerVersionUpdateLockModal();
+            }
+        }
+    } finally {
+        isCheckingSiteVersion = false;
+    }
+}
+
 async function startGithubVersionWatcher() {
-    // На локальном диске (file://) проверку не запускаем
-    if (window.location.protocol === "file:") return;
+    // На локальном диске (file://) и localhost проверку не запускаем
+    if (window.location.protocol === "file:" || window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1") {
+        return;
+    }
 
     // Чистим технический параметр ?updated=... из адресной строки после перезагрузки
     if (window.location.search.includes("updated=")) {
@@ -1600,28 +1642,18 @@ async function startGithubVersionWatcher() {
     }
 
     initialSiteVersionSignature = await computeCurrentSiteSignature();
-    if (!initialSiteVersionSignature) return;
 
-    // Проверяем каждые 45 секунд, а также сразу при возвращении на вкладку браузера
-    setInterval(async () => {
-        if (isVersionUpdateLocked || document.hidden) return;
-        const latestSig = await computeCurrentSiteSignature();
-        if (latestSig && initialSiteVersionSignature && latestSig !== initialSiteVersionSignature) {
-            triggerVersionUpdateLockModal();
-        }
-    }, 45000);
+    // Проверяем раз в 60 секунд и при возвращении на вкладку
+    setInterval(checkSiteVersionOnce, 60000);
 
-    document.addEventListener("visibilitychange", async () => {
-        if (!document.hidden && !isVersionUpdateLocked && initialSiteVersionSignature) {
-            const latestSig = await computeCurrentSiteSignature();
-            if (latestSig && latestSig !== initialSiteVersionSignature) {
-                triggerVersionUpdateLockModal();
-            }
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) {
+            checkSiteVersionOnce();
         }
     });
 }
 
 window.addEventListener("load", () => {
     setTimeout(initRealtimeCloud, 150);
-    setTimeout(startGithubVersionWatcher, 2000);
+    setTimeout(startGithubVersionWatcher, 2500);
 });
