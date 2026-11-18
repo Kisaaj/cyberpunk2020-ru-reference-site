@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CYBERPUNK 2020 // СПРАВОЧНИК И БАЗА ДАННЫХ (1920x1080)</title>
+  <title>CYBERPUNK 2020 ПОМОГАЛКА</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link
     href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;0,700;0,800;1,400&family=Orbitron:wght@600;800;900&display=swap"
@@ -267,7 +267,54 @@
       </form>
     </div>
   </div>
+  <!-- МОДАЛЬНОЕ ОКНО 5: ВЫБОР КАРТОЧКИ ДЛЯ ВСТАВКИ ВНУТРЕННЕЙ ССЫЛКИ -->
+  <div id="cardRefPickerModal"
+    class="hidden fixed inset-0 z-[70] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+    onclick="if(event.target===this) closeCardRefPickerModal()">
+    <div class="max-w-2xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_40px_rgba(0,240,255,0.35)] p-5 flex flex-col gap-3.5 max-h-[88vh]"
+      onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">ВНУТРЕННЯЯ ГИПЕРССЫЛКА БАЗЫ ДАННЫХ</div>
+          <h3 class="font-display text-base font-black text-white uppercase mt-0.5">📌 Указать ссылку на карточку</h3>
+        </div>
+        <button type="button" onclick="closeCardRefPickerModal()"
+          class="text-gray-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
 
+      <div class="grid grid-cols-12 gap-3">
+        <div class="col-span-7">
+          <label class="block text-[11px] text-cp-cyan font-bold uppercase mb-1">1. Поиск карточки по названию или разделу:</label>
+          <input type="text" id="cardRefSearchInput" oninput="renderCardRefPickerList()"
+            placeholder="Начните вводить: Minami 10, Соло, Сандевистан, Dragoon..."
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-xs text-white outline-none">
+        </div>
+        <div class="col-span-5">
+          <label class="block text-[11px] text-cp-yellow font-bold uppercase mb-1">2. Текст ссылки (пусто = имя карточки):</label>
+          <input type="text" id="cardRefCustomLabelInput"
+            placeholder="По умолчанию — название карточки"
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white outline-none">
+        </div>
+      </div>
+
+      <div id="cardRefPickerList"
+        class="flex-1 overflow-y-auto bg-cp-bg border border-gray-800 divide-y divide-gray-800/80 min-h-[260px] max-h-[50vh]">
+      </div>
+
+      <div class="flex items-center justify-between text-[11px] text-gray-400 pt-1 border-t border-gray-800">
+        <span>Нажмите на любую карточку в списке, чтобы вставить ссылку в текст</span>
+        <button type="button" onclick="closeCardRefPickerModal()"
+          class="px-4 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold uppercase border border-gray-700">Отмена</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ВСПЛЫВАЮЩАЯ МИНИ-КАРТОЧКА ПРИ НАВЕДЕНИИ КУРСОРА НА ССЫЛКУ (HOVER PREVIEW) -->
+  <div id="cardHoverPreviewPopover"
+    onmouseenter="keepCardHoverPreviewAlive()"
+    onmouseleave="scheduleHideCardHoverPreview()"
+    class="hidden fixed z-[90] w-[430px] max-w-[94vw] bg-cp-panel/95 backdrop-blur-md border-2 border-cp-cyan shadow-[0_12px_40px_rgba(0,0,0,0.95)] p-4 text-xs pointer-events-auto transition-opacity duration-150">
+  </div>
   <!-- МОДАЛЬНОЕ ОКНО 4: ПОЛНОЭКРАННЫЙ ПРОСМОТР ГАЛЕРЕИ КАРТИНОК (ЛАЙТБОКС) -->
   <div id="cardGalleryLightboxModal"
     class="hidden fixed inset-0 z-50 bg-black/90 backdrop-blur-sm flex flex-col items-center justify-center p-4 select-none"

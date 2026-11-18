@@ -4125,9 +4125,9 @@ function getRichToolbarHTML(textareaId) {
             <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-red font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-red font-bold">Красный</button>
             <button type="button" onclick="insertRichFormatTag('${textareaId}', '<span class=&quot;text-cp-green font-bold&quot;>', '</span>')" class="px-2 py-0.5 bg-cp-panel hover:bg-gray-800 border border-gray-700 text-[11px] text-cp-green font-bold">Зелёный</button>
             <span class="text-gray-700 px-0.5">|</span>
-            <button type="button" onclick="insertRichHyperlink('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-[11px] font-bold transition-colors" title="Вставить оформленную гиперссылку">🔗 Ссылка</button>
-            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button>
-          </div>
+            <button type="button" onclick="openCardRefPickerModal('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/25 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan text-[11px] font-bold transition-colors" title="Указать внутреннюю ссылку на другую карточку сайта">📌 Указать карточку</button>
+            <button type="button" onclick="insertRichHyperlink('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-[11px] font-bold transition-colors" title="Вставить внешнюю веб-ссылку">🔗 Веб-ссылка</button>
+            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button></div>
           <div id="emoji-picker-${textareaId}" class="hidden bg-cp-panel border border-cp-yellow/60 p-2 grid grid-cols-10 gap-1 shadow-lg">
             ${emojiButtons}
           </div>
@@ -4572,6 +4572,345 @@ document.addEventListener("click", (ev) => {
         dropdown.classList.add("hidden");
     }
 });
+
+// =========================================================================
+// СИСТЕМА ВНУТРЕННИХ ССЫЛОК НА КАРТОЧКИ («📌 УКАЗАТЬ») И HOVER-ПРЕВЬЮ СТАТОВ
+// =========================================================================
+
+let activeCardRefTargetTextareaId = null;
+let cardHoverShowTimer = null;
+let cardHoverHideTimer = null;
+let currentlyHoveredRefKey = null;
+
+window.openCardRefPickerModal = function (textareaId) {
+    const area = document.getElementById(textareaId);
+    if (!area) return;
+    activeCardRefTargetTextareaId = textareaId;
+
+    const start = area.selectionStart || 0;
+    const end = area.selectionEnd || 0;
+    const selectedText = area.value.slice(start, end).trim();
+
+    const searchInp = document.getElementById("cardRefSearchInput");
+    const labelInp = document.getElementById("cardRefCustomLabelInput");
+    if (searchInp) searchInp.value = "";
+    if (labelInp) labelInp.value = selectedText;
+
+    renderCardRefPickerList();
+    document.getElementById("cardRefPickerModal").classList.remove("hidden");
+    setTimeout(() => { if (searchInp) searchInp.focus(); }, 40);
+};
+
+window.closeCardRefPickerModal = function () {
+    document.getElementById("cardRefPickerModal").classList.add("hidden");
+    activeCardRefTargetTextareaId = null;
+};
+
+window.renderCardRefPickerList = function () {
+    const listEl = document.getElementById("cardRefPickerList");
+    if (!listEl) return;
+    const q = (document.getElementById("cardRefSearchInput")?.value || "").trim().toLowerCase();
+
+    const items = [];
+    Object.keys(SECTION_LABELS).forEach(secKey => {
+        (DB[secKey] || []).forEach(item => {
+            if (!item || !item.id) return;
+            const title = String(item.name || item.title || "").trim();
+            const orig = String(item.origName || "").trim();
+            const cat = String(item.category || item.subsection || "").trim();
+            const book = String(item.book || "").trim();
+            if (!title) return;
+
+            let score = 1;
+            if (q) {
+                const tLow = title.toLowerCase();
+                const oLow = orig.toLowerCase();
+                const cLow = cat.toLowerCase();
+                const sLow = (SECTION_LABELS[secKey] || "").toLowerCase();
+                if (tLow.startsWith(q) || oLow.startsWith(q)) score = 3;
+                else if (tLow.includes(q) || oLow.includes(q)) score = 2;
+                else if (cLow.includes(q) || sLow.includes(q) || book.toLowerCase().includes(q)) score = 1;
+                else score = 0;
+            }
+            if (score > 0) items.push({ secKey, item, title, orig, cat, book, score });
+        });
+    });
+
+    items.sort((a, b) => b.score - a.score || a.title.localeCompare(b.title, "ru"));
+    const limited = items.slice(0, 80);
+
+    if (limited.length === 0) {
+        listEl.innerHTML = `<div class="p-6 text-center text-xs text-gray-500">Карточки не найдены. Попробуйте другой запрос.</div>`;
+        return;
+    }
+
+    listEl.innerHTML = limited.map(m => {
+        const secLabel = SECTION_LABELS[m.secKey] || m.secKey;
+        const origSub = (m.orig && m.orig !== "—" && m.orig.toLowerCase() !== m.title.toLowerCase())
+            ? `<span class="text-gray-500 font-normal ml-1">(${escapeHtmlAttr(m.orig)})</span>` : "";
+        return `
+          <div onclick="insertSelectedCardReference('${m.secKey}', '${escapeHtmlAttr(m.item.id)}')"
+            class="px-3.5 py-2.5 hover:bg-cp-cyan/15 cursor-pointer transition-colors flex items-center justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-bold text-white truncate">${escapeHtmlAttr(m.title)}${origSub}</div>
+              <div class="text-[10px] text-gray-400 truncate mt-0.5">
+                <span class="text-cp-cyan font-bold">${secLabel}</span> • ${escapeHtmlAttr(m.cat || "—")}
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 bg-cp-panel border border-gray-700 text-cp-yellow font-bold shrink-0">+ Выбрать</span>
+          </div>
+        `;
+    }).join("");
+};
+
+window.insertSelectedCardReference = function (secKey, itemId) {
+    const area = activeCardRefTargetTextareaId ? document.getElementById(activeCardRefTargetTextareaId) : null;
+    const found = (DB[secKey] || []).find(x => x && x.id === itemId);
+    if (!area || !found) {
+        closeCardRefPickerModal();
+        return;
+    }
+
+    const customLabel = (document.getElementById("cardRefCustomLabelInput")?.value || "").trim();
+    const defaultTitle = String(found.name || found.title || "Карточка").trim();
+    const finalLabel = customLabel || defaultTitle;
+
+    const tagHtml = `<span data-card-ref="${secKey}:${itemId}">${finalLabel}</span>`;
+
+    const start = area.selectionStart || 0;
+    const end = area.selectionEnd || 0;
+    const val = area.value;
+    area.value = val.slice(0, start) + tagHtml + val.slice(end);
+
+    closeCardRefPickerModal();
+    area.focus();
+    const newPos = start + tagHtml.length;
+    area.setSelectionRange(newPos, newPos);
+};
+
+// Превращаем все теги <span data-card-ref="sec:id">...</span> в интерактивные синие ссылки с кликом и наведением
+function upgradeCardRefsInHtml(htmlStr) {
+    if (!htmlStr || typeof htmlStr !== "string") return htmlStr;
+    return htmlStr.replace(
+        /<span\s+data-card-ref=["']([^:"']+):([^"']+)["'][^>]*>([\s\S]*?)<\/span>/gi,
+        (match, secKey, itemId, innerText) => {
+            const safeSec = escapeHtmlAttr(secKey.trim());
+            const safeId = escapeHtmlAttr(itemId.trim());
+            return `<span data-card-ref="${safeSec}:${safeId}" onclick="event.stopPropagation(); navigateToCardReference('${safeSec}', '${safeId}')" onmouseenter="handleCardRefMouseEnter(event, '${safeSec}', '${safeId}')" onmouseleave="scheduleHideCardHoverPreview()" class="text-cp-cyan hover:text-cp-yellow underline decoration-cp-cyan/70 hover:decoration-cp-yellow underline-offset-4 font-bold cursor-pointer transition-colors bg-cp-cyan/10 hover:bg-cp-yellow/15 px-1 py-0.5 rounded-sm">${innerText}</span>`;
+        }
+    );
+}
+
+// Расширяем formatRichTextWithLinks, чтобы она автоматически обрабатывала и внутренние ссылки на карточки
+const _prevFormatRichTextWithLinks = formatRichTextWithLinks;
+formatRichTextWithLinks = function (rawText) {
+    const withUrls = _prevFormatRichTextWithLinks(rawText);
+    return upgradeCardRefsInHtml(withUrls);
+};
+
+// Прогоняем описания всех карточек и механик через форматировщик ссылок при рендере
+const _prevRenderDetailCardForRefs = renderDetailCard;
+renderDetailCard = function (item) {
+    _prevRenderDetailCardForRefs(item);
+    const box = document.getElementById("detailCard");
+    if (box && box.innerHTML.includes("data-card-ref")) {
+        box.innerHTML = upgradeCardRefsInHtml(box.innerHTML);
+    }
+};
+
+const _prevRenderRulesSidebarForRefs = renderRulesSidebar;
+renderRulesSidebar = function () {
+    _prevRenderRulesSidebarForRefs();
+    const areaEl = document.getElementById("ruleContentArea");
+    if (areaEl && areaEl.innerHTML.includes("data-card-ref")) {
+        areaEl.innerHTML = upgradeCardRefsInHtml(areaEl.innerHTML);
+    }
+};
+
+window.navigateToCardReference = function (secKey, itemId) {
+    hideCardHoverPreviewImmediately();
+    if (typeof window.selectGlobalSearchResult === "function") {
+        window.selectGlobalSearchResult(secKey, itemId);
+        return;
+    }
+    if (secKey === "rules") {
+        selectedRuleId = itemId;
+        switchMainView("rules");
+    } else {
+        selectedItemId = itemId;
+        switchMainView("catalog", secKey);
+    }
+};
+
+// --- ГЕНЕРАТОР КРАТКОЙ СПРАВКИ ПО СТАТАМ КАРТОЧКИ (БЕЗ БЛОКА ОПИСАНИЯ) ---
+function buildCardStatsPreviewHTML(secKey, item) {
+    const secLabel = SECTION_LABELS[secKey] || secKey;
+    const title = dash(item.name || item.title);
+    const orig = (item.origName && item.origName !== "—" && item.origName !== item.name) ? item.origName : "";
+    const cat = dash(item.category || item.subsection);
+    const book = dash(item.book);
+
+    let bodyHtml = "";
+
+    if (secKey === "roles") {
+        const salTable = resolveRoleSalaryTable(item);
+        const skillsArr = Array.isArray(item.skills) ? item.skills.filter(s => s && s !== "—") : [];
+        bodyHtml = `
+          <div class="grid grid-cols-2 gap-2 text-center">
+            <div class="bg-cp-bg border border-gray-800 p-2">
+              <div class="text-[9px] text-gray-400 uppercase">⚡ Способность</div>
+              <div class="font-bold text-cp-cyan mt-0.5">${dash(item.ability)} (${dash(item.stat)})</div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2">
+              <div class="text-[9px] text-gray-400 uppercase">💰 Зарплата</div>
+              <div class="font-bold text-cp-green mt-0.5">${dash(salTable.lvl1_5)} — ${dash(salTable.lvl10)}</div>
+            </div>
+          </div>
+          ${skillsArr.length > 0 ? `<div class="bg-cp-bg border border-gray-800 p-2 text-[11px]"><span class="text-cp-yellow font-bold uppercase text-[10px]">Навыки:</span> <span class="text-gray-200">${skillsArr.join(", ")}</span></div>` : ""}
+        `;
+    } else if (secKey === "corporations") {
+        bodyHtml = `
+          <div class="grid grid-cols-2 gap-2">
+            <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">📍 Штаб-квартира</div><div class="font-bold text-cp-yellow mt-0.5">${dash(item.hq)}</div></div>
+            <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">👥 Сотрудники</div><div class="font-bold text-cp-cyan mt-0.5">${dash(item.employees)}</div></div>
+            <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">🪖 Войска</div><div class="font-bold text-cp-red mt-0.5">${dash(item.soldiers)}</div></div>
+            <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400 uppercase">🕶️ Оперативники</div><div class="font-bold text-purple-400 mt-0.5">${dash(item.operatives)}</div></div>
+          </div>
+        `;
+    } else if (secKey === "rules") {
+        bodyHtml = item.summary
+            ? `<div class="bg-cp-bg border-l-2 border-cp-yellow p-2.5 text-gray-200 leading-relaxed"><b>Суть механики:</b> ${item.summary}</div>`
+            : `<div class="text-gray-400 italic">Нажмите на ссылку, чтобы открыть полный текст игровой механики.</div>`;
+    } else {
+        const isDeck = secKey === "netrunning" && (item.itemKind === "deck" || item.category === "Кибердеки");
+        const schemaKey = secKey === "netrunning" ? (isDeck ? "net_deck" : "net_program") : secKey;
+        const fields = (SCHEMAS[schemaKey] || []).filter(f => f.stat);
+
+        const statsCells = fields.map(f => {
+            const colorCls = f.c || "text-white";
+            const valDisplay = (secKey === "vehicles" && f.k === "os") ? formatVehicleArmorOS(item.os) : dash(item[f.k]);
+            return `
+              <div class="bg-cp-bg border border-gray-800 p-1.5 text-center">
+                <div class="text-[9px] text-gray-400 truncate">${f.stat}</div>
+                <div class="text-[11px] font-bold ${colorCls} truncate mt-0.5">${valDisplay}</div>
+              </div>
+            `;
+        }).join("");
+
+        let extraCompactHtml = "";
+        if (secKey === "borging" && item.borgStats) {
+            const st = item.borgStats;
+            const cyberNames = Array.isArray(item.cyberwareList) ? item.cyberwareList.map(c => c.name).filter(Boolean) : [];
+            extraCompactHtml = `
+              <div class="grid grid-cols-4 gap-1.5 text-center bg-cp-bg border border-gray-800 p-2">
+                <div><div class="text-[9px] text-gray-400">РЕФ</div><b class="text-white">${dash(st.ref)}</b></div>
+                <div><div class="text-[9px] text-gray-400">ПЕР</div><b class="text-cp-cyan">${dash(st.ma)}</b></div>
+                <div><div class="text-[9px] text-gray-400">ТЕЛО</div><b class="text-cp-yellow">${dash(st.body)}</b></div>
+                <div><div class="text-[9px] text-gray-400">Удар/Пинок</div><b class="text-cp-red">${dash(st.punch)}/${dash(st.kick)}</b></div>
+              </div>
+              ${cyberNames.length > 0 ? `<div class="bg-cp-bg border-l-2 border-purple-500 p-2 text-[11px]"><b class="text-purple-400 uppercase text-[10px]">Системы:</b> <span class="text-gray-200">${cyberNames.join(", ")}</span></div>` : ""}
+            `;
+        } else if (secKey === "acpa") {
+            const wNames = Array.isArray(item.acpaWeaponsList) ? item.acpaWeaponsList.map(w => `${w.name} (${dash(w.damage)})`).filter(Boolean) : [];
+            const gNames = Array.isArray(item.acpaGearList) ? item.acpaGearList.map(g => g.name).filter(Boolean) : [];
+            extraCompactHtml = `
+              ${wNames.length > 0 ? `<div class="bg-cp-bg border-l-2 border-cp-red p-2 text-[11px]"><b class="text-cp-red uppercase text-[10px]">Вооружение:</b> <span class="text-gray-200">${wNames.join(", ")}</span></div>` : ""}
+              ${gNames.length > 0 ? `<div class="bg-cp-bg border-l-2 border-cp-cyan p-2 text-[11px]"><b class="text-cp-cyan uppercase text-[10px]">Оснащение:</b> <span class="text-gray-200">${gNames.join(", ")}</span></div>` : ""}
+            `;
+        } else if (secKey === "characters") {
+            extraCompactHtml = `
+              <div class="grid grid-cols-5 gap-1 text-center bg-cp-bg border border-gray-800 p-1.5 text-[10px]">
+                <div><span class="text-gray-400">ИНТ</span> <b class="text-cp-cyan">${dash(item.stat_int)}</b></div>
+                <div><span class="text-gray-400">РЕФ</span> <b class="text-cp-cyan">${dash(item.stat_ref)}</b></div>
+                <div><span class="text-gray-400">ТЕХ</span> <b class="text-cp-cyan">${dash(item.stat_tech)}</b></div>
+                <div><span class="text-gray-400">КРУТ</span> <b class="text-cp-cyan">${dash(item.stat_cool)}</b></div>
+                <div><span class="text-gray-400">ТЕЛО</span> <b class="text-cp-cyan">${dash(item.stat_body)}</b></div>
+              </div>
+            `;
+        } else if (secKey === "vehicles" && item.specialEquipment && item.specialEquipment !== "—") {
+            extraCompactHtml = `<div class="bg-cp-bg border-l-2 border-cp-cyan p-2 text-[11px] text-gray-200 line-clamp-2"><b class="text-cp-cyan">Оснащение:</b> ${item.specialEquipment}</div>`;
+        } else if (isDeck) {
+            const opts = Array.isArray(item.deckOptions) && item.deckOptions.length > 0 ? item.deckOptions.join(", ") : "Стандарт";
+            extraCompactHtml = `<div class="bg-cp-bg border-l-2 border-cp-cyan p-2 text-[11px] text-gray-200"><b class="text-cp-cyan">Опции деки:</b> ${opts}</div>`;
+        }
+
+        bodyHtml = `
+          ${statsCells ? `<div class="grid grid-cols-3 gap-1.5">${statsCells}</div>` : ""}
+          ${extraCompactHtml}
+        `;
+    }
+
+    return `
+      <div class="space-y-2.5">
+        <div class="border-b border-gray-800 pb-2 flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="text-[10px] font-bold uppercase text-cp-cyan truncate">${secLabel} • ${cat}</div>
+            <div class="font-display font-black text-sm text-white truncate mt-0.5">${title}</div>
+            ${orig ? `<div class="text-[10px] text-gray-400 truncate">${escapeHtmlAttr(orig)}</div>` : ""}
+          </div>
+          <span class="px-1.5 py-0.5 bg-cp-bg border border-gray-700 text-[10px] font-bold text-cp-yellow shrink-0">[${book}]</span>
+        </div>
+        ${bodyHtml}
+        <div class="pt-1 border-t border-gray-800/80 flex items-center justify-between text-[10px] text-gray-400">
+          <span>Кликните по ссылке для перехода к карточке</span>
+          <span class="text-cp-cyan font-bold">↗ Открыть</span>
+        </div>
+      </div>
+    `;
+}
+
+window.handleCardRefMouseEnter = function (ev, secKey, itemId) {
+    clearTimeout(cardHoverHideTimer);
+    clearTimeout(cardHoverShowTimer);
+
+    const targetEl = ev.currentTarget || ev.target;
+    const rect = targetEl.getBoundingClientRect();
+
+    cardHoverShowTimer = setTimeout(() => {
+        const item = (DB[secKey] || []).find(x => x && x.id === itemId);
+        const pop = document.getElementById("cardHoverPreviewPopover");
+        if (!item || !pop) return;
+
+        currentlyHoveredRefKey = `${secKey}:${itemId}`;
+        pop.innerHTML = buildCardStatsPreviewHTML(secKey, item);
+        pop.classList.remove("hidden");
+
+        const popWidth = pop.offsetWidth || 420;
+        const popHeight = pop.offsetHeight || 220;
+
+        let left = rect.left;
+        if (left + popWidth > window.innerWidth - 16) {
+            left = Math.max(12, window.innerWidth - popWidth - 16);
+        }
+
+        let top = rect.bottom + 8;
+        if (top + popHeight > window.innerHeight - 12) {
+            top = Math.max(12, rect.top - popHeight - 8);
+        }
+
+        pop.style.left = `${Math.round(left)}px`;
+        pop.style.top = `${Math.round(top)}px`;
+    }, 320);
+};
+
+window.keepCardHoverPreviewAlive = function () {
+    clearTimeout(cardHoverHideTimer);
+};
+
+window.scheduleHideCardHoverPreview = function () {
+    clearTimeout(cardHoverShowTimer);
+    cardHoverHideTimer = setTimeout(() => {
+        hideCardHoverPreviewImmediately();
+    }, 180);
+};
+
+function hideCardHoverPreviewImmediately() {
+    clearTimeout(cardHoverShowTimer);
+    clearTimeout(cardHoverHideTimer);
+    currentlyHoveredRefKey = null;
+    const pop = document.getElementById("cardHoverPreviewPopover");
+    if (pop) pop.classList.add("hidden");
+}
 
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
