@@ -5085,20 +5085,16 @@ function calculateCartTotals() {
     const resolvedItems = [];
 
     SHOPPING_CART.forEach(entry => {
-        const found = findItemAcrossAllSections(entry.itemId);
-        if (!found || !found.item) return;
-        const unitPrice = parseItemUnitPriceEb(found.item.cost);
+        const found = entry.customItem ? null : findItemAcrossAllSections(entry.itemId);
+        const itemObj = entry.customItem || (found && found.item);
+        const secKey = entry.customItem ? (entry.sectionKey || "fashion") : (found ? found.section : entry.sectionKey);
+        if (!itemObj) return;
+        const unitPrice = parseItemUnitPriceEb(itemObj.cost);
         const qty = Math.max(1, Number(entry.qty) || 1);
         const lineTotal = unitPrice * qty;
         totalCount += qty;
         totalEb += lineTotal;
-        resolvedItems.push({
-            sectionKey: found.section,
-            item: found.item,
-            qty,
-            unitPrice,
-            lineTotal
-        });
+        resolvedItems.push({ sectionKey: secKey, item: itemObj, qty, unitPrice, lineTotal });
     });
 
     return { totalCount, totalEb, resolvedItems };
@@ -5968,7 +5964,7 @@ switchMainView = function (view, catalogTab = null) {
     activeMainView = view;
     if (catalogTab) activeCatalogTab = catalogTab;
 
-    ["home", "catalog", "fashion", "wip", "rules", "profile", "admin"].forEach(v => {
+    ["home", "catalog", "fashion", "deck_builder", "datafort", "wip", "rules", "profile", "admin"].forEach(v => {
         const el = document.getElementById("view-" + v);
         if (el) el.classList.toggle("hidden", view !== v);
     });
@@ -5986,6 +5982,8 @@ switchMainView = function (view, catalogTab = null) {
     if (view === "home") renderHomeView();
     else if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
     else if (view === "fashion") renderFashionView();
+    else if (view === "deck_builder") renderDeckBuilderView();
+    else if (view === "datafort") renderDatafortView();
     else if (view === "rules") renderRulesView();
     else if (view === "profile") renderProfileView();
     else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
@@ -6463,28 +6461,6 @@ window.addConfiguredFashionToCart = function () {
     renderCartDropdownList();
 };
 
-// Расширяем calculateCartTotals, чтобы Корзина поддерживала кастомную одежду из «Моды»
-const _prevCalcCartTotals = calculateCartTotals;
-calculateCartTotals = function () {
-    let totalCount = 0;
-    let totalEb = 0;
-    const resolvedItems = [];
-
-    SHOPPING_CART.forEach(entry => {
-        const itemObj = entry.customItem || (findItemAcrossAllSections(entry.itemId)?.item);
-        const secKey = entry.customItem ? "fashion" : (findItemAcrossAllSections(entry.itemId)?.section || entry.sectionKey);
-        if (!itemObj) return;
-        const unitPrice = parseItemUnitPriceEb(itemObj.cost);
-        const qty = Math.max(1, Number(entry.qty) || 1);
-        const lineTotal = unitPrice * qty;
-        totalCount += qty;
-        totalEb += lineTotal;
-        resolvedItems.push({ sectionKey: secKey, item: itemObj, qty, unitPrice, lineTotal });
-    });
-
-    return { totalCount, totalEb, resolvedItems };
-};
-
 // =========================================================================
 // ЧАСТЬ 4: ЭКЗОТИКА + ЧАСТЬ 5.2: КОНСТРУКТОР КИБЕРДЕК
 // =========================================================================
@@ -6502,53 +6478,6 @@ SCHEMAS.exotics = [
 
 // Регистрируем deck_builder под родительской вкладкой «Нетраннинг»
 PARENT_NAV_MAP.deck_builder = "netrunning_group";
-
-// Подключаем сортировку по названию (А → Я / Я → А) для «Экзотики»
-const _prevSetupFiltersV3 = setupCatalogFilters;
-setupCatalogFilters = function () {
-    _prevSetupFiltersV3();
-    if (activeCatalogTab === "exotics") {
-        const extraSelect = document.getElementById("extraFilter");
-        const extraLabel = document.getElementById("extraFilterLabel");
-        const legend = document.getElementById("abbrevLegend");
-        extraLabel.textContent = "Сортировка по названию";
-        extraSelect.innerHTML = `
-            <option value="ALL">Без сортировки</option>
-            <option value="SORT_NAME_ASC">🔤 Название: А → Я</option>
-            <option value="SORT_NAME_DESC">🔤 Название: Я → А</option>
-            <option value="SORT_PRICE_ASC">💰 Цена: от меньшей к большей</option>
-            <option value="SORT_PRICE_DESC">💰 Цена: от большей к меньшей</option>
-        `;
-        legend.innerHTML = `<span><b class="text-cp-yellow">Код операции:</b> Н — Незначительная • М — Малая • С — Серьёзная • КР — Критическая</span>`;
-    }
-};
-
-const _prevRenderCatalogV3 = renderCatalog;
-renderCatalog = function () {
-    if (activeCatalogTab === "exotics") {
-        const extra = document.getElementById("extraFilter")?.value || "ALL";
-        const origArr = DB.exotics || [];
-        let temp = [...origArr];
-        if (extra === "SORT_NAME_ASC") temp.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ru"));
-        else if (extra === "SORT_NAME_DESC") temp.sort((a, b) => (b.name || "").localeCompare(a.name || "", "ru"));
-        DB.exotics = temp;
-        try { _prevRenderCatalogV3(); } finally { DB.exotics = origArr; }
-    } else {
-        _prevRenderCatalogV3();
-    }
-};
-
-// Добавляем поддержку экрана deck_builder в switchMainView
-const _prevSwitchMainViewV3 = switchMainView;
-switchMainView = function (view, catalogTab = null) {
-    _prevSwitchMainViewV3(view, catalogTab);
-    const dbEl = document.getElementById("view-deck_builder");
-    if (dbEl) dbEl.classList.toggle("hidden", view !== "deck_builder");
-    if (view === "deck_builder") {
-        renderDeckBuilderView();
-    }
-};
-window.switchMainView = switchMainView;
 
 // --- ЛОГИКА КОНСТРУКТОРА КИБЕРДЕК ---
 let deckBuilderState = {
@@ -7291,17 +7220,6 @@ renderDetailCard = function (item) {
 // =========================================================================
 
 PARENT_NAV_MAP.datafort = "netrunning_group";
-
-const _prevSwitchMainViewV4 = switchMainView;
-switchMainView = function (view, catalogTab = null) {
-    _prevSwitchMainViewV4(view, catalogTab);
-    const dfEl = document.getElementById("view-datafort");
-    if (dfEl) dfEl.classList.toggle("hidden", view !== "datafort");
-    if (view === "datafort") {
-        renderDatafortView();
-    }
-};
-window.switchMainView = switchMainView;
 
 const DF_REMOTES = [
     { id: "rem_manip",    name: "Манипуляторы", desc: "Предназначены для ремонтных задач, покраски или выполнения любого другого вида «ручной» работы." },
