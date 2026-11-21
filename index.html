@@ -448,44 +448,140 @@
         </div>
       </div>
 
-      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ (2 СТРОКИ, ВЫРОВНЕННЫЕ ПО ПРАВОМУ КРАЮ «ТРАНСПОРТ») -->
+      <!-- НАВИГАЦИЯ ПО РАЗДЕЛАМ С ВЫПАДАЮЩИМИ ПОДВКЛАДКАМИ -->
       <nav class="inline-flex flex-col gap-1.5 shrink-0" id="mainNav">
-        <!-- Верхний ряд (задаёт эталонную правую границу по кнопке «Транспорт») -->
+        <!-- Верхний ряд -->
         <div class="flex items-center gap-1.5">
           <button type="button" onclick="switchMainView('catalog', 'roles')" data-view="roles"
             class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🎭 Роли</button>
-          <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="weapons"
-            class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🔫 Оружие</button>
+
+          <!-- БОЙ (выпадашка) -->
+          <div class="relative group">
+            <button type="button" onclick="switchMainView('catalog', 'weapons')" data-view="combat"
+              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+              🔫 Бой <span class="text-[9px] opacity-60">▾</span>
+            </button>
+            <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[190px] z-50">
+              <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                <button type="button" onclick="switchMainView('catalog', 'weapons')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🔫 Оружие</button>
+                <button type="button" onclick="switchMainView('catalog', 'weapon_options')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🔧 Опции</button>
+                <button type="button" onclick="switchMainView('catalog', 'ammo')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">💥 Патроны</button>
+                <button type="button" onclick="switchMainView('catalog', 'martial_arts')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🥋 Боевые Искусства</button>
+              </div>
+            </div>
+          </div>
+
           <button type="button" onclick="switchMainView('catalog', 'armor')" data-view="armor"
             class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🛡️ Броня</button>
-          <button type="button" onclick="switchMainView('catalog', 'gear')" data-view="gear"
-            class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🎒 Снаряжение</button>
+
+          <!-- СНАРЯЖЕНИЕ (выпадашка) -->
+          <div class="relative group">
+            <button type="button" onclick="switchMainView('catalog', 'gear')" data-view="gear_group"
+              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+              🎒 Снаряжение <span class="text-[9px] opacity-60">▾</span>
+            </button>
+            <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[170px] z-50">
+              <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                <button type="button" onclick="switchMainView('catalog', 'gear')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🎒 Стаф</button>
+                <button type="button" onclick="switchMainView('fashion')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🧥 Мода</button>
+              </div>
+            </div>
+          </div>
+
           <button type="button" onclick="switchMainView('catalog', 'services')" data-view="services"
             class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">💼 Услуги</button>
+
           <button type="button" onclick="switchMainView('catalog', 'cyberware')" data-view="cyberware"
             class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🦾 Кибероснащение</button>
-          <button type="button" onclick="switchMainView('catalog', 'borging')" data-view="borging"
-            class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🤖 Боргирование</button>
+
+          <!-- БОРГИРОВАНИЕ (выпадашка) -->
+          <div class="relative group">
+            <button type="button" onclick="switchMainView('catalog', 'borging')" data-view="borging_group"
+              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+              🤖 Боргирование <span class="text-[9px] opacity-60">▾</span>
+            </button>
+            <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[180px] z-50">
+              <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                <button type="button" onclick="switchMainView('catalog', 'borging')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🤖 Боргирование</button>
+                <button type="button" onclick="switchMainView('catalog', 'exotics')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🧬 Экзотика</button>
+              </div>
+            </div>
+          </div>
+
           <button type="button" onclick="switchMainView('catalog', 'acpa')" data-view="acpa"
             class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🛡️ ACPA</button>
-          <button type="button" onclick="switchMainView('catalog', 'netrunning')" data-view="netrunning"
-            class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🌐 Нетраннинг</button>
-          <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles"
-            class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🚗 Транспорт</button>
+
+          <!-- НЕТРАННИНГ (выпадашка) -->
+          <div class="relative group">
+            <button type="button" onclick="openNetrunningSubtab('programs')" data-view="netrunning_group"
+              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+              🌐 Нетраннинг <span class="text-[9px] opacity-60">▾</span>
+            </button>
+            <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[220px] z-50">
+              <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                <button type="button" onclick="openNetrunningSubtab('programs')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">💾 Программы</button>
+                <button type="button" onclick="openNetrunningSubtab('decks')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">💻 Кибердеки</button>
+                <button type="button" onclick="switchMainView('datafort')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🏰 Конструктор Датафортов</button>
+                <button type="button" onclick="switchMainView('deck_builder')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🛠️ Конструктор Кибердеки</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ТРАНСПОРТ (выпадашка) -->
+          <div class="relative group">
+            <button type="button" onclick="switchMainView('catalog', 'vehicles')" data-view="vehicles_group"
+              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+              🚗 Транспорт <span class="text-[9px] opacity-60">▾</span>
+            </button>
+            <div class="hidden group-hover:flex flex-col absolute right-0 top-full pt-1 min-w-[180px] z-50">
+              <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                <button type="button" onclick="switchMainView('catalog', 'vehicles')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🚗 Транспорт</button>
+                <button type="button" onclick="switchMainView('catalog', 'vehicle_tuning')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">⚙️ Тюнинг</button>
+                <button type="button" onclick="openWipView('vehicles_group', 'Сборка транспорта')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-400 hover:bg-cp-yellow hover:text-black transition-colors">🔧 Сборка</button>
+              </div>
+            </div>
+          </div>
         </div>
 
-        <!-- Нижний ряд (растягивается строго по ширине верхнего ряда, не выходя за «Транспорт») -->
+        <!-- Нижний ряд -->
         <div class="flex items-center justify-between gap-2 w-full">
           <div class="flex items-center gap-1.5 shrink-0">
-            <button type="button" onclick="switchMainView('catalog', 'corporations')" data-view="corporations"
-              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">🏢 Корпорации</button>
-            <button type="button" onclick="switchMainView('catalog', 'characters')" data-view="characters"
-              class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">👥 Персонажи</button>
+            <!-- ЛОР (на месте Корпораций, выпадашка) -->
+            <div class="relative group">
+              <button type="button" onclick="switchMainView('catalog', 'corporations')" data-view="lore_group"
+                class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+                📜 Лор <span class="text-[9px] opacity-60">▾</span>
+              </button>
+              <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[180px] z-50">
+                <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                  <button type="button" onclick="switchMainView('catalog', 'lore_nomads')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🏜️ Кочевники</button>
+                  <button type="button" onclick="switchMainView('catalog', 'lore_gangs')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">💀 Банды</button>
+                  <button type="button" onclick="switchMainView('catalog', 'corporations')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🏢 Корпорации</button>
+                  <button type="button" onclick="switchMainView('catalog', 'lore_countries')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🌍 Страны</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- ПЕРСОНАЖИ (выпадашка) -->
+            <div class="relative group">
+              <button type="button" onclick="openCharactersSubtab('named')" data-view="characters_group"
+                class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1">
+                👥 Персонажи <span class="text-[9px] opacity-60">▾</span>
+              </button>
+              <div class="hidden group-hover:flex flex-col absolute left-0 top-full pt-1 min-w-[190px] z-50">
+                <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
+                  <button type="button" onclick="openCharactersSubtab('named')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">⭐ Именные</button>
+                  <button type="button" onclick="openCharactersSubtab('npc')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">👤 NPC</button>
+                  <button type="button" onclick="openWipView('characters_group', 'Генератор NPC')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-400 hover:bg-cp-yellow hover:text-black transition-colors">🎲 Генератор NPC</button>
+                </div>
+              </div>
+            </div>
+
             <button type="button" onclick="switchMainView('rules')" data-view="rules"
               class="nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap">⚙️ Игровые механики</button>
           </div>
 
-          <!-- ТУМБЛЕР «ОТ СООБЩЕСТВА» (СЛЕВА ПЕРЕКЛЮЧАТЕЛЬ, СПРАВА НАДПИСЬ) -->
+          <!-- ТУМБЛЕР «ОТ СООБЩЕСТВА» -->
           <div id="communityModeToggleBox" onclick="toggleCommunityMode()"
             title="Переключить базу данных: Официальные материалы / Материалы от сообщества"
             class="flex items-center gap-2.5 px-3 py-1 bg-cp-panel border border-gray-700 hover:border-cp-purple cursor-pointer select-none transition-all shrink-0">
@@ -498,7 +594,7 @@
               class="font-display font-bold text-[11px] uppercase tracking-wider text-gray-300 whitespace-nowrap">От сообщества</span>
           </div>
 
-          <!-- ГЛОБАЛЬНЫЙ ПОИСК (ВЫРОВНЕН ПО ПРАВОМУ КРАЮ «ТРАНСПОРТ») -->
+          <!-- ГЛОБАЛЬНЫЙ ПОИСК -->
           <div id="globalSearchWrapper" class="relative flex-1 min-w-[180px]">
             <div class="relative flex items-center">
               <span class="absolute left-2.5 text-[11px] text-gray-500 pointer-events-none select-none">🔍</span>
@@ -789,7 +885,142 @@
         id="detailCard"></div>
     </div>
   </main>
+  <!-- ОКНО 1.5: МОДА И КОНСТРУКТОР ОДЕЖДЫ -->
+  <main id="view-fashion" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4"
+    aria-label="fashion">
+    <section class="bg-cp-panel cp-border p-4">
+      <div class="grid grid-cols-12 gap-3 items-end">
+        <div class="col-span-5">
+          <label class="block text-[11px] uppercase text-cp-cyan font-bold mb-1 tracking-wider">Поиск одежды</label>
+          <input type="text" id="fashionSearchInput" oninput="renderFashionView()"
+            placeholder="Куртка, джинсы, тренч, сапоги, плащ..."
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow text-white px-3 py-2 text-xs outline-none">
+        </div>
+        <div class="col-span-3">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Вес материала</label>
+          <select id="fashionWeightFilter" onchange="renderFashionView()"
+            class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2.5 py-2 outline-none focus:border-cp-cyan">
+            <option value="ALL">Все типы веса</option>
+            <option value="light">🪶 Лёгкая одежда</option>
+            <option value="medium">🧥 Средняя одежда</option>
+            <option value="heavy">🛡️ Тяжёлая одежда</option>
+          </select>
+        </div>
+        <div class="col-span-3">
+          <label class="block text-[11px] uppercase text-gray-400 font-bold mb-1">Сортировка по цене</label>
+          <select id="fashionPriceSort" onchange="renderFashionView()"
+            class="w-full bg-cp-bg border border-gray-700 text-xs text-white px-2.5 py-2 outline-none focus:border-cp-cyan">
+            <option value="DEFAULT">По умолчанию</option>
+            <option value="ASC">🔼 Сначала дешевле</option>
+            <option value="DESC">🔽 Сначала дороже</option>
+          </select>
+        </div>
+        <div class="col-span-1">
+          <button type="button" onclick="resetFashionFilters()"
+            class="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs py-2 border border-gray-600 font-bold">Сброс</button>
+        </div>
+      </div>
+    </section>
 
+    <div class="grid grid-cols-12 gap-5 items-start flex-1">
+      <div class="col-span-6 flex flex-col gap-2 max-h-[76vh] overflow-y-auto pr-1.5" id="fashionCatalogList"></div>
+      <div class="col-span-6 sticky top-20 bg-cp-panel cp-border p-6 min-h-[540px] max-h-[76vh] overflow-y-auto"
+        id="fashionBuilderPanel"></div>
+    </div>
+  </main>
+
+  <!-- ОКНО 1.55: КОНСТРУКТОР КИБЕРДЕКИ -->
+  <main id="view-deck_builder" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4"
+    aria-label="deck_builder">
+    <div class="bg-cp-panel cp-border p-4 flex items-center justify-between gap-4 border-l-4 border-l-cp-cyan">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">NETRUNNING WORKBENCH // СБОРКА ОБОРУДОВАНИЯ</div>
+        <h2 class="font-display text-lg font-black text-white uppercase mt-0.5">🛠️ Конструктор собственной кибердеки</h2>
+        <p class="text-xs text-gray-400 mt-0.5">Соберите деку с нужными характеристиками и опциями — итоговая цена пересчитывается мгновенно и отправляется прямо в Корзину.</p>
+      </div>
+      <button type="button" onclick="resetDeckBuilder()"
+        class="px-4 py-2 bg-gray-800 hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 text-xs font-bold uppercase transition-colors shrink-0">
+        🔄 Сбросить сборку
+      </button>
+    </div>
+
+    <div class="grid grid-cols-12 gap-6 items-start" id="deckBuilderGrid"></div>
+  </main>
+  <!-- ОКНО 1.56: КОНСТРУКТОР ДАТАФОРТОВ -->
+  <main id="view-datafort" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4"
+    aria-label="datafort">
+    <div class="bg-cp-panel cp-border p-4 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-cp-cyan">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">NETRUNNING ARCHITECT // КАРТА ПОДСЕТИ 20×20</div>
+        <h2 class="font-display text-lg font-black text-white uppercase mt-0.5">🏰 Конструктор Крепости Данных (Датафорт)</h2>
+      </div>
+      <div class="flex flex-wrap items-center gap-3 text-xs">
+        <div class="bg-cp-bg border border-gray-800 px-3 py-1.5">ЦПУ: <b id="dfStatCpu" class="text-cp-cyan">0 / 7</b></div>
+        <div class="bg-cp-bg border border-gray-800 px-3 py-1.5">ИНТ: <b id="dfStatInt" class="text-cp-yellow">0</b></div>
+        <div class="bg-cp-bg border border-gray-800 px-3 py-1.5">Память: <b id="dfStatMem" class="text-white">0 / 0 (0 MU)</b></div>
+        <div class="bg-cp-bg border border-cp-green/50 px-3.5 py-1.5">Итого: <b id="dfStatCost" class="text-cp-green font-display">0 eb</b></div>
+        <button type="button" onclick="exportDatafortToPng()"
+          class="px-3 py-1.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold uppercase transition-colors">
+          📥 Скачать PNG
+        </button>
+        <button type="button" onclick="resetDatafortBuilder()"
+          class="px-3 py-1.5 bg-gray-800 hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 font-bold uppercase transition-colors">
+          🗑️ Очистить карту
+        </button>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-12 gap-5 items-start">
+      <!-- ЛЕВАЯ КОЛОНКА: ИНСТРУМЕНТАРИЙ, ИИ, НАВЫКИ И ЗАМЕТКИ -->
+      <div class="col-span-12 xl:col-span-6 space-y-4 max-h-[78vh] overflow-y-auto pr-1.5" id="datafortToolsColumn"></div>
+
+      <!-- ПРАВАЯ КОЛОНКА: БЕЛАЯ СЕТКА 20×20 -->
+      <div class="col-span-12 xl:col-span-6 sticky top-20 bg-cp-panel cp-border p-4 flex flex-col items-center gap-3">
+        <div class="w-full flex items-center justify-between text-[11px] text-gray-400">
+          <span><b class="text-cp-cyan">ЛКМ</b> — поставить элемент • <b class="text-cp-red">ПКМ</b> — стереть клетку</span>
+          <span id="dfActiveToolHint" class="text-cp-yellow font-bold">Инструмент: ЦПУ</span>
+        </div>
+        <div id="datafortGridContainer" class="bg-white p-2 border-2 border-black shadow-2xl select-none overflow-auto max-w-full"></div>
+        <div id="dfGridErrorMsg" class="hidden w-full text-center text-xs font-bold text-cp-red bg-cp-red/10 border border-cp-red/40 py-1.5 px-3"></div>
+      </div>
+    </div>
+  </main>
+  <!-- МОДАЛЬНОЕ ОКНО: ПРОСМОТР КАРТОЧКИ СОБРАННОЙ КИБЕРДЕКИ / ОДЕЖДЫ ИЗ КОРЗИНЫ -->
+  <div id="customCartItemModal"
+    class="hidden fixed inset-0 z-[85] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+    onclick="if(event.target===this) closeCustomCartItemModal()">
+    <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_40px_rgba(0,240,255,0.3)] p-6 relative cp-clip"
+      onclick="event.stopPropagation()">
+      <div class="flex items-start justify-between border-b border-gray-800 pb-3 mb-4">
+        <div>
+          <div id="customCartModalSub" class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">КОРЗИНА // КАСТОМНАЯ СБОРКА</div>
+          <h3 id="customCartModalTitle" class="font-display text-lg font-black text-white mt-0.5">Кибердека</h3>
+        </div>
+        <button type="button" onclick="closeCustomCartItemModal()" class="text-gray-400 hover:text-white text-lg font-bold px-1.5">✕</button>
+      </div>
+      <div id="customCartModalBody" class="space-y-3 text-xs"></div>
+      <div class="mt-5 pt-3 border-t border-gray-800 flex justify-end">
+        <button type="button" onclick="closeCustomCartItemModal()"
+          class="px-5 py-2 bg-gray-800 hover:bg-gray-700 text-white text-xs font-bold uppercase border border-gray-600">Закрыть</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ОКНО 1.6: ЗАГЛУШКА ДЛЯ БУДУЩИХ КОНСТРУКТОРОВ -->
+  <main id="view-wip" class="hidden max-w-[1880px] w-full mx-auto px-6 py-10 flex-1 flex items-center justify-center">
+    <div class="max-w-lg w-full bg-cp-panel border-2 border-cp-yellow/70 p-8 text-center space-y-4 cp-clip">
+      <div class="text-4xl">🚧</div>
+      <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">DATATERM // МОДУЛЬ В РАЗРАБОТКЕ</div>
+      <h2 id="wipViewTitle" class="font-display text-2xl font-black text-white uppercase">Раздел в разработке</h2>
+      <p class="text-xs text-gray-400 leading-relaxed">
+        Этот интерактивный конструктор находится в очереди на сборку и появится в одном из следующих обновлений.
+      </p>
+      <button type="button" onclick="navigateHistory(-1)"
+        class="px-5 py-2.5 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider">
+        ◀ Вернуться назад
+      </button>
+    </div>
+  </main>
   <!-- ОКНО 2: ИГРОВЫЕ МЕХАНИКИ -->
   <main id="view-rules" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1" aria-label="rules">
     <div class="grid grid-cols-12 gap-6 items-start">
@@ -1115,6 +1346,22 @@
             class="btype-btn px-3 py-2 text-xs font-bold border">👥 Персонажи</button>
           <button type="button" onclick="setBuilderType('rules')" data-btype="rules"
             class="btype-btn px-3 py-2 text-xs font-bold border">⚙️ Игровые механики</button>
+          <button type="button" onclick="setBuilderType('weapon_options')" data-btype="weapon_options"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🔧 Опции оружия</button>
+          <button type="button" onclick="setBuilderType('ammo')" data-btype="ammo"
+            class="btype-btn px-3 py-2 text-xs font-bold border">💥 Патроны</button>
+          <button type="button" onclick="setBuilderType('martial_arts')" data-btype="martial_arts"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🥋 Боевые Искусства</button>
+          <button type="button" onclick="setBuilderType('exotics')" data-btype="exotics"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🧬 Экзотика</button>
+          <button type="button" onclick="setBuilderType('vehicle_tuning')" data-btype="vehicle_tuning"
+            class="btype-btn px-3 py-2 text-xs font-bold border">⚙️ Тюнинг</button>
+          <button type="button" onclick="setBuilderType('lore_nomads')" data-btype="lore_nomads"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🏜️ Кочевники</button>
+          <button type="button" onclick="setBuilderType('lore_gangs')" data-btype="lore_gangs"
+            class="btype-btn px-3 py-2 text-xs font-bold border">💀 Банды</button>
+          <button type="button" onclick="setBuilderType('lore_countries')" data-btype="lore_countries"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🌍 Страны</button>  
         </div>
       </div>
 

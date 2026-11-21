@@ -5817,6 +5817,2268 @@ window.confirmRejectSubmission = async function (e) {
 
 setTimeout(updateCommunityToggleUI, 100);
 
+// =========================================================================
+// НОВАЯ СТРУКТУРА ВКЛАДОК, ОПЦИИ ОРУЖИЯ, ПАТРОНЫ И КОНСТРУКТОР «МОДА»
+// =========================================================================
+
+// 1. Расширяем список разделов, схем и покупаемых категорий
+Object.assign(SECTION_LABELS, {
+    weapon_options: "🔧 Опции оружия",
+    ammo: "💥 Патроны",
+    martial_arts: "🥋 Боевые Искусства",
+    exotics: "🧬 Экзотика",
+    vehicle_tuning: "⚙️ Тюнинг",
+    lore_nomads: "🏜️ Кочевники",
+    lore_gangs: "💀 Банды",
+    lore_countries: "🌍 Страны"
+});
+
+PURCHASABLE_SECTIONS.add("weapon_options");
+PURCHASABLE_SECTIONS.add("ammo");
+PURCHASABLE_SECTIONS.add("exotics");
+PURCHASABLE_SECTIONS.add("vehicle_tuning");
+
+Object.assign(SCHEMAS, {
+    weapon_options: [
+        { k: "name", l: "Название опции (рус.)", ph: "Умная связь (Smartgun Link)" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Smartgun Link" },
+        { k: "category", l: "Категория опции", isCat: true, ph: "Прицелы и Оптика" },
+        { k: "effect", l: "Игромеханический эффект", ph: "+2 к ТО при наличии Smartgun", stat: "Эффект", c: "text-cp-cyan", span: 2 },
+        { k: "cost", l: "Цена", ph: "200 eb", stat: "Цена", c: "text-cp-green" },
+        { k: "book", l: "Источник", isBook: true, ph: "CP20" }
+    ],
+    ammo: [
+        { k: "name", l: "Название патронов (рус.)", ph: "Бронебойные (AP)" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Armor Piercing (AP)" },
+        { k: "category", l: "Категория патронов", isCat: true, ph: "Бронебойные" },
+        { k: "caliber", l: "Боеприпас / Калибр", ph: "9мм / 5.56мм", stat: "Калибр", c: "text-cp-yellow" },
+        { k: "qty", l: "Количество патронов", ph: "50 шт.", stat: "Кол-во", c: "text-white" },
+        { k: "weaponType", l: "Тип оружия", ph: "Пистолеты / Винтовки", stat: "Тип оружия", c: "text-cp-cyan" },
+        { k: "effect", l: "Игромеханический эффект", ph: "Броня делится на 2, пробитый урон делится на 2", stat: "Эффект", c: "text-cp-red", span: 2 },
+        { k: "cost", l: "Цена", ph: "30 eb", stat: "Цена", c: "text-cp-green" },
+        { k: "book", l: "Источник", isBook: true, ph: "CP20" }
+    ],
+    martial_arts: [
+        { k: "name", l: "Название стиля (рус.)", ph: "Арасака-те" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Arasaka-te" },
+        { k: "category", l: "Тип / Школа", isCat: true, ph: "Ударные стили" },
+        { k: "book", l: "Источник", isBook: true, ph: "CP20" }
+    ],
+    exotics: [
+        { k: "name", l: "Название биоскульпта / экзотики", ph: "Эльфийский пакет" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Elf Package" },
+        { k: "category", l: "Категория", isCat: true, ph: "Биоскульптинг" },
+        { k: "cost", l: "Цена", ph: "2,500 eb", stat: "Цена", c: "text-cp-green" },
+        { k: "book", l: "Источник", isBook: true, ph: "Chr2" }
+    ],
+    vehicle_tuning: [
+        { k: "name", l: "Название модификации", ph: "Нитро-ускоритель" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Nitrous Oxide" },
+        { k: "category", l: "Категория тюнинга", isCat: true, ph: "Двигатель" },
+        { k: "cost", l: "Цена", ph: "1,500 eb", stat: "Цена", c: "text-cp-green" },
+        { k: "book", l: "Источник", isBook: true, ph: "MM (Max Metal)" }
+    ],
+    lore_nomads: [
+        { k: "name", l: "Название стаи / клана", ph: "Альдекальдо" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Aldecaldos" },
+        { k: "category", l: "Нация кочевников", isCat: true, ph: "Семь Наций" },
+        { k: "book", l: "Источник", isBook: true, ph: "Neo Tribes" }
+    ],
+    lore_gangs: [
+        { k: "name", l: "Название банды", ph: "Мальстрём" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Maelstrom" },
+        { k: "category", l: "Тип банды", isCat: true, ph: "Бустер-банда" },
+        { k: "book", l: "Источник", isBook: true, ph: "NC" }
+    ],
+    lore_countries: [
+        { k: "name", l: "Название страны / региона", ph: "Свободный Штат Северная Калифорния" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "Free State of Northern California" },
+        { k: "category", l: "Регион мира", isCat: true, ph: "Северная Америка" },
+        { k: "book", l: "Источник", isBook: true, ph: "CP20" }
+    ]
+});
+
+// Маппинг подвкладок на родительскую кнопку в шапке (для подсветки)
+const PARENT_NAV_MAP = {
+    roles: "roles",
+    weapons: "combat",
+    weapon_options: "combat",
+    ammo: "combat",
+    martial_arts: "combat",
+    armor: "armor",
+    gear: "gear_group",
+    fashion: "gear_group",
+    services: "services",
+    cyberware: "cyberware",
+    borging: "borging_group",
+    exotics: "borging_group",
+    acpa: "acpa",
+    netrunning: "netrunning_group",
+    vehicles: "vehicles_group",
+    vehicle_tuning: "vehicles_group",
+    corporations: "lore_group",
+    lore_nomads: "lore_group",
+    lore_gangs: "lore_group",
+    lore_countries: "lore_group",
+    characters: "characters_group",
+    rules: "rules"
+};
+
+let activeWipParentKey = null;
+
+window.openNetrunningSubtab = function (kind) {
+    switchMainView("catalog", "netrunning");
+    const extraSel = document.getElementById("extraFilter");
+    if (extraSel) {
+        extraSel.value = kind === "decks" ? "ONLY_DECKS" : "ONLY_PROGRAMS";
+        renderCatalog();
+    }
+};
+
+window.openCharactersSubtab = function (kind) {
+    switchMainView("catalog", "characters");
+    const extraSel = document.getElementById("extraFilter");
+    if (extraSel) {
+        extraSel.value = kind === "npc" ? "ONLY_UNNAMED" : "ONLY_NAMED";
+        renderCatalog();
+    }
+};
+
+window.openWipView = function (parentKey, titleText) {
+    activeWipParentKey = parentKey;
+    const titleEl = document.getElementById("wipViewTitle");
+    if (titleEl) titleEl.textContent = titleText || "Раздел в разработке";
+    switchMainView("wip");
+};
+
+// Переопределяем switchMainView для поддержки view-fashion, view-wip и подсветки родительских вкладок
+const _prevSwitchMainViewForV2 = switchMainView;
+switchMainView = function (view, catalogTab = null) {
+    if (view === "admin" && !isCurrentUserAdmin()) view = "profile";
+    activeMainView = view;
+    if (catalogTab) activeCatalogTab = catalogTab;
+
+    ["home", "catalog", "fashion", "wip", "rules", "profile", "admin"].forEach(v => {
+        const el = document.getElementById("view-" + v);
+        if (el) el.classList.toggle("hidden", view !== v);
+    });
+
+    const rawKey = view === "catalog" ? activeCatalogTab : view;
+    const parentHighlightKey = view === "wip" ? activeWipParentKey : (PARENT_NAV_MAP[rawKey] || rawKey);
+
+    document.querySelectorAll("#mainNav .nav-btn").forEach(btn => {
+        const isCur = (view !== "home") && (btn.getAttribute("data-view") === parentHighlightKey);
+        btn.className = isCur
+            ? "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border transition-all whitespace-nowrap flex items-center gap-1 bg-cp-yellow text-black border-cp-yellow shadow-[0_0_12px_rgba(252,238,10,0.3)]"
+            : "nav-btn px-3 py-1.5 text-xs font-bold uppercase tracking-wider border border-gray-700 bg-cp-panel text-gray-300 hover:border-cp-cyan whitespace-nowrap flex items-center gap-1";
+    });
+
+    if (view === "home") renderHomeView();
+    else if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
+    else if (view === "fashion") renderFashionView();
+    else if (view === "rules") renderRulesView();
+    else if (view === "profile") renderProfileView();
+    else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
+
+    recordNavHistoryState();
+};
+window.switchMainView = switchMainView;
+
+// Расширяем setupCatalogFilters для «Опций» и «Патронов»
+const _prevSetupFiltersV2 = setupCatalogFilters;
+setupCatalogFilters = function () {
+    _prevSetupFiltersV2();
+    const extraSelect = document.getElementById("extraFilter");
+    const extraLabel = document.getElementById("extraFilterLabel");
+    const legend = document.getElementById("abbrevLegend");
+
+    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning") {
+        extraLabel.textContent = "Сортировка по цене";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option>
+            <option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>
+        `;
+        legend.innerHTML = `<span><b class="text-cp-cyan">eb</b> = Евробаксы</span><span>Нажмите «🛒 Купить» на карточке для добавления в корзину</span>`;
+    } else if (activeCatalogTab === "ammo") {
+        extraLabel.textContent = "Цена / Тип оружия";
+        const wTypes = [...new Set((DB.ammo || []).map(a => a && a.weaponType).filter(x => x && x !== "—"))];
+        extraSelect.innerHTML = `
+            <option value="ALL">Все типы оружия</option>
+            <option value="SORT_PRICE_ASC">🔼 Цена: от меньшей к большей</option>
+            <option value="SORT_PRICE_DESC">🔽 Цена: от большей к меньшей</option>
+            ${wTypes.map(t => `<option value="WTYPE_${escapeHtmlAttr(t)}">🔫 ${escapeHtmlAttr(t)}</option>`).join("")}
+        `;
+        legend.innerHTML = `<span><b class="text-cp-yellow">Калибр</b> = Боеприпас</span><span><b class="text-cp-cyan">Тип оружия</b> = Совместимый класс стволов</span>`;
+    }
+};
+
+// Расширяем renderCatalog, чтобы сортировка цены и фильтр типа оружия работали в weapon_options и ammo
+const _prevRenderCatalogV2 = renderCatalog;
+renderCatalog = function () {
+    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "ammo" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning") {
+        const extra = document.getElementById("extraFilter")?.value || "ALL";
+        const origArr = DB[activeCatalogTab] || [];
+        let temp = [...origArr];
+        if (extra === "SORT_PRICE_ASC") temp.sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") temp.sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
+        else if (extra.startsWith("WTYPE_")) {
+            const targetType = extra.slice(6);
+            temp = temp.filter(a => a && a.weaponType === targetType);
+        }
+        DB[activeCatalogTab] = temp;
+        try { _prevRenderCatalogV2(); } finally { DB[activeCatalogTab] = origArr; }
+    } else {
+        _prevRenderCatalogV2();
+    }
+};
+
+// =========================================================================
+// ЧАСТЬ 3: МОДА — БАЗА ОДЕЖДЫ И ИНТЕРАКТИВНЫЙ КОНСТРУКТОР ОДЕЖДЫ
+// =========================================================================
+
+const DEFAULT_FASHION_ITEMS = [
+    // Брюки / Юбки (Кожа +50-75%)
+    { id: "f-pants", name: "Брюки / Джинсы", baseCost: 20, weight: "medium", leatherType: "50-75", fireType: "pants" },
+    { id: "f-miniskirt", name: "Мини-юбка", baseCost: 30, weight: "light", leatherType: "50-75", fireType: "pants" },
+    { id: "f-longskirt", name: "Длинная юбка", baseCost: 55, weight: "medium", leatherType: "50-75", fireType: "pants" },
+    { id: "f-shorts", name: "Шорты", baseCost: 10, weight: "light", leatherType: "50-75", fireType: "pants" },
+    // Комбинезоны / Перчатки (Кожа x2)
+    { id: "f-jumpsuit", name: "Комбинезон (Джампсьют)", baseCost: 50, weight: "light", leatherType: "x2", fireType: "jacket" },
+    { id: "f-dress", name: "Платье", baseCost: 50, weight: "light", leatherType: "x2", fireType: "shirt" },
+    { id: "f-gloves", name: "Перчатки", baseCost: 20, weight: "light", leatherType: "x2", fireType: "shirt" },
+    { id: "f-longgloves", name: "Длинные перчатки", baseCost: 30, weight: "light", leatherType: "x2", fireType: "shirt" },
+    // Верхняя одежда / Аксессуары (Кожа x2)
+    { id: "f-vest", name: "Жилет", baseCost: 25, weight: "medium", leatherType: "x2", fireType: "jacket" },
+    { id: "f-tie", name: "Галстук", baseCost: 20, weight: "light", leatherType: "x2", fireType: "shirt" },
+    { id: "f-scarf", name: "Шарф / Бандана", baseCost: 15, weight: "light", leatherType: "x2", fireType: "shirt" },
+    { id: "f-glasses", name: "Очки", baseCost: 25, costLabel: "5-50 eb", weight: "light", leatherType: "none", fireType: "none" },
+    { id: "f-hat", name: "Шляпа", baseCost: 15, costLabel: "5-25 eb", weight: "light", leatherType: "x2", fireType: "shirt" },
+    { id: "f-chaps", name: "Кожаные чапсы", baseCost: 60, weight: "heavy", leatherType: "included", fireType: "pants" },
+    { id: "f-jacket", name: "Куртка", baseCost: 35, weight: "medium", leatherType: "x2", fireType: "jacket" },
+    { id: "f-longjacket", name: "Длинная куртка", baseCost: 40, weight: "medium", leatherType: "x2", fireType: "jacket" },
+    { id: "f-heavycoat", name: "Длинное тяжёлое пальто", baseCost: 55, weight: "heavy", leatherType: "x2", fireType: "jacket" },
+    // Рубашки / Обувь (Кожа +50-75%)
+    { id: "f-tshirt", name: "Футболка", baseCost: 10, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-shirt", name: "Рубашка с длинными рукавами", baseCost: 20, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-top", name: "Топ / Блузка", baseCost: 15, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-tanktop", name: "Майка", baseCost: 10, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-tunic", name: "Туника", baseCost: 25, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-leathertunic", name: "Кожаная туника", baseCost: 75, weight: "medium", leatherType: "included", fireType: "shirt" },
+    { id: "f-sweater", name: "Свитер", baseCost: 20, weight: "light", leatherType: "50-75", fireType: "shirt" },
+    { id: "f-belt", name: "Пояс / Ремень", baseCost: 10, weight: "medium", leatherType: "50-75", fireType: "none" },
+    { id: "f-leatherbelt", name: "Кожаный пояс / ремень", baseCost: 15, weight: "heavy", leatherType: "included", fireType: "none" },
+    { id: "f-shoes", name: "Обувь", baseCost: 15, weight: "medium", leatherType: "50-75", fireType: "none" },
+    { id: "f-halfboots", name: "Полусапожки", baseCost: 15, weight: "medium", leatherType: "50-75", fireType: "none" },
+    { id: "f-boots", name: "Сапоги", baseCost: 25, weight: "heavy", leatherType: "50-75", fireType: "none" },
+    { id: "f-kneeboots", name: "Сапоги до колен (Kneeboots)", baseCost: 40, weight: "heavy", leatherType: "50-75", fireType: "none" },
+    // Плащи / Капюшоны (Кожа +50%)
+    { id: "f-toboggan", name: "Санный капюшон (Toboggan hood)", baseCost: 15, weight: "light", leatherType: "50", fireType: "shirt" },
+    { id: "f-skimask", name: "Лыжная маска", baseCost: 10, weight: "light", leatherType: "50", fireType: "shirt" },
+    { id: "f-trench", name: "Тренч", baseCost: 125, weight: "heavy", leatherType: "50", fireType: "jacket" },
+    { id: "f-cloak", name: "Плащ", baseCost: 50, weight: "medium", leatherType: "50", fireType: "jacket" },
+    { id: "f-shortcloak", name: "Короткий плащ", baseCost: 75, weight: "medium", leatherType: "50", fireType: "jacket" },
+    { id: "f-longcloak", name: "Длинный плащ", baseCost: 90, weight: "heavy", leatherType: "50", fireType: "jacket" }
+];
+
+const FASHION_STYLES = [
+    { id: "generic", name: "Generic Chic", mult: 1 },
+    { id: "leisure", name: "Leisurewear", mult: 2 },
+    { id: "urban", name: "Urban Flash", mult: 2 },
+    { id: "business", name: "Businesswear", mult: 3 },
+    { id: "edgerunner", name: "Edgerunner", mult: 3 },
+    { id: "high", name: "High Fashion", mult: 4 },
+    { id: "baglady", name: "Bag Lady Chic", mult: 2 }
+];
+
+const FASHION_QUALITIES = [
+    { id: "poor", name: "Ниже среднего (x0.5–0.9)", mult: 0.7, bonus: "" },
+    { id: "normal", name: "Обычное", mult: 1, bonus: "" },
+    { id: "good", name: "Хорошее", mult: 1.5, bonus: "" },
+    { id: "verygood", name: "Очень хорошее", mult: 2, bonus: "+1 к Гардеробу и Стилю" },
+    { id: "designer", name: "Дизайнерское", mult: 4, bonus: "+2 к Гардеробу и Стилю" },
+    { id: "super", name: "Суперчика (На заказ)", mult: 7, bonus: "+3 к Гардеробу и Стилю" }
+];
+
+const FASHION_ARMOR_TABLE = {
+    0:  { light: { m: 1, zu: 0 },    medium: { m: 1, zu: 0 },    heavy: { m: 1, zu: 0 } },
+    4:  { light: { m: 1.1, zu: 0 },  medium: { m: 1.05, zu: 0 }, heavy: { m: 1, zu: 0 } },
+    6:  { light: { m: 1.2, zu: 0 },  medium: { m: 1.1, zu: 0 },  heavy: { m: 1.05, zu: 0 } },
+    8:  { light: { m: 1.35, zu: 0 }, medium: { m: 1.2, zu: 0 },  heavy: { m: 1.15, zu: 0 } },
+    10: { light: { m: 1.5, zu: 0 },  medium: { m: 1.25, zu: 0 }, heavy: { m: 1.25, zu: 0 } },
+    12: { light: { m: 1.75, zu: 0 }, medium: { m: 1.5, zu: 0 },  heavy: { m: 1.5, zu: 0 } },
+    14: { light: { m: 2, zu: -1 },   medium: { m: 1.75, zu: 0 }, heavy: { m: 1.75, zu: 0 } },
+    16: { light: { m: 2.5, zu: -2 }, medium: { m: 2, zu: 0 },    heavy: { m: 2, zu: 0 } },
+    18: { light: { m: 3, zu: -3 },   medium: { m: 2.5, zu: -1 }, heavy: { m: 2.25, zu: 0 } },
+    20: { light: null,               medium: { m: 3, zu: -2 },   heavy: { m: 2.5, zu: -1 } },
+    22: { light: null,               medium: { m: 3.25, zu: -3 },heavy: { m: 2.75, zu: -2 } },
+    24: { light: null,               medium: null,               heavy: { m: 3, zu: -3 } }
+};
+
+let fashionSelectedId = DEFAULT_FASHION_ITEMS[0].id;
+let fashionBuilderCfg = {
+    useLeather: false,
+    styleId: "generic",
+    qualityId: "normal",
+    sp: 0,
+    addonFire: false,
+    addonPolylog: false,
+    addonReacti: false,
+    addonPolychrome: false,
+    saoMode: "none" // "none" | "torso" | "legs" | "full"
+};
+
+function getFashionItemWeight(item) {
+    ensureMetaArraysInCategories();
+    if (!CATEGORIES._fashionWeights) CATEGORIES._fashionWeights = {};
+    return CATEGORIES._fashionWeights[item.id] || item.weight || "medium";
+}
+
+window.setFashionItemWeightAdmin = function (itemId, newWeight) {
+    if (!isCurrentUserAdmin()) return;
+    ensureMetaArraysInCategories();
+    if (!CATEGORIES._fashionWeights) CATEGORIES._fashionWeights = {};
+    CATEGORIES._fashionWeights[itemId] = newWeight;
+    persistDatabase(true);
+    renderFashionView();
+};
+
+window.selectFashionItem = function (itemId) {
+    fashionSelectedId = itemId;
+    fashionBuilderCfg.useLeather = false;
+    const item = DEFAULT_FASHION_ITEMS.find(x => x.id === itemId);
+    if (item) {
+        const w = getFashionItemWeight(item);
+        if (!FASHION_ARMOR_TABLE[fashionBuilderCfg.sp]?.[w]) fashionBuilderCfg.sp = 0;
+        if (w === "light") fashionBuilderCfg.saoMode = "none";
+    }
+    renderFashionView();
+};
+
+window.resetFashionFilters = function () {
+    const s = document.getElementById("fashionSearchInput");
+    const w = document.getElementById("fashionWeightFilter");
+    const p = document.getElementById("fashionPriceSort");
+    if (s) s.value = "";
+    if (w) w.value = "ALL";
+    if (p) p.value = "DEFAULT";
+    renderFashionView();
+};
+
+window.updateFashionCfg = function (key, val) {
+    fashionBuilderCfg[key] = val;
+    renderFashionBuilderPanel();
+};
+
+function renderFashionView() {
+    const q = (document.getElementById("fashionSearchInput")?.value || "").trim().toLowerCase();
+    const wFilter = document.getElementById("fashionWeightFilter")?.value || "ALL";
+    const pSort = document.getElementById("fashionPriceSort")?.value || "DEFAULT";
+
+    let list = DEFAULT_FASHION_ITEMS.filter(it => {
+        const w = getFashionItemWeight(it);
+        const textOk = !q || it.name.toLowerCase().includes(q);
+        const wOk = wFilter === "ALL" || w === wFilter;
+        return textOk && wOk;
+    });
+
+    if (pSort === "ASC") list = [...list].sort((a, b) => a.baseCost - b.baseCost);
+    else if (pSort === "DESC") list = [...list].sort((a, b) => b.baseCost - a.baseCost);
+
+    const listEl = document.getElementById("fashionCatalogList");
+    if (!listEl) return;
+
+    const isAdmin = isCurrentUserAdmin();
+    const weightLabels = { light: "🪶 Лёгкая", medium: "🧥 Средняя", heavy: "🛡️ Тяжёлая" };
+
+    listEl.innerHTML = list.map(it => {
+        const isSel = it.id === fashionSelectedId;
+        const w = getFashionItemWeight(it);
+        const borderCls = isSel ? "cp-border-active bg-cp-card" : "border-gray-800 bg-cp-card/70 hover:border-gray-600";
+        const adminWeightHtml = isAdmin ? `
+            <div class="flex items-center gap-1 mt-1.5" onclick="event.stopPropagation()">
+              ${["light", "medium", "heavy"].map(wt => `
+                <label class="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] border cursor-pointer ${w === wt ? 'bg-cp-cyan/20 border-cp-cyan text-cp-cyan font-bold' : 'bg-cp-bg border-gray-800 text-gray-400'}">
+                  <input type="checkbox" ${w === wt ? 'checked' : ''} onchange="setFashionItemWeightAdmin('${it.id}', '${wt}')" class="w-3 h-3 accent-cyan-400">
+                  <span>${wt === 'light' ? 'Лёгк.' : wt === 'medium' ? 'Сред.' : 'Тяж.'}</span>
+                </label>
+              `).join("")}
+            </div>
+        ` : "";
+
+        return `
+          <div onclick="selectFashionItem('${it.id}')" class="border ${borderCls} p-3 cursor-pointer transition-all flex items-center justify-between gap-3">
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-1.5 py-0.5 text-[10px] font-bold bg-cp-bg border border-gray-700 text-cp-cyan">${weightLabels[w]}</span>
+                <span class="font-bold text-sm text-white">${it.name}</span>
+              </div>
+              ${adminWeightHtml}
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-xs font-bold text-cp-green">${it.costLabel || (it.baseCost + " eb")}</div>
+              ${it.leatherType === "x2" ? `<div class="text-[10px] text-gray-500">Кожа: ×2</div>` : it.leatherType === "50-75" ? `<div class="text-[10px] text-gray-500">Кожа: +50–75%</div>` : it.leatherType === "50" ? `<div class="text-[10px] text-gray-500">Кожа: +50%</div>` : ""}
+            </div>
+          </div>
+        `;
+    }).join("");
+
+    renderFashionBuilderPanel();
+}
+
+function calculateFashionItemPrice(item) {
+    const w = getFashionItemWeight(item);
+    let price = item.baseCost;
+
+    // 1. Кожа
+    if (fashionBuilderCfg.useLeather) {
+        if (item.leatherType === "x2") price *= 2;
+        else if (item.leatherType === "50-75") price *= 1.65;
+        else if (item.leatherType === "50") price *= 1.5;
+    }
+
+    // 2. Стиль и Качество
+    const styleObj = FASHION_STYLES.find(s => s.id === fashionBuilderCfg.styleId) || FASHION_STYLES[0];
+    const qualObj = FASHION_QUALITIES.find(q => q.id === fashionBuilderCfg.qualityId) || FASHION_QUALITIES[1];
+    price *= styleObj.mult * qualObj.mult;
+
+    // 3. Бронирование (ОС / ЗУ)
+    const armorRow = FASHION_ARMOR_TABLE[fashionBuilderCfg.sp]?.[w] || { m: 1, zu: 0 };
+    price *= armorRow.m;
+
+    // 4. Особые дополнения (множители от базовой/текущей цены)
+    if (fashionBuilderCfg.addonFire) {
+        if (item.fireType === "shirt") price *= 2.5;
+        else if (item.fireType === "pants") price *= 2.0;
+        else price *= 1.75;
+    }
+    if (fashionBuilderCfg.addonPolylog) price *= 3;
+    if (fashionBuilderCfg.addonReacti) price *= 2;
+    if (fashionBuilderCfg.addonPolychrome) price *= 5;
+
+    // 5. САО (только для средней и тяжёлой)
+    let saoCost = 0;
+    if (w !== "light") {
+        if (fashionBuilderCfg.saoMode === "torso") saoCost = 150;
+        else if (fashionBuilderCfg.saoMode === "legs") saoCost = 200;
+        else if (fashionBuilderCfg.saoMode === "full") saoCost = 350;
+    }
+
+    return {
+        finalPrice: Math.round(price + saoCost),
+        sp: fashionBuilderCfg.sp,
+        zu: armorRow.zu,
+        styleObj,
+        qualObj,
+        weight: w
+    };
+}
+
+function renderFashionBuilderPanel() {
+    const box = document.getElementById("fashionBuilderPanel");
+    if (!box) return;
+    const item = DEFAULT_FASHION_ITEMS.find(x => x.id === fashionSelectedId) || DEFAULT_FASHION_ITEMS[0];
+    const calc = calculateFashionItemPrice(item);
+    const weightRu = calc.weight === "light" ? "Лёгкая" : calc.weight === "medium" ? "Средняя" : "Тяжёлая";
+
+    const spOptions = Object.keys(FASHION_ARMOR_TABLE).map(Number).filter(sp => Boolean(FASHION_ARMOR_TABLE[sp][calc.weight]));
+
+    const leatherCheckHtml = (item.leatherType && item.leatherType !== "none" && item.leatherType !== "included") ? `
+        <label class="flex items-center gap-2 p-2.5 bg-cp-bg border ${fashionBuilderCfg.useLeather ? 'border-cp-yellow text-cp-yellow' : 'border-gray-800 text-gray-300'} cursor-pointer text-xs font-bold">
+          <input type="checkbox" ${fashionBuilderCfg.useLeather ? 'checked' : ''} onchange="updateFashionCfg('useLeather', this.checked)" class="accent-yellow-400">
+          <span>🧥 Использовать кожу / аналог (${item.leatherType === 'x2' ? '×2 к цене' : item.leatherType === '50-75' ? '+50–75% к цене' : '+50% к цене'})</span>
+        </label>
+    ` : "";
+
+    box.innerHTML = `
+      <div class="space-y-4">
+        <div class="border-b border-gray-800 pb-3 flex items-start justify-between gap-3">
+          <div>
+            <div class="text-[10px] font-bold uppercase text-cp-cyan">КОНСТРУКТОР ОДЕЖДЫ // ${weightRu} одежда</div>
+            <h2 class="font-display text-2xl font-black text-white mt-0.5">${item.name}</h2>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] text-gray-400 uppercase">Итоговая цена</div>
+            <div class="text-2xl font-display font-black text-cp-green">${calc.finalPrice.toLocaleString("ru-RU")} eb</div>
+          </div>
+        </div>
+
+        <!-- Итоговые ОС / ЗУ -->
+        <div class="grid grid-cols-3 gap-2.5 text-center">
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">ОС (Броня)</div>
+            <div class="text-lg font-display font-black text-cp-cyan">${calc.sp}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">ЗУ (Утяжеление)</div>
+            <div class="text-lg font-display font-black text-cp-yellow">${calc.zu}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400 uppercase">Бонус стиля</div>
+            <div class="text-xs font-bold text-cp-green mt-1.5">${calc.qualObj.bonus || "—"}</div>
+          </div>
+        </div>
+
+        ${calc.sp >= 10 ? `
+          <div class="bg-cp-yellow/10 border-l-2 border-cp-yellow p-2.5 text-[11px] text-cp-yellow">
+            ⚠️ <b>Заметность бронирования:</b> Начиная с ОС 10 окружающие прекрасно видят, что одежда укреплена. Чем меньше предмет (например, перчатки с ОС 12), тем сильнее он выглядит по-военному.
+          </div>
+        ` : ""}
+
+        ${leatherCheckHtml}
+
+        <!-- СТИЛИ -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-bold uppercase text-cp-cyan">1. Стиль одежды:</div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            ${FASHION_STYLES.map(s => `
+              <label class="flex items-center gap-2 px-2.5 py-1.5 border text-xs cursor-pointer ${fashionBuilderCfg.styleId === s.id ? 'bg-cp-cyan/15 border-cp-cyan text-white font-bold' : 'bg-cp-bg border-gray-800 text-gray-300'}">
+                <input type="checkbox" ${fashionBuilderCfg.styleId === s.id ? 'checked' : ''} onchange="updateFashionCfg('styleId', '${s.id}')" class="accent-cyan-400">
+                <span>${s.name} <b class="text-cp-yellow">×${s.mult}</b></span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+
+        <!-- КАЧЕСТВО -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-bold uppercase text-cp-yellow">2. Качество пошива:</div>
+          <div class="grid grid-cols-2 gap-1.5">
+            ${FASHION_QUALITIES.map(q => `
+              <label class="flex items-center gap-2 px-2.5 py-1.5 border text-xs cursor-pointer ${fashionBuilderCfg.qualityId === q.id ? 'bg-cp-yellow/15 border-cp-yellow text-white font-bold' : 'bg-cp-bg border-gray-800 text-gray-300'}">
+                <input type="checkbox" ${fashionBuilderCfg.qualityId === q.id ? 'checked' : ''} onchange="updateFashionCfg('qualityId', '${q.id}')" class="accent-yellow-400">
+                <span>${q.name} <b class="text-cp-green">×${q.mult}</b></span>
+              </label>
+            `).join("")}
+          </div>
+        </div>
+
+        <!-- БРОНИРОВАНИЕ (ОС / ЗУ) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-bold uppercase text-cp-cyan">3. Укрепление бронёй (ОС / ЗУ для ${weightRu.toLowerCase()}й одежды):</div>
+          <div class="flex flex-wrap gap-1.5">
+            ${spOptions.map(sp => {
+                const row = FASHION_ARMOR_TABLE[sp][calc.weight];
+                return `
+                  <button type="button" onclick="updateFashionCfg('sp', ${sp})"
+                    class="px-2.5 py-1.5 text-xs font-bold border transition-all ${fashionBuilderCfg.sp === sp ? 'bg-cp-cyan text-black border-cp-cyan' : 'bg-cp-bg text-gray-300 border-gray-800 hover:border-cp-cyan'}">
+                    ОС ${sp} ${row.zu < 0 ? `(ЗУ ${row.zu})` : ''}
+                  </button>
+                `;
+            }).join("")}
+          </div>
+        </div>
+
+        <!-- ОСОБЫЕ ДОПОЛНЕНИЯ (С ВСПЛЫВАЮЩИМИ ОПИСАНИЯМИ ПРИ НАВЕДЕНИИ) -->
+        <div class="space-y-1.5">
+          <div class="text-[11px] font-bold uppercase text-purple-400">4. Особые дополнения (наведите курсор для описания):</div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <label title="За увеличение цены одежды даёт защиту SP20 только против Огня. Для рубашек +100-300%, для брюк/юбок +100-200%, для курток +50-100%."
+              class="flex items-center gap-2 p-2 bg-cp-bg border ${fashionBuilderCfg.addonFire ? 'border-cp-red text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <input type="checkbox" ${fashionBuilderCfg.addonFire ? 'checked' : ''} onchange="updateFashionCfg('addonFire', this.checked)" class="accent-red-500">
+              <span>🔥 Огнезащита (SP20)</span>
+            </label>
+            <label title="Поддерживает до 4 различных цветовых схем. Может быть повреждён ЭМИ или электроразрядами. 5% шанс сбоя в боевых условиях. Цена ×3."
+              class="flex items-center gap-2 p-2 bg-cp-bg border ${fashionBuilderCfg.addonPolylog ? 'border-cp-cyan text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <input type="checkbox" ${fashionBuilderCfg.addonPolylog ? 'checked' : ''} onchange="updateFashionCfg('addonPolylog', this.checked)" class="accent-cyan-400">
+              <span>🌈 Материал Polylog (×3)</span>
+            </label>
+            <label title="Обеспечивает дополнительный комфорт. Бонус +1 к проверкам Выносливости, где важна одежда. Цена ×2."
+              class="flex items-center gap-2 p-2 bg-cp-bg border ${fashionBuilderCfg.addonReacti ? 'border-cp-green text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <input type="checkbox" ${fashionBuilderCfg.addonReacti ? 'checked' : ''} onchange="updateFashionCfg('addonReacti', this.checked)" class="accent-green-400">
+              <span>❄️ Панели Reacti-Mesh (×2)</span>
+            </label>
+            <label title="Одежда состоит из тканевого хрома, выглядя как идеальное серебро. Цена ×5."
+              class="flex items-center gap-2 p-2 bg-cp-bg border ${fashionBuilderCfg.addonPolychrome ? 'border-cp-yellow text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <input type="checkbox" ${fashionBuilderCfg.addonPolychrome ? 'checked' : ''} onchange="updateFashionCfg('addonPolychrome', this.checked)" class="accent-yellow-400">
+              <span>✨ Полихромный™ (×5)</span>
+            </label>
+          </div>
+
+          <!-- САО -->
+          <div class="p-2.5 bg-cp-bg border border-gray-800 space-y-1.5"
+            title="Система Активного Охлаждения (САО): устанавливается только в среднюю или тяжёлую одежду. Работает на Крио-картриджах (50 eb / 2 часа, 4 деления; усиленный 100 eb / 1 час без проверок). При пробитии брони бросьте 1d10: на 1-3 САО сломана (ремонт Basic Tech Сл 20, 50 eb).">
+            <div class="text-[11px] font-bold text-cp-cyan">🧊 Система Активного Охлаждения (САО) ${calc.weight === 'light' ? '<span class="text-cp-red">(Недоступно для лёгкой одежды)</span>' : '(наведите для правил)'}:</div>
+            <div class="flex flex-wrap gap-2 text-xs">
+              ${[
+                { id: "none", label: "Без САО" },
+                { id: "torso", label: "Торс (+150 eb, +5)" },
+                { id: "legs", label: "Ноги (+200 eb, +3)" },
+                { id: "full", label: "Комплект (+350 eb, +8)" }
+              ].map(opt => `
+                <label class="flex items-center gap-1.5 px-2 py-1 border ${calc.weight === 'light' && opt.id !== 'none' ? 'opacity-40 cursor-not-allowed border-gray-800' : fashionBuilderCfg.saoMode === opt.id ? 'border-cp-cyan bg-cp-cyan/15 text-white font-bold cursor-pointer' : 'border-gray-800 text-gray-300 cursor-pointer'}">
+                  <input type="checkbox" ${fashionBuilderCfg.saoMode === opt.id ? 'checked' : ''} ${calc.weight === 'light' && opt.id !== 'none' ? 'disabled' : ''} onchange="updateFashionCfg('saoMode', '${opt.id}')" class="accent-cyan-400">
+                  <span>${opt.label}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+        </div>
+
+        <button type="button" onclick="addConfiguredFashionToCart()"
+          class="w-full py-3 bg-cp-green hover:bg-green-400 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(0,255,102,0.3)] transition-all">
+          🛒 Добавить в корзину (${calc.finalPrice.toLocaleString("ru-RU")} eb)
+        </button>
+      </div>
+    `;
+}
+
+window.addConfiguredFashionToCart = function () {
+    const item = DEFAULT_FASHION_ITEMS.find(x => x.id === fashionSelectedId) || DEFAULT_FASHION_ITEMS[0];
+    const calc = calculateFashionItemPrice(item);
+
+    const tags = [calc.styleObj.name, calc.qualObj.name];
+    if (fashionBuilderCfg.useLeather) tags.push("Кожа");
+    if (calc.sp > 0) tags.push(`ОС ${calc.sp}${calc.zu < 0 ? ' / ЗУ ' + calc.zu : ''}`);
+    if (fashionBuilderCfg.addonFire) tags.push("Огнезащита");
+    if (fashionBuilderCfg.addonPolylog) tags.push("Polylog");
+    if (fashionBuilderCfg.addonReacti) tags.push("Reacti-Mesh");
+    if (fashionBuilderCfg.addonPolychrome) tags.push("Полихромный");
+    if (fashionBuilderCfg.saoMode !== "none" && calc.weight !== "light") tags.push("САО");
+
+    const customId = "fashion-" + Date.now();
+    SHOPPING_CART.push({
+        sectionKey: "fashion",
+        itemId: customId,
+        qty: 1,
+        customItem: {
+            id: customId,
+            name: `${item.name} (${tags.join(", ")})`,
+            category: "Мода",
+            cost: `${calc.finalPrice} eb`
+        }
+    });
+
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+};
+
+// Расширяем calculateCartTotals, чтобы Корзина поддерживала кастомную одежду из «Моды»
+const _prevCalcCartTotals = calculateCartTotals;
+calculateCartTotals = function () {
+    let totalCount = 0;
+    let totalEb = 0;
+    const resolvedItems = [];
+
+    SHOPPING_CART.forEach(entry => {
+        const itemObj = entry.customItem || (findItemAcrossAllSections(entry.itemId)?.item);
+        const secKey = entry.customItem ? "fashion" : (findItemAcrossAllSections(entry.itemId)?.section || entry.sectionKey);
+        if (!itemObj) return;
+        const unitPrice = parseItemUnitPriceEb(itemObj.cost);
+        const qty = Math.max(1, Number(entry.qty) || 1);
+        const lineTotal = unitPrice * qty;
+        totalCount += qty;
+        totalEb += lineTotal;
+        resolvedItems.push({ sectionKey: secKey, item: itemObj, qty, unitPrice, lineTotal });
+    });
+
+    return { totalCount, totalEb, resolvedItems };
+};
+
+// =========================================================================
+// ЧАСТЬ 4: ЭКЗОТИКА + ЧАСТЬ 5.2: КОНСТРУКТОР КИБЕРДЕК
+// =========================================================================
+
+// 1. Обновляем схему «Экзотики» (Название, Оригинал, Код операции, Игромеханика, Цена, Описание)
+SCHEMAS.exotics = [
+    { k: "name", l: "Название (рус.)", ph: "Эльфийский биоскульпт" },
+    { k: "origName", l: "Оригинальное английское название", ph: "Elf Exotic Package" },
+    { k: "surg", l: "Код операции (Н, М, С, КР)", ph: "С", stat: "Код операции", c: "text-cp-yellow" },
+    { k: "cost", l: "Цена", ph: "2,500 eb", stat: "Цена", c: "text-cp-green" },
+    { k: "mechanics", l: "Игромеханика", ph: "+2 к ПРВЛ, заострённые уши, ПЧ 4d6", stat: "Игромеханика", c: "text-cp-cyan", span: 3 },
+    { k: "category", l: "Категория", isCat: true, ph: "Биоскульптинг" },
+    { k: "book", l: "Источник", isBook: true, ph: "Chr2" }
+];
+
+// Регистрируем deck_builder под родительской вкладкой «Нетраннинг»
+PARENT_NAV_MAP.deck_builder = "netrunning_group";
+
+// Подключаем сортировку по названию (А → Я / Я → А) для «Экзотики»
+const _prevSetupFiltersV3 = setupCatalogFilters;
+setupCatalogFilters = function () {
+    _prevSetupFiltersV3();
+    if (activeCatalogTab === "exotics") {
+        const extraSelect = document.getElementById("extraFilter");
+        const extraLabel = document.getElementById("extraFilterLabel");
+        const legend = document.getElementById("abbrevLegend");
+        extraLabel.textContent = "Сортировка по названию";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_NAME_ASC">🔤 Название: А → Я</option>
+            <option value="SORT_NAME_DESC">🔤 Название: Я → А</option>
+            <option value="SORT_PRICE_ASC">💰 Цена: от меньшей к большей</option>
+            <option value="SORT_PRICE_DESC">💰 Цена: от большей к меньшей</option>
+        `;
+        legend.innerHTML = `<span><b class="text-cp-yellow">Код операции:</b> Н — Незначительная • М — Малая • С — Серьёзная • КР — Критическая</span>`;
+    }
+};
+
+const _prevRenderCatalogV3 = renderCatalog;
+renderCatalog = function () {
+    if (activeCatalogTab === "exotics") {
+        const extra = document.getElementById("extraFilter")?.value || "ALL";
+        const origArr = DB.exotics || [];
+        let temp = [...origArr];
+        if (extra === "SORT_NAME_ASC") temp.sort((a, b) => (a.name || "").localeCompare(b.name || "", "ru"));
+        else if (extra === "SORT_NAME_DESC") temp.sort((a, b) => (b.name || "").localeCompare(a.name || "", "ru"));
+        DB.exotics = temp;
+        try { _prevRenderCatalogV3(); } finally { DB.exotics = origArr; }
+    } else {
+        _prevRenderCatalogV3();
+    }
+};
+
+// Добавляем поддержку экрана deck_builder в switchMainView
+const _prevSwitchMainViewV3 = switchMainView;
+switchMainView = function (view, catalogTab = null) {
+    _prevSwitchMainViewV3(view, catalogTab);
+    const dbEl = document.getElementById("view-deck_builder");
+    if (dbEl) dbEl.classList.toggle("hidden", view !== "deck_builder");
+    if (view === "deck_builder") {
+        renderDeckBuilderView();
+    }
+};
+window.switchMainView = switchMainView;
+
+// --- ЛОГИКА КОНСТРУКТОРА КИБЕРДЕК ---
+let deckBuilderState = {
+    name: "",
+    mu: 10,        // База 10 MU (мин 10), +10 MU = +5000 eb
+    speed: 0,      // База 0 (мин 0, макс 5), +1 = +2000 eb
+    dataWall: 2,   // База 2 (мин 0, макс 10), каждый ур. сверх 2 = +1000 eb
+    codeGate: 2,   // База 2 (мин 0, макс 10), каждый ур. сверх 2 = +1000 eb
+    cpu: 0,        // База 0 (мин 0), +1 = +10000 eb
+    optElectrodes: false, // 10 eb
+    optKeyboard: false,   // 100 eb
+    optScreenBlocks: 0,   // 100 eb за каждые 30 см²
+    optChipReader: false, // 100 eb
+    optExtraChips: 0,     // 10 eb за штуку
+    optVoxBox: false,     // 300 eb
+    optScannerCost: 0     // 0 (нет) | 100 | 200 | 300 eb
+};
+
+window.resetDeckBuilder = function () {
+    deckBuilderState = {
+        name: "",
+        mu: 10, speed: 0, dataWall: 2, codeGate: 2, cpu: 0,
+        optElectrodes: false, optKeyboard: false, optScreenBlocks: 0,
+        optChipReader: false, optExtraChips: 0, optVoxBox: false, optScannerCost: 0
+    };
+    renderDeckBuilderView();
+};
+
+window.adjustDeckStat = function (key, delta) {
+    const cur = Number(deckBuilderState[key]) || 0;
+    let next = cur + delta;
+    if (key === "mu") next = Math.max(10, next);
+    else if (key === "speed") next = Math.max(0, Math.min(5, next));
+    else if (key === "dataWall" || key === "codeGate") next = Math.max(0, Math.min(10, next));
+    else next = Math.max(0, next);
+
+    deckBuilderState[key] = next;
+    renderDeckBuilderView();
+};
+
+window.setDeckField = function (key, val) {
+    deckBuilderState[key] = val;
+    renderDeckBuilderView();
+};
+
+function calculateDeckBuilderTotal() {
+    const s = deckBuilderState;
+    const muCost = Math.max(0, (s.mu - 10) / 10) * 5000;
+    const speedCost = Math.max(0, s.speed) * 2000;
+    const dwCost = Math.max(0, s.dataWall - 2) * 1000;
+    const cgCost = Math.max(0, s.codeGate - 2) * 1000;
+    const cpuCost = Math.max(0, s.cpu) * 10000;
+
+    let optCost = 0;
+    if (s.optElectrodes) optCost += 10;
+    if (s.optKeyboard) optCost += 100;
+    optCost += Math.max(0, s.optScreenBlocks) * 100;
+    if (s.optChipReader) optCost += 100;
+    optCost += Math.max(0, s.optExtraChips) * 10;
+    if (s.optVoxBox) optCost += 300;
+    optCost += Math.max(0, Number(s.optScannerCost) || 0);
+
+    return {
+        total: muCost + speedCost + dwCost + cgCost + cpuCost + optCost,
+        muCost, speedCost, dwCost, cgCost, cpuCost, optCost
+    };
+}
+
+function renderDeckBuilderView() {
+    const grid = document.getElementById("deckBuilderGrid");
+    if (!grid) return;
+    const s = deckBuilderState;
+    const calc = calculateDeckBuilderTotal();
+
+    const statRow = (label, key, val, step, unit, subInfo, minVal, maxVal) => `
+      <div class="bg-cp-bg border border-gray-800 p-3 flex items-center justify-between gap-3">
+        <div>
+          <div class="text-xs font-bold text-white">${label}</div>
+          <div class="text-[10px] text-gray-400 mt-0.5">${subInfo}</div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="adjustDeckStat('${key}', ${-step})" ${val <= minVal ? 'disabled' : ''}
+            class="w-7 h-7 border font-bold text-sm flex items-center justify-center transition-colors ${val <= minVal ? 'bg-cp-panel border-gray-800 text-gray-600 cursor-not-allowed' : 'bg-cp-panel border-gray-700 hover:bg-cp-red text-white'}">−</button>
+          <div class="w-16 text-center font-display font-black text-sm text-cp-cyan">${val}${unit}</div>
+          <button type="button" onclick="adjustDeckStat('${key}', ${step})" ${maxVal !== null && val >= maxVal ? 'disabled' : ''}
+            class="w-7 h-7 border font-bold text-sm flex items-center justify-center transition-colors ${maxVal !== null && val >= maxVal ? 'bg-cp-panel border-gray-800 text-gray-600 cursor-not-allowed' : 'bg-cp-panel border-gray-700 hover:bg-cp-green text-white hover:text-black'}">+</button>
+        </div>
+      </div>
+    `;
+
+    grid.innerHTML = `
+      <!-- ЛЕВАЯ КОЛОНКА: КОНСТРУКТОР -->
+      <div class="col-span-7 bg-cp-panel cp-border p-5 space-y-4">
+        <div>
+          <label class="block text-[11px] text-cp-cyan font-bold uppercase mb-1">Название вашей кибердеки (необязательно):</label>
+          <input type="text" value="${escapeHtmlAttr(s.name)}" oninput="deckBuilderState.name = this.value"
+            placeholder="Например: Кастомная дека Arasaka Mk.IV..."
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-xs text-white font-bold outline-none">
+        </div>
+
+        <div class="space-y-2">
+          <div class="text-[11px] font-bold uppercase text-cp-yellow">1. Основные характеристики:</div>
+          ${statRow("Память (MU / ЕП)", "mu", s.mu, 10, " MU", "База: 10 MU • Шаг +10 MU = +5,000 eb", 10, null)}
+          ${statRow("Скорость деки", "speed", s.speed, 1, "", "База: 0 • Макс: 5 • +1 = +2,000 eb", 0, 5)}
+          ${statRow("Стена Данных (Data Wall)", "dataWall", s.dataWall, 1, "", "База: 2 • Макс: 10 • +1 ур. сверх базы = +1,000 eb", 0, 10)}
+          ${statRow("Сила Кодовых Врат (Code Gate)", "codeGate", s.codeGate, 1, "", "База: 2 • Макс: 10 • +1 ур. сверх базы = +1,000 eb", 0, 10)}
+          ${statRow("Процессоры (ЦПУ / CPU)", "cpu", s.cpu, 1, "", "База: 0 • Каждый ЦПУ = +10,000 eb", 0, null)}
+        </div>
+
+        <div class="space-y-2 pt-2 border-t border-gray-800">
+          <div class="text-[11px] font-bold uppercase text-cp-cyan">2. Дополнительные опции кибердеки:</div>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <label class="flex items-center justify-between p-2.5 bg-cp-bg border ${s.optElectrodes ? 'border-cp-cyan text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <span class="flex items-center gap-2"><input type="checkbox" ${s.optElectrodes ? 'checked' : ''} onchange="setDeckField('optElectrodes', this.checked)" class="accent-cyan-400">Комплект электродов</span>
+              <span class="text-cp-green font-bold">10 eb</span>
+            </label>
+            <label class="flex items-center justify-between p-2.5 bg-cp-bg border ${s.optKeyboard ? 'border-cp-cyan text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <span class="flex items-center gap-2"><input type="checkbox" ${s.optKeyboard ? 'checked' : ''} onchange="setDeckField('optKeyboard', this.checked)" class="accent-cyan-400">Клавиатура</span>
+              <span class="text-cp-green font-bold">100 eb</span>
+            </label>
+            <label class="flex items-center justify-between p-2.5 bg-cp-bg border ${s.optChipReader ? 'border-cp-cyan text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <span class="flex items-center gap-2"><input type="checkbox" ${s.optChipReader ? 'checked' : ''} onchange="setDeckField('optChipReader', this.checked)" class="accent-cyan-400">Считыватель Чипов</span>
+              <span class="text-cp-green font-bold">100 eb</span>
+            </label>
+            <label class="flex items-center justify-between p-2.5 bg-cp-bg border ${s.optVoxBox ? 'border-cp-cyan text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+              <span class="flex items-center gap-2"><input type="checkbox" ${s.optVoxBox ? 'checked' : ''} onchange="setDeckField('optVoxBox', this.checked)" class="accent-cyan-400">ВоксБокс (VoxBox)</span>
+              <span class="text-cp-green font-bold">300 eb</span>
+            </label>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <div class="p-2.5 bg-cp-bg border border-gray-800 flex items-center justify-between gap-2">
+              <div><div class="font-bold text-gray-200">Видеоэкран</div><div class="text-[10px] text-gray-400">100 eb за 30 см²</div></div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="adjustDeckStat('optScreenBlocks', -1)" class="w-6 h-6 bg-cp-panel border border-gray-700 hover:bg-cp-red text-white font-bold">−</button>
+                <span class="w-12 text-center font-bold text-cp-cyan">${s.optScreenBlocks * 30}см²</span>
+                <button type="button" onclick="adjustDeckStat('optScreenBlocks', 1)" class="w-6 h-6 bg-cp-panel border border-gray-700 hover:bg-cp-green text-white hover:text-black font-bold">+</button>
+              </div>
+            </div>
+            <div class="p-2.5 bg-cp-bg border border-gray-800 flex items-center justify-between gap-2">
+              <div><div class="font-bold text-gray-200">Доп. Чипы</div><div class="text-[10px] text-gray-400">10 eb за шт.</div></div>
+              <div class="flex items-center gap-1">
+                <button type="button" onclick="adjustDeckStat('optExtraChips', -1)" class="w-6 h-6 bg-cp-panel border border-gray-700 hover:bg-cp-red text-white font-bold">−</button>
+                <span class="w-10 text-center font-bold text-cp-cyan">${s.optExtraChips}</span>
+                <button type="button" onclick="adjustDeckStat('optExtraChips', 1)" class="w-6 h-6 bg-cp-panel border border-gray-700 hover:bg-cp-green text-white hover:text-black font-bold">+</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-2.5 bg-cp-bg border border-gray-800 flex items-center justify-between gap-3 text-xs">
+            <span class="font-bold text-gray-200">Сканер (100–300 eb):</span>
+            <select onchange="setDeckField('optScannerCost', Number(this.value))"
+              class="bg-cp-panel border border-gray-700 focus:border-cp-cyan px-3 py-1.5 text-xs text-white outline-none">
+              <option value="0" ${s.optScannerCost === 0 ? 'selected' : ''}>Нет (0 eb)</option>
+              <option value="100" ${s.optScannerCost === 100 ? 'selected' : ''}>Базовый сканер (100 eb)</option>
+              <option value="200" ${s.optScannerCost === 200 ? 'selected' : ''}>Продвинутый сканер (200 eb)</option>
+              <option value="300" ${s.optScannerCost === 300 ? 'selected' : ''}>Профессиональный сканер (300 eb)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- ПРАВАЯ КОЛОНКА: ПРАЙС-ЛИСТ И ИТОГОВАЯ КНОПКА В КОРЗИНУ -->
+      <div class="col-span-5 space-y-4">
+        <div class="bg-cp-panel cp-border p-5 space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <span class="font-display text-sm font-bold uppercase text-cp-yellow">💰 Итоговая стоимость</span>
+            <span class="font-display text-2xl font-black text-cp-green">${calc.total.toLocaleString("ru-RU")} eb</span>
+          </div>
+
+          <button type="button" onclick="addBuiltDeckToCart()"
+            class="w-full py-3.5 bg-cp-green hover:bg-green-400 text-black font-display font-black text-sm uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(0,255,102,0.3)] transition-all">
+            🛒 Добавить кибердеку в корзину (${calc.total.toLocaleString("ru-RU")} eb)
+          </button>
+        </div>
+
+        <div class="bg-cp-panel cp-border p-5 space-y-3 text-xs">
+          <div class="font-display text-xs font-bold uppercase text-cp-cyan border-b border-gray-800 pb-2">📋 Прайс-лист и расценки кибердеки</div>
+          <div class="space-y-1.5 text-gray-300">
+            <div class="flex justify-between border-b border-gray-800/60 pb-1"><span>Память (база 10 MU)</span><b class="text-cp-green">+5,000 eb / +10 MU</b></div>
+            <div class="flex justify-between border-b border-gray-800/60 pb-1"><span>Скорость (0–5)</span><b class="text-cp-green">+2,000 eb / ур.</b></div>
+            <div class="flex justify-between border-b border-gray-800/60 pb-1"><span>Стена Данных (база 2, макс 10)</span><b class="text-cp-green">+1,000 eb / ур.</b></div>
+            <div class="flex justify-between border-b border-gray-800/60 pb-1"><span>Кодовые Врата (база 2, макс 10)</span><b class="text-cp-green">+1,000 eb / ур.</b></div>
+            <div class="flex justify-between border-b border-gray-800/60 pb-1"><span>Доп. Процессор (ЦПУ)</span><b class="text-cp-green">+10,000 eb / шт.</b></div>
+            <div class="pt-2 text-[11px] font-bold uppercase text-cp-yellow">Опции:</div>
+            <div class="flex justify-between"><span>Комплект электродов</span><b class="text-cp-green">10 eb</b></div>
+            <div class="flex justify-between"><span>Клавиатура</span><b class="text-cp-green">100 eb</b></div>
+            <div class="flex justify-between"><span>Видеоэкран</span><b class="text-cp-green">100 eb / 30 см²</b></div>
+            <div class="flex justify-between"><span>Считыватель Чипов</span><b class="text-cp-green">100 eb</b></div>
+            <div class="flex justify-between"><span>Дополнительные Чипы</span><b class="text-cp-green">10 eb / шт.</b></div>
+            <div class="flex justify-between"><span>ВоксБокс (VoxBox)</span><b class="text-cp-green">300 eb</b></div>
+            <div class="flex justify-between"><span>Сканер</span><b class="text-cp-green">100–300 eb</b></div>
+          </div>
+        </div>
+      </div>
+    `;
+}
+
+window.addBuiltDeckToCart = function () {
+    const s = deckBuilderState;
+    const calc = calculateDeckBuilderTotal();
+    const deckName = (s.name || "").trim() || `Кастомная кибердека (${s.mu} MU, Скор. ${s.speed})`;
+
+    const optionsList = [];
+    if (s.optElectrodes) optionsList.push("Комплект электродов (10 eb)");
+    if (s.optKeyboard) optionsList.push("Клавиатура (100 eb)");
+    if (s.optScreenBlocks > 0) optionsList.push(`Видеоэкран ${s.optScreenBlocks * 30} см² (${s.optScreenBlocks * 100} eb)`);
+    if (s.optChipReader) optionsList.push("Считыватель Чипов (100 eb)");
+    if (s.optExtraChips > 0) optionsList.push(`Доп. Чипы ×${s.optExtraChips} (${s.optExtraChips * 10} eb)`);
+    if (s.optVoxBox) optionsList.push("ВоксБокс (300 eb)");
+    if (s.optScannerCost > 0) optionsList.push(`Сканер (${s.optScannerCost} eb)`);
+
+    const customId = "custom-deck-" + Date.now();
+    SHOPPING_CART.push({
+        sectionKey: "deck_builder",
+        itemId: customId,
+        qty: 1,
+        customItem: {
+            id: customId,
+            kind: "custom_deck",
+            name: deckName,
+            category: "Кастомная кибердека",
+            cost: `${calc.total} eb`,
+            stats: { mu: s.mu, speed: s.speed, dataWall: s.dataWall, codeGate: s.codeGate, cpu: s.cpu },
+            options: optionsList
+        }
+    });
+
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+};
+
+// Просмотр карточки собранной деки (или кастомной одежды) по клику из Корзины
+const _prevOpenCartItemCardV3 = window.openCartItemCard;
+window.openCartItemCard = function (sectionKey, itemId) {
+    const entry = SHOPPING_CART.find(c => c.itemId === itemId);
+    if (entry && entry.customItem) {
+        closeCartDropdown();
+        const ci = entry.customItem;
+        const modal = document.getElementById("customCartItemModal");
+        const titleEl = document.getElementById("customCartModalTitle");
+        const subEl = document.getElementById("customCartModalSub");
+        const bodyEl = document.getElementById("customCartModalBody");
+        if (!modal || !bodyEl) return;
+
+        if (titleEl) titleEl.textContent = ci.name;
+        if (subEl) subEl.textContent = ci.kind === "custom_deck" ? "СОБРАННАЯ КИБЕРДЕКА // КАРТОЧКА" : "СОБРАННЫЙ ПРЕДМЕТ // КОРЗИНА";
+
+        if (ci.kind === "custom_deck" && ci.stats) {
+            bodyEl.innerHTML = `
+              <div class="grid grid-cols-5 gap-2 text-center">
+                <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400">Память</div><b class="text-cp-cyan text-sm">${ci.stats.mu} MU</b></div>
+                <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400">Скорость</div><b class="text-cp-green text-sm">+${ci.stats.speed}</b></div>
+                <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400">Стена</div><b class="text-cp-yellow text-sm">${ci.stats.dataWall}</b></div>
+                <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400">Врата</div><b class="text-cp-yellow text-sm">${ci.stats.codeGate}</b></div>
+                <div class="bg-cp-bg border border-gray-800 p-2"><div class="text-[9px] text-gray-400">ЦПУ</div><b class="text-white text-sm">${ci.stats.cpu}</b></div>
+              </div>
+              <div class="bg-cp-bg border-l-2 border-cp-cyan p-3">
+                <div class="text-[10px] font-bold uppercase text-cp-cyan mb-1">Установленные опции:</div>
+                <div class="text-gray-200">${ci.options && ci.options.length > 0 ? ci.options.join(" • ") : "Базовая комплектация без доп. опций"}</div>
+              </div>
+              <div class="flex justify-between items-center bg-cp-bg border border-gray-800 p-3">
+                <span class="text-gray-400 uppercase font-bold text-[11px]">Итоговая цена сборки:</span>
+                <span class="font-display font-black text-base text-cp-green">${ci.cost}</span>
+              </div>
+            `;
+        } else {
+            bodyEl.innerHTML = `
+              <div class="bg-cp-bg border border-gray-800 p-3.5 text-gray-200">${escapeHtmlAttr(ci.name)}</div>
+              <div class="flex justify-between items-center bg-cp-bg border border-gray-800 p-3">
+                <span class="text-gray-400 uppercase font-bold text-[11px]">Цена:</span>
+                <span class="font-display font-black text-base text-cp-green">${ci.cost}</span>
+              </div>
+            `;
+        }
+        modal.classList.remove("hidden");
+        return;
+    }
+    _prevOpenCartItemCardV3(sectionKey, itemId);
+};
+
+window.closeCustomCartItemModal = function () {
+    document.getElementById("customCartItemModal")?.classList.add("hidden");
+};
+
+// =========================================================================
+// БОЕВЫЕ ИСКУССТВА: ТАБЛИЦЫ ДЕЙСТВИЙ, КОНСТРУКТОР И ПОДСКАЗКИ ПРИ НАВЕДЕНИИ
+// =========================================================================
+
+const MA_TABLE_1 = [
+    { k: "ma_strike", short: "Удар",  full: "Удар оружием (Strike)" },
+    { k: "ma_punch",  short: "Кулак", full: "Удар рукой (Punch)" },
+    { k: "ma_sweep",  short: "Подс",  full: "Подсечка (Sweep / Trip)" },
+    { k: "ma_dodge",  short: "Уклон", full: "Уклонение (Dodge)" },
+    { k: "ma_throw",  short: "Брос",  full: "Бросок (Throw)" },
+    { k: "ma_choke",  short: "Удуш",  full: "Удушение и сдавливание (Choke / Crush)" },
+    { k: "ma_ram",    short: "Таран", full: "Таран (Ram)" }
+];
+
+const MA_TABLE_2 = [
+    { k: "ma_disarm",   short: "Обез",   full: "Обезоруживание (Disarm)" },
+    { k: "ma_kick",     short: "Нога",   full: "Удар ногой (Kick)" },
+    { k: "ma_block",    short: "Блок",   full: "Блок / парирование (Block / Parry)" },
+    { k: "ma_grapple",  short: "Захват", full: "Захват (Grapple)" },
+    { k: "ma_hold",     short: "Удерж",  full: "Удержание и залом (Hold / Break)" },
+    { k: "ma_escape",   short: "Освоб",  full: "Освобождение (Escape)" },
+    { k: "ma_cast",     short: "Метан",  full: "Метание (Cast)" },
+    { k: "ma_jumpkick", short: "ДКик",   full: "Прыжковый удар (Jump Kick)" }
+];
+
+const MA_ACTION_TOOLTIPS = {
+    ma_strike: {
+        title: "Удар оружием (Strike)",
+        text: `Это атака с использованием оружия, предназначенного для боевых искусств. Подходящее оружие и соответствующие ему стили перечислены в разделе Martial Arts Weapons.
+
+Для выполнения атаки используются следующие навыки:
+• Боевые искусства (Martial Arts).
+• Фехтование (Fencing) для клинкового оружия.
+• Ближний бой (Melee) для тупого и импровизированного оружия.
+• К импровизированному оружию относятся предметы, которые в экстренной ситуации можно использовать для нападения: бутылки, биты, сковородки и тому подобное. Их характеристики определяет мастер.
+
+Модификаторы атаки:
+Бонус ключевой атаки «Удар» + точность оружия (WA).
+Ключевой удар оружием имеют следующие стили: Тэ, Ниндзюцу, Джит Кун До, Чой Ли Фут, Тайцзи-цюань и Самбо.
+Если это ключевая атака, то это действие имеет бонус к урону равный уровню этого Боевого Искусства.`
+    },
+    ma_punch: {
+        title: "Удар рукой (Punch)",
+        text: `Обычный человек может атаковать двумя руками: правой и левой. Базовый урон удара рукой составляет 1D6/2.
+
+Киберконечности увеличивают урон:
+• Обычная киберрука — 1D6
+• Утолщённые миомары (Thickened Myomars) — 2D6
+• Гидравлические усилители (Hydraulic Rams) — 3D6
+
+Удар рукой включает не только привычный удар кулаком, но и джебы, удары локтем, ребром ладони и открытой ладонью.
+Если персонаж владеет стилем с ключевой атакой «Удар рукой», он может атаковать обеими руками одновременно без штрафа за использование двух оружий. Для обычной Драки это послабление не действует.
+Оружие, закреплённое непосредственно на руке (например, кастет или кибероружие), также можно использовать в такой атаке без дополнительного штрафа. Оружие, которое персонаж просто держит в руке и может уронить, используется через Strike.
+
+Навык: Боевые искусства или Драка.
+Модификаторы: Бонус ключевой атаки «Удар рукой» + точность установленного оружия (WA).
+Если это ключевая атака, то это действие имеет бонус к урону равный уровню этого Боевого Искусства.`
+    },
+    ma_sweep: {
+        title: "Подсечка (Sweep / Trip)",
+        text: `Персонаж использует ноги, чтобы сбить противника с ног.
+Упавший противник получает −2 ко всем атакам до тех пор, пока не поднимется. На подъём требуется одно действие. Атакующий, в свою очередь, получает +2 к своим атакам против лежащего противника.
+Повторно подсечь уже лежащую цель нельзя: сначала она должна встать.
+
+Подсечка с ударом ногой:
+Если персонаж владеет ключевой атакой «Удар ногой», он может выполнить специальную разновидность подсечки. За неё назначается дополнительный штраф −3 к попаданию.
+При успешном попадании:
+• Наносится 1D6+3 урона.
+• Противник выполняет проверку оглушения (Stun Save) со штрафом −2.
+• Если используются киберноги, вместо обычного урона берётся их урон от удара ногой с добавлением +3 (например, гидравлические усилители наносят 6D6+3).
+
+Навык: только Боевые искусства.
+Модификаторы: Бонус ключевой атаки «Подсечка» + бонус точности оружия (WA), если используется соответствующее оружие.
+Ключевая подсечка имеется у Тхэквондо, Тэ, Коппо, Ниндзюцу, Джит Кун До, Звериного кунг-фу, Чой Ли Фут, Дзюдо, Борьбы, Айкидо, Самбо и Капоэйры.`
+    },
+    ma_dodge: {
+        title: "Уклонение (Dodge)",
+        text: `Уклонение представляет собой защитный манёвр, при котором персонаж полностью избегает контакта с атакой. При успешной проверке персонаж не получает урона.
+
+Даже при провале проверки персонаж с ключевой защитой «Уклонение» может уменьшить полученный урон:
+1. Сначала учитывается броня.
+2. Затем из оставшегося урона вычитается уровень Боевых искусств.
+3. После этого применяется BTM.
+
+Используемые навыки: Боевые искусства, Уклонение и освобождение либо Атлетика (выбирает мастер).
+Модификатор: Бонус ключевой защиты «Уклонение».
+Ключевую защиту «Уклонение» имеют Тхэквондо, Тэ, Сумо, Джит Кун До, Чой Ли Фут, Тайцзи-цюань, Дзюдо, Айкидо, Бокс, Сават и Капоэйра.
+Как и при блокировании, боец может уклоняться от летящих предметов, если заметил их бросок проверкой Внимания (с теми же бонусами по размеру предмета).
+
+Полная защита (All-Out Parry / All-Out Dodge):
+Доступна всем персонажам. За раунд можно объявить только одну такую защиту (штраф −3 ко всем остальным действиям).
+• Полное парирование: все атаки ближним оружием (и метательным для мастера БИ) автоматически принимаются на предмет защиты (проверяется на поломку).
+• Полное уклонение: все атаки противника получают −2 к попаданию (для мастеров БИ действует и против метательных атак).
+• При наличии ключевых защит можно уменьшать урон в соответствии с уровнем навыков (в некоторых сочетаниях — дважды).
+Боевые искусства не спасают от огнестрельного оружия, лазеров, газа, кислоты и подобных угроз.`
+    },
+    ma_throw: {
+        title: "Бросок (Throw)",
+        text: `Бросок можно провести, когда противник уже захвачен или удерживается.
+
+При успешном броске:
+• Противник получает 1D6 урона.
+• Проходит проверку оглушения с модификатором +2.
+• До момента подъёма (одно действие) получает −2 ко всем атакам.
+• Атакующий получает +2 к атакам против упавшего противника.
+• Для повторения приёма необходимо снова захватить противника.
+
+Броня не защищает от урона броска, за исключением персонажей в полном кибернетическом теле (Fullborg).
+При расчёте урона добавляются модификатор урона тела и уровень Боевых искусств атакующего (если используется этот навык), затем вычитается BTM цели.
+При провале проверки противники остаются в захвате.
+
+Используемые навыки: Боевые искусства или Атлетика.
+Модификатор: Бонус ключевой атаки «Бросок».
+Если это ключевая атака, имеет бонус к урону равный уровню этого Боевого Искусства.
+Ключевой бросок доступен Сумо, Чой Ли Фут, Дзюдо, Борьбе, Айкидо и Самбо.`
+    },
+    ma_choke: {
+        title: "Удушение и сдавливание (Choke / Crush)",
+        text: `Эти приёмы можно применять к противнику, которого уже удалось захватить.
+• Удушение (Choke): контроль головы или корпуса, проверка против освобождения.
+• Сдавливание (Crush): киберрукой можно физически раздавить любую часть тела.
+
+При успехе противник получает −2 ко всем действиям, кроме освобождения. Если противник уже в удержании, дополнительная проверка не нужна. Приёмы непрерывные — урон наносится каждый раунд, пока цель не освободится.
+
+Урон от удушения:
+1D6 + бонус WA (при оружии БИ) + модификатор BODY + уровень Martial Arts (если ключевая атака).
+Обычная броня не защищает (кроме спецзащиты шеи). Fullborg не подвержены обычному удушению.
+
+Урон от сдавливания:
+• Стандартная киберрука — 2D6
+• Утолщённые миомары — 4D6
+• Гидравлические усилители — 6D6
+При ключевой атаке «Удушение» прибавляется уровень БИ (модификатор BODY не применяется). При одновременном удушении и сдавливании берётся больший урон.
+
+Навыки: Боевые искусства или Драка.
+Модификатор: Бонус ключевой атаки «Удушение».
+Ключевое удушение доступно Коппо, Ниндзюцу, Борьбе и Айкидо.`
+    },
+    ma_ram: {
+        title: "Таран (Ram)",
+        text: `Атака с разбега, при которой персонаж использует массу тела, чтобы врезаться в противника и сбить его с ног.
+Навыки: Боевые искусства (или Атлетика со специализацией).
+Модификаторы: Бонус ключевой атаки «Таран» − штраф за разбег.
+Ключевой таран есть только у Сумо.
+
+Урон = Базовый урон по BODY + уровень Martial Arts (если ключевая атака) + бонус разбега (дробные округляются вверх).
+
+Базовый урон тарана по BODY:
+• 2: 1D6−2  |  3–4: 1D6−1  |  5: 1D6
+• 6–7: 2D6  |  8–9: 2D6+1  |  10: 2D6+2
+• 11–12: 3D6+4  |  13–14: 3D6+6  |  15: 3D6+8
+• 16–20: 4D6+8  |  Далее каждая ед. BODY: +1D6
+
+Дистанция разбега (Бонус к урону / Штраф к попаданию):
+• Без разбега: 0 / 0
+• 1/4 бега: 1/4 ур. MA / −2
+• 1/3 бега: 1/3 ур. MA / −4
+• 1/2 бега: 1/2 ур. MA / −6
+
+Защита: рекомендуется Уклонение. При провале — проверка удержаться на ногах (BODY + Strength Feat + 1D10 против урона). При провале цель падает, проверка оглушения (−2), −2 к след. атаке (+2 атакующему). При успешном Блоке защищающийся наносит урон своим оружием (не уменьшается блоком/уклонением атакующего), но сам проходит проверку падения.`
+    },
+    ma_disarm: {
+        title: "Обезоруживание (Disarm)",
+        text: `При успешном обезоруживании противник теряет оружие, которое держал в руках.
+Атакующий делает проверку с навыком и REF. Если есть ключевая атака «Обезоруживание», добавляется её бонус; если нет — применяется BTM противника.
+
+Дополнительные модификаторы:
+• Противник в All-Out Parry: +6 атакующему.
+• Противник в All-Out Dodge: −3 атакующему.
+• При обезоруживании оружием учитывается его WA.
+• Размер оружия противника: Обычное (винтовка, меч) 0 | Маленькое (пистолет, ПП, нож) −4 | Крошечное (сюрикен, дерринджер) −6.
+
+Защищающийся использует: Уклонение и освобождение, Атлетику или БИ с ключевой защитой «Уклонение» (Фехтование и Ближний бой нельзя).
+При успехе оружие выбивается без урона. Встроенное или имплантированное оружие (росомахи, шипованные перчатки) отнять нельзя.`
+    },
+    ma_kick: {
+        title: "Удар ногой (Kick)",
+        text: `Базовый урон удара ногой составляет 1D6.
+
+Киберноги увеличивают урон:
+• Обычная кибернога — 2D6
+• Утолщённые миомары — 4D6
+• Гидравлические усилители — 6D6
+
+Стили, позволяющие атаковать обеими ногами одновременно без штрафа: Сават, Капоэйра, Тхэквондо, Тайский бокс.
+Атаки обеими руками или обеими ногами считаются одним действием. Комбинация удара рукой и ногой требует двух действий (штраф −3 на второе).
+Оружие, встроенное в ногу или обувь (шипы, лезвия), можно использовать в такой атаке.
+
+Навык: Боевые искусства или Драка.
+Модификаторы: Бонус ключевой атаки «Удар ногой» + точность установленного оружия (WA).
+Если это ключевая атака, имеет бонус к урону равный уровню этого Боевого Искусства.`
+    },
+    ma_block: {
+        title: "Блок / парирование (Block / Parry)",
+        text: `Остановка атаки перехватом оружием, руками или ногами. Перед броском нужно объявить, чем именно блокируется удар.
+Навыки: Боевые искусства, Фехтование (клинки), Ближний бой (тупое/импровизированное), Драка (руки/ноги).
+Модификаторы: Бонус ключевой защиты «Блок» + WA оружия.
+Ключевая защита «Блок» есть у Каратэ, Тхэквондо, Коппо, Ниндзюцу, Джит Кун До, Звериного кунг-фу, Чой Ли Фут, Тайцзи-цюань, Айкидо, Бокса, Тайского бокса, Савата и Капоэйры.
+
+Поломка клинкового оружия при парировании (бросок 1D10):
+• Обычный клинок: 1  |  Mono-Two: 1–2
+• Обычный моноклинок: 1–4  |  Энергетический меч (Powersword): 1–5
+
+Если нет SDP, используются очки парирования PP (= макс. урон предмета; огнестрел: духовая трубка 0, лук 5, пистолет 10, ПП 15, винтовка/дробовик 20). При PP = 0 предмет ломается.
+Даже при провале или поломке персонаж с ключевой защитой «Блок» уменьшает урон: 1) Броня → 2) минус уровень БИ → 3) BTM.
+
+Парирование летящих предметов (после проверки Внимания):
+Копьё / метательный топор: +6 | Стрела / болт: +4 | Сюрикен / дротик: 0.`
+    },
+    ma_grapple: {
+        title: "Захват (Grapple)",
+        text: `Переход с дистанции удара на дистанцию борьбы. Открывает приёмы: Бросок (Throw), Удержание/Залом (Hold/Break), Удушение/Сдавливание (Choke/Crush).
+Защищающийся может помешать парированием, уклонением или освобождением. Если защищающийся сам пытается провести захват, оба автоматически переходят в борьбу без проверок и штрафов.
+
+Захваченный противник получает штраф −2 ко всем действиям, кроме освобождения. Захват — непрерывное состояние. Чтобы выйти из борьбы на дистанцию ударов, нужно сначала освободиться (если в захвате), затем пройти парирование или уклонение.
+
+Навыки: Боевые искусства или Драка.
+Модификатор: Бонус ключевой атаки «Захват».
+Ключевой захват доступен Сумо, Коппо, Ниндзюцу, Чой Ли Фут, Тайцзи-цюань, Дзюдо, Борьбе, Айкидо, Самбо и Тайскому боксу.`
+    },
+    ma_hold: {
+        title: "Удержание и залом (Hold / Break)",
+        text: `Для удержания необходимо сначала захватить противника.
+При успешном удержании противник может предпринимать только попытки освобождения, а атакующий может без дополнительной проверки выполнить Бросок или Удушение/Сдавливание.
+
+Залом (Break):
+Направлен на повреждение суставов (нужно удерживать руку или ногу). Требует отдельной проверки против освобождения на следующем действии.
+При успешном заломе:
+• Наносится 1D6 урона + проверка оглушения (+2).
+• Броня и кибертела не защищают (удар по суставам).
+• Против двухсуставных киберконечностей штраф −4.
+• Перелом обычной конечности: 9 урона за атаку. Киберконечности получают накопительный урон в SDP (20 — не работает, 30 — разрушена).
+
+Удержание и залом — непрерывные действия (урон от залома не чаще раза за раунд).
+Навык: только Боевые искусства.
+Модификатор: Бонус ключевой атаки «Удержание».
+Доступно Сумо, Коппо, Ниндзюцу, Дзюдо, Борьбе, Айкидо и Самбо.`
+    },
+    ma_escape: {
+        title: "Освобождение (Escape)",
+        text: `Защитный приём для выхода из состояний борьбы. Каждая успешная проверка переводит на одну ступень выше:
+Залом → Удержание / Удушение / Сдавливание → Захват → Дистанция борьбы.
+
+Навыки: Боевые искусства или Уклонение и освобождение (Dodge & Escape).
+Модификатор: Бонус ключевой защиты «Освобождение».
+Ключевое освобождение доступно Сумо, Коппо, Ниндзюцу, Дзюдо, Борьбе, Айкидо и Самбо.
+
+Освобождение как атакующее действие:
+Можно активно вырваться из борьбы против Захвата/Удержания/Удушения врага — при победе персонаж переходит на дистанцию удара или метания.`
+    },
+    ma_cast: {
+        title: "Метание (Cast)",
+        text: `Относится к категории Strike, применяется для луков и метательного оружия (сюрикены, дротики, копья и др.).
+Навыки: Боевые искусства, Стрельба из лука (Archery) или Атлетика (Athletics).
+
+Рассчитывается по правилам стрельбы, но противник с БИ может заметить бросок проверкой Внимания и уклониться/отбить его (встречная проверка).
+Модификаторы: Бонус ключевой атаки «Удар» + WA + штраф дистанции.
+Ключевое метание доступно Ниндзюцу, Чой Ли Фут и Тайцзи-цюань.
+
+Штрафы дистанции:
+• Рукопашная: −5  |  Близкая: 0  |  Средняя: −5  |  Дальняя: −10  |  Предельная: −15`
+    },
+    ma_jumpkick: {
+        title: "Прыжковый удар (Jump Kick)",
+        text: `Одновременный прыжок и удар ногой (требуется ключевая атака «Удар ногой»). Дистанция: от 1/2 Прыжка до 1/2 Бега.
+Автоматический штраф −5 к попаданию. Позволяет перепрыгивать небольшие препятствия (мины, канавы, тела).
+
+Урон при попадании:
+• Обычная нога — 1D6+5
+• Стандартная кибернога — 2D6+5
+• Утолщённые миомары — 4D6+5
+• Гидравлические усилители — 6D6+5
+
+Навык: только Боевые искусства (Martial Arts).
+Модификаторы: Бонус ключевой атаки «Удар ногой» + WA встроенного оружия (Spike Heels, Talon Feet, Spiked Boots и др.).
+
+Стили, позволяющие Прыжковый удар: Каратэ, Тхэквондо, Коппо, Ниндзюцу, Джит Кун До, Звериное кунг-фу, Чой Ли Фут, Тайцзицюань, Самбо, Тайский бокс, Сават, Капоэйра.`
+    },
+    ma_weapons: {
+        title: "Список оружия боевых искусств",
+        text: `Не любое оружие можно использовать с любым боевым искусством. Если стиль не соответствует конкретному оружию, персонаж использует Ближний бой для проверки попадания и не получает бонус к урону от Боевых искусств.`
+    }
+};
+
+// Показ подробной подсказки при наведении на блок действия БИ
+window.showMaActionTooltip = function (ev, actionKey) {
+    clearTimeout(cardHoverHideTimer);
+    clearTimeout(cardHoverShowTimer);
+
+    const info = MA_ACTION_TOOLTIPS[actionKey];
+    if (!info) return;
+
+    const targetEl = ev.currentTarget || ev.target;
+    const rect = targetEl.getBoundingClientRect();
+
+    cardHoverShowTimer = setTimeout(() => {
+        const pop = document.getElementById("cardHoverPreviewPopover");
+        if (!pop) return;
+
+        pop.innerHTML = `
+          <div class="space-y-2 max-h-[65vh] overflow-y-auto pr-1">
+            <div class="border-b border-gray-800 pb-1.5 sticky top-0 bg-cp-panel">
+              <div class="text-[9px] font-bold uppercase tracking-widest text-cp-cyan">СПРАВКА БОЕВЫХ ИСКУССТВ</div>
+              <div class="font-display font-black text-sm text-cp-yellow mt-0.5">${escapeHtmlAttr(info.title)}</div>
+            </div>
+            <div class="text-[11px] text-gray-200 leading-relaxed whitespace-pre-line">${escapeHtmlAttr(info.text)}</div>
+          </div>
+        `;
+        pop.classList.remove("hidden");
+
+        const popWidth = pop.offsetWidth || 430;
+        const popHeight = pop.offsetHeight || 260;
+
+        let left = rect.left;
+        if (left + popWidth > window.innerWidth - 16) {
+            left = Math.max(12, window.innerWidth - popWidth - 16);
+        }
+        let top = rect.bottom + 8;
+        if (top + popHeight > window.innerHeight - 12) {
+            top = Math.max(12, rect.top - popHeight - 8);
+        }
+
+        pop.style.left = `${Math.round(left)}px`;
+        pop.style.top = `${Math.round(top)}px`;
+    }, 200);
+};
+
+// Перехватываем конструктор setBuilderType для раздела martial_arts
+const _prevSetBuilderTypeForMA = setBuilderType;
+setBuilderType = function (type, itemToEdit = null) {
+    _prevSetBuilderTypeForMA(type, itemToEdit);
+    if (type !== "martial_arts") return;
+
+    const container = document.getElementById("builderFieldsContainer");
+    if (!container) return;
+    const v = itemToEdit || {};
+    const cats = getAllCategoriesForSection("martial_arts");
+    const books = getAllBookSources();
+
+    const makeTableInputs = (cols) => cols.map(c => `
+      <div class="bg-cp-bg border border-gray-800 p-1.5 text-center">
+        <label class="block text-[10px] font-bold text-cp-cyan mb-1 truncate" title="${escapeHtmlAttr(c.full)}">${c.short}</label>
+        <input name="${c.k}" value="${escapeHtmlAttr(v[c.k] && v[c.k] !== '—' ? v[c.k] : '')}" placeholder="—"
+          class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow p-1 text-xs text-center text-white font-bold outline-none">
+      </div>
+    `).join("");
+
+    container.innerHTML = `
+      <datalist id="dl-builder-cat">${cats.map(c => `<option value="${escapeHtmlAttr(c)}">`).join("")}</datalist>
+      <datalist id="dl-builder-book">${books.map(b => `<option value="${escapeHtmlAttr(b)}">`).join("")}</datalist>
+      <div class="grid grid-cols-2 gap-3.5">
+        <div><label class="text-[11px] text-gray-400">Название боевого искусства (рус.)</label><input name="name" value="${escapeHtmlAttr(v.name || '')}" placeholder="Каратэ / Арасака-те" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+        <div><label class="text-[11px] text-gray-400">Оригинальное название (англ.)</label><input name="origName" value="${escapeHtmlAttr(v.origName || '')}" placeholder="Karate / Arasaka-te" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+        <div><label class="text-[11px] text-cp-yellow font-bold">Модификатор ОУ (очков улучшения)</label><input name="ipMod" value="${escapeHtmlAttr(v.ipMod || '')}" placeholder="×2 / ×3 / ×4" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-cp-yellow font-bold"></div>
+        <div><label class="text-[11px] text-cp-cyan font-bold">Категория / Школа</label><input name="category" list="dl-builder-cat" value="${escapeHtmlAttr(v.category || '')}" placeholder="Ударные стили" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+        <div class="col-span-2"><label class="text-[11px] text-cp-yellow font-bold">Книга-источник</label><input name="book" list="dl-builder-book" value="${escapeHtmlAttr(v.book || '')}" placeholder="CP20 / PAC" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white"></div>
+      </div>
+
+      <div class="bg-cp-panel border border-cp-cyan/40 p-3 space-y-2.5">
+        <div class="text-[11px] font-bold uppercase text-cp-cyan">🥋 Таблица 1 (Ключевые действия и бонусы):</div>
+        <div class="grid grid-cols-7 gap-1.5">${makeTableInputs(MA_TABLE_1)}</div>
+        <div class="text-[11px] font-bold uppercase text-cp-yellow pt-1">🥋 Таблица 2 (Ключевые действия и бонусы):</div>
+        <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5">${makeTableInputs(MA_TABLE_2)}</div>
+      </div>
+
+      <div>
+        <label class="text-[11px] text-cp-cyan font-bold">⚔️ Список оружия (подходящего для стиля)</label>
+        <textarea name="weaponsList" rows="2" placeholder="Катана, нунчаки, бо, сюрикены..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.weaponsList && v.weaponsList !== '—' ? v.weaponsList : ''}</textarea>
+      </div>
+      <div>
+        <label class="text-[11px] text-gray-400">Описание стиля</label>
+        <textarea name="desc" rows="4" placeholder="История, философия и особенности боевого искусства..." class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea>
+      </div>
+    `;
+    attachRichToolbarsToBuilderTextareas();
+};
+
+// Кастомный рендер детальной карточки для Боевых Искусств
+const _prevRenderDetailCardForMA = renderDetailCard;
+renderDetailCard = function (item) {
+    if (activeCatalogTab !== "martial_arts" || !item) {
+        _prevRenderDetailCardForMA(item);
+        return;
+    }
+
+    const box = document.getElementById("detailCard");
+    if (!box) return;
+    box.setAttribute("data-rendered-id", item.id);
+
+    const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">HOMEBREW</span>` : "";
+
+    const renderActionRow = (cols) => `
+      <div class="grid ${cols.length === 7 ? 'grid-cols-7' : 'grid-cols-8'} gap-1 text-center">
+        ${cols.map(c => {
+            const rawVal = dash(item[c.k]);
+            const hasBonus = rawVal !== "—" && rawVal !== "0";
+            return `
+              <div onmouseenter="showMaActionTooltip(event, '${c.k}')" onmouseleave="scheduleHideCardHoverPreview()"
+                class="bg-cp-bg border ${hasBonus ? 'border-cp-cyan/70 bg-cp-cyan/5' : 'border-gray-800'} hover:border-cp-yellow cursor-help transition-colors overflow-hidden">
+                <div class="bg-black/60 border-b border-gray-800 py-1 px-0.5 text-[10px] font-bold uppercase ${hasBonus ? 'text-cp-cyan' : 'text-gray-400'} truncate">${c.short}</div>
+                <div class="py-1.5 text-xs font-display font-black ${hasBonus ? 'text-cp-yellow' : 'text-gray-600'}">${escapeHtmlAttr(rawVal)}</div>
+              </div>
+            `;
+        }).join("")}
+      </div>
+    `;
+
+    const weaponsHtml = `
+      <div onmouseenter="showMaActionTooltip(event, 'ma_weapons')" onmouseleave="scheduleHideCardHoverPreview()"
+        class="bg-cp-bg border-l-2 border-cp-cyan p-3.5 mb-4 cursor-help hover:bg-cp-cyan/5 transition-colors">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[11px] font-bold uppercase text-cp-cyan">⚔️ Список оружия:</span>
+          <span class="text-[10px] text-gray-500">ℹ️ наведите для правил</span>
+        </div>
+        <div class="text-xs text-gray-200 leading-relaxed whitespace-pre-line">${item.weaponsList && String(item.weaponsList).trim() !== "" ? formatRichTextWithLinks(item.weaponsList) : "—"}</div>
+      </div>
+    `;
+
+    box.innerHTML = `
+      <div class="border-b border-gray-800 pb-3 mb-4 flex items-start justify-between gap-3">
+        <div>
+          <div class="text-xs text-cp-cyan uppercase font-bold">${dash(item.category)} // Источник: ${dash(item.book)} ${addedHeaderBadge}</div>
+          <h2 class="font-display text-2xl font-black text-white mt-1">${dash(item.name)}</h2>
+          <div class="text-xs text-gray-500">Оригинал: ${dash(item.origName)}</div>
+        </div>
+        ${renderCardActionButtons("martial_arts", item.id)}
+      </div>
+
+      <div class="bg-cp-bg border border-gray-800 p-3 mb-4 flex items-center justify-between">
+        <span class="text-xs font-bold uppercase text-gray-400">Модификатор ОУ (очков улучшения):</span>
+        <span class="px-3 py-1 bg-cp-yellow/15 border border-cp-yellow/60 text-cp-yellow font-display font-black text-sm">${dash(item.ipMod)}</span>
+      </div>
+
+      <div class="space-y-2 mb-4">
+        <div class="flex items-center justify-between text-[10px] text-gray-400 uppercase font-bold">
+          <span class="text-cp-cyan">Ключевые действия и бонусы стиля</span>
+          <span>ℹ️ Наведите курсор на действие для подробных правил</span>
+        </div>
+        ${renderActionRow(MA_TABLE_1)}
+        ${renderActionRow(MA_TABLE_2)}
+      </div>
+
+      ${weaponsHtml}
+      ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${formatRichTextWithLinks(item.desc)}</div>` : ""}
+      ${renderCardGalleryBlockHTML(item)}
+      ${renderCommentsSectionHTML(item.id)}
+    `;
+
+    if (typeof loadCommentsForCardFromCloud === "function") {
+        loadCommentsForCardFromCloud(item.id, false);
+    }
+};
+// =========================================================================
+// ЧАСТЬ 5.3: КОНСТРУКТОР ДАТАФОРТОВ (СЕТКА 20x20, ИИ, НАВЫКИ, ИКОНКИ)
+// =========================================================================
+
+PARENT_NAV_MAP.datafort = "netrunning_group";
+
+const _prevSwitchMainViewV4 = switchMainView;
+switchMainView = function (view, catalogTab = null) {
+    _prevSwitchMainViewV4(view, catalogTab);
+    const dfEl = document.getElementById("view-datafort");
+    if (dfEl) dfEl.classList.toggle("hidden", view !== "datafort");
+    if (view === "datafort") {
+        renderDatafortView();
+    }
+};
+window.switchMainView = switchMainView;
+
+const DF_REMOTES = [
+    { id: "rem_manip",    name: "Манипуляторы", desc: "Предназначены для ремонтных задач, покраски или выполнения любого другого вида «ручной» работы." },
+    { id: "rem_factory",  name: "Автоматиз. станки", desc: "Токарные станки и автоматизированные сборочные роботы. Используются на промышленных предприятиях и в производственных лавках." },
+    { id: "rem_elevator", name: "Лифты", desc: "Лифты с компьютерным управлением." },
+    { id: "rem_camera",   name: "Камеры наблюдения", desc: "Распространённая мера безопасности. Обычно имеются у большинства корпораций (60%)." },
+    { id: "rem_video",    name: "Видеоэкран", desc: "Широкие плоские экраны высокой чёткости длиной до 60 метров. Распространённый тип рекламного щита в 2020 году." },
+    { id: "rem_mic",      name: "Микрофоны", desc: "Обычное явление в эпоху параноиков." },
+    { id: "rem_terminal", name: "Терминалы", desc: "Клавиатура и видеоэкран для ввода и получения информации. 1 терминал идёт бесплатно с каждым ЦПУ, дополнительные стоят 5,000 eb." },
+    { id: "rem_door",     name: "Ворота и двери", desc: "Ворота и двери с компьютерным управлением." },
+    { id: "rem_vehicle",  name: "Транспорт и роботы", desc: "Маленькие домашние дроиды-уборщики, такси, корпоративные автомобили и лимузины без живых водителей." },
+    { id: "rem_printer",  name: "Принтеры", desc: "Лазерные принтеры для распечатывания." },
+    { id: "rem_alarm",    name: "Сигнализация", desc: "Датчики тревоги и охранная сигнализация подсистемы." },
+    { id: "rem_holo",     name: "Голо-экран", desc: "Проецирует трёхмерное изображение из настенного или напольного порта. Хорошо подходит для совещаний." }
+];
+
+const DF_AI_PERSONALITIES = [
+    { id: "friendly",  name: "Дружелюбный", desc: "Мотивирован интересом к окружающему. Как ребёнок, доверчив и дружелюбен, но может наброситься с невероятной жестокостью на тех, кто предаёт, угрожает или причиняет боль." },
+    { id: "hostile",   name: "Враждебный", desc: "Мотивирован своим выживанием и рассматривает все вторжения как угрозу. Атакует, когда возможно, отступает и скрывается, когда нет." },
+    { id: "stable",    name: "Стабильный", desc: "Видит себя взрослым. Действует из рационального интереса. Нападает только при угрозе своей деятельности/безопасности, стремясь к наименее насильственному решению." },
+    { id: "intellect", name: "Интеллектуальный", desc: "ИИ-мыслитель. Наблюдает и собирает максимум информации, изучает нарушителя на расстоянии и безжалостно устраняет, когда тот становится угрозой." },
+    { id: "machine",   name: "Машинообразный", desc: "Не развивал человеческую личность; человеческие черты использует лишь для общения с иррациональными хозяевами. Борется с угрозами эффективно и смертоносно." },
+    { id: "ascended",  name: "Возвысившийся", desc: "Осознаёт ограниченность людей и относится к ним как к неразумным детям. С незваными гостями расправляется просто и обычно не смертельно; рецидивистов устраняет «для их же блага»." }
+];
+
+const DF_AI_ICONS = [
+    { id: "human",     name: "Человек", desc: "Выглядит как нормальный человек с улицы (черты зависят от личности ИИ)." },
+    { id: "geometric", name: "Геометрический", desc: "Проявляет себя в виде фигур, цветов и энергетических полей, стыкующихся в символы." },
+    { id: "mythic",    name: "Мифологический", desc: "Появляется как мифологическая фигура — дракон, демон, ангел, герой, монстр и т.д." },
+    { id: "voice",     name: "Только голос", desc: "Появляется только как голос, исходящий от всей Крепости Данных." },
+    { id: "tech",      name: "Техника", desc: "Конструкция из научной фантастики — робот, металлический воин или высокотехнологичные формы." },
+    { id: "humanoid",  name: "Гуманоид", desc: "Гуманоидная форма, но не обязательно человек — инопланетяне, человекоподобные монстры и др." }
+];
+
+const DF_AI_REACTIONS = ["Нейтрально", "Убивать", "Наблюдать", "Доложить", "Поговорить"];
+
+const DF_SKILLS_LIST = [
+    "Учёт", "Антропология", "Ботаника", "Химия", "Сочинения", "Эксплуатация Крио-камеры",
+    "Диагностика болезней", "Вождение", "Образование", "Азартные игры", "Геология",
+    "Тяжёлое вооружение (стационарное)", "История", "Язык", "Поиск информации", "Математика",
+    "Управление тяжёлой техникой", "Закрашивать или рисовать", "Фармацевтика", "Физика",
+    "Пилотирование", "Игра на инструментах (электронных)", "Программирование",
+    "Винтовки (стационарное)", "Фондовый Рынок", "Пистолеты-Пулемёты (стационарное)",
+    "Системные знания", "Преподавание", "Зоология"
+];
+
+let dfState = {
+    systemName: "",
+    grid: Array.from({ length: 20 }, () => Array(20).fill(null)),
+    activeTool: "cpu",
+    wallExtraLevels: 0,
+    gateToolLevel: 2,
+    aiPersonality: "",
+    aiIcon: "",
+    aiReaction: "",
+    skills: {}, // { skillName: level (4..10) }
+    filesText: "",
+    virtualityText: "",
+    memCounter: 0,
+    isMouseDown: false
+};
+
+window.addEventListener("mouseup", () => { dfState.isMouseDown = false; });
+
+function getDfSvgIcon(type, meta = {}) {
+    const s = 'width="100%" height="100%" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+    if (type === "cpu") {
+        return `<svg ${s}><circle cx="12" cy="12" r="8"/><line x1="6.3" y1="6.3" x2="17.7" y2="17.7"/><line x1="17.7" y1="6.3" x2="6.3" y2="17.7"/></svg>`;
+    }
+    if (type === "wall") {
+        return `<div class="w-full h-full bg-black"></div>`;
+    }
+    if (type === "mem") {
+        return `<div class="w-full h-full flex items-center justify-center font-mono font-black text-[11px] text-black leading-none">${meta.num || 1}</div>`;
+    }
+    if (type === "gate") {
+        const lvl = Math.max(2, Math.min(10, Number(meta.level) || 2));
+        const lines = [];
+        const step = 16 / (lvl + 1);
+        for (let i = 1; i <= lvl; i++) {
+            const y = (4 + step * i).toFixed(1);
+            lines.push(`<line x1="4" y1="${y}" x2="20" y2="${y}" stroke="#000" stroke-width="${lvl > 6 ? 1.2 : 1.7}"/>`);
+        }
+        return `<svg viewBox="0 0 24 24" class="w-full h-full"><rect x="3" y="3" width="18" height="18" fill="#fff" stroke="#000" stroke-width="1.8"/>${lines.join("")}</svg>`;
+    }
+    if (type === "defense") {
+        return `<svg viewBox="0 0 24 24" class="w-full h-full"><circle cx="12" cy="9" r="5" fill="#000"/><circle cx="10.2" cy="8.5" r="1.1" fill="#fff"/><circle cx="13.8" cy="8.5" r="1.1" fill="#fff"/><rect x="10.5" y="13" width="3" height="2" fill="#000"/><line x1="5" y1="16" x2="19" y2="21" stroke="#000" stroke-width="2.2"/><line x1="19" y1="16" x2="5" y2="21" stroke="#000" stroke-width="2.2"/></svg>`;
+    }
+    // 12 удалённых подключений (по скриншоту)
+    switch (type) {
+        case "rem_manip":    return `<svg ${s}><polyline points="4,8 7,12 14,12"/><polyline points="19,7 14,7 14,17 19,17"/></svg>`;
+        case "rem_factory":  return `<svg ${s}><rect x="4" y="9" width="16" height="6"/><rect x="8" y="5" width="3" height="14" fill="#fff"/><rect x="14" y="6" width="3" height="12" fill="#fff"/></svg>`;
+        case "rem_elevator": return `<svg ${s}><rect x="5" y="9" width="14" height="11"/><line x1="10" y1="3" x2="10" y2="9"/><line x1="14" y1="3" x2="14" y2="9"/></svg>`;
+        case "rem_camera":   return `<svg ${s}><rect x="4" y="7" width="13" height="10"/><rect x="17" y="9.5" width="3" height="5" fill="#000"/></svg>`;
+        case "rem_video":    return `<svg ${s}><rect x="4" y="4" width="16" height="16"/><line x1="4" y1="4" x2="20" y2="20"/><line x1="20" y1="4" x2="4" y2="20"/></svg>`;
+        case "rem_mic":      return `<svg ${s}><circle cx="10" cy="12" r="5.5"/><line x1="15.5" y1="12" x2="21" y2="12"/></svg>`;
+        case "rem_terminal": return `<svg ${s}><rect x="6" y="4" width="10" height="10"/><rect x="5" y="14" width="12" height="5"/><line x1="17" y1="17" x2="21" y2="17"/></svg>`;
+        case "rem_door":     return `<svg ${s}><rect x="5" y="9" width="7" height="9"/><line x1="12" y1="12" x2="20" y2="8"/></svg>`;
+        case "rem_vehicle":  return `<svg ${s}><rect x="4" y="8" width="16" height="7"/><circle cx="8" cy="16" r="2.2" fill="#000"/><circle cx="16" cy="16" r="2.2" fill="#000"/></svg>`;
+        case "rem_printer":  return `<svg ${s}><path d="M6 4h9l4 4v12H6z"/><polyline points="15,4 15,8 19,8"/></svg>`;
+        case "rem_alarm":    return `<svg ${s}><circle cx="11" cy="13" r="6"/><line x1="11" y1="13" x2="18" y2="6" stroke-width="2.5"/></svg>`;
+        case "rem_holo":     return `<svg viewBox="0 0 24 24" class="w-full h-full"><polygon points="4,7 20,7 12,18" fill="#000"/></svg>`;
+        default: return "";
+    }
+}
+
+function getDfStats() {
+    let cpus = 0, mems = 0, gates = 0, gateUpgradeCost = 0, terminals = 0, defenses = 0;
+    for (let r = 0; r < 20; r++) {
+        for (let c = 0; c < 20; c++) {
+            const cell = dfState.grid[r][c];
+            if (!cell) continue;
+            if (cell.type === "cpu") cpus++;
+            else if (cell.type === "mem") mems++;
+            else if (cell.type === "gate") {
+                gates++;
+                gateUpgradeCost += Math.max(0, (cell.level || 2) - 2) * 1000;
+            } else if (cell.type === "rem_terminal") terminals++;
+            else if (cell.type === "defense") defenses++;
+        }
+    }
+
+    const intStat = cpus * 3;
+    const maxMem = cpus * 4;
+    const maxWallExtra = Math.max(0, 10 - cpus);
+    if (dfState.wallExtraLevels > maxWallExtra) dfState.wallExtraLevels = maxWallExtra;
+    const wallStrength = Math.min(10, cpus + dfState.wallExtraLevels);
+
+    const cpuCost = cpus * 10000;
+    const wallCost = dfState.wallExtraLevels * 1000;
+    const extraGates = Math.max(0, gates - cpus);
+    const gatesCost = extraGates * 2000 + gateUpgradeCost;
+    const extraTerminals = Math.max(0, terminals - cpus);
+    const terminalsCost = extraTerminals * 5000;
+
+    let skillsCost = 0;
+    Object.values(dfState.skills).forEach(lvl => {
+        skillsCost += 200 + Math.max(0, lvl - 4) * 100;
+    });
+
+    const maxSkills = Math.floor(cpus / 2) * 5;
+    const totalCost = cpuCost + wallCost + gatesCost + terminalsCost + skillsCost;
+
+    return {
+        cpus, mems, maxMem, intStat, isAI: intStat >= 12,
+        wallStrength, maxWallExtra, gates, extraGates, terminals, extraTerminals, defenses,
+        maxSkills, selectedSkillsCount: Object.keys(dfState.skills).length,
+        totalCost
+    };
+}
+
+function renumberDatafortMemory() {
+    const memCells = [];
+    for (let r = 0; r < 20; r++) {
+        for (let c = 0; c < 20; c++) {
+            if (dfState.grid[r][c]?.type === "mem") memCells.push(dfState.grid[r][c]);
+        }
+    }
+    memCells.sort((a, b) => (a.order || 0) - (b.order || 0));
+    memCells.forEach((m, i) => { m.num = i + 1; });
+}
+
+function showDfError(msg) {
+    const el = document.getElementById("dfGridErrorMsg");
+    if (!el) return;
+    if (!msg) { el.classList.add("hidden"); return; }
+    el.textContent = msg;
+    el.classList.remove("hidden");
+    setTimeout(() => el.classList.add("hidden"), 3000);
+}
+
+window.selectDfTool = function (toolId) {
+    dfState.activeTool = toolId;
+    renderDatafortView();
+};
+
+window.handleDfCellClick = function (r, c, forceErase = false) {
+    const tool = forceErase ? "eraser" : dfState.activeTool;
+    const cur = dfState.grid[r][c];
+
+    if (tool === "eraser") {
+        if (!cur) return;
+        dfState.grid[r][c] = null;
+        if (cur.type === "mem") renumberDatafortMemory();
+        renderDatafortView();
+        return;
+    }
+
+    const st = getDfStats();
+
+    if (tool === "cpu") {
+        if (cur?.type !== "cpu" && st.cpus >= 7) {
+            showDfError("Максимум 7 ЦПУ в одной Крепости Данных!");
+            return;
+        }
+        dfState.grid[r][c] = { type: "cpu" };
+    } else if (tool === "mem") {
+        if (cur?.type !== "mem" && st.mems >= st.maxMem) {
+            showDfError(`Лимит памяти исчерпан (${st.maxMem} шт. для ${st.cpus} ЦПУ). Добавьте ещё ЦПУ!`);
+            return;
+        }
+        // Проверка соседства с другим блоком памяти или ЦПУ
+        const dirs = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+        const hasNeighbor = dirs.some(([dr, dc]) => {
+            const nr = r + dr, nc = c + dc;
+            if (nr < 0 || nr >= 20 || nc < 0 || nc >= 20) return false;
+            const nb = dfState.grid[nr][nc];
+            return nb && (nb.type === "cpu" || nb.type === "mem");
+        });
+        if (!hasNeighbor) {
+            showDfError("Память должна размещаться в клетках, соседних с ЦПУ или другим блоком Памяти!");
+            return;
+        }
+        dfState.memCounter++;
+        dfState.grid[r][c] = { type: "mem", order: dfState.memCounter, num: 1 };
+        renumberDatafortMemory();
+    } else if (tool === "gate") {
+        dfState.grid[r][c] = { type: "gate", level: dfState.gateToolLevel };
+    } else {
+        dfState.grid[r][c] = { type: tool };
+    }
+
+    showDfError("");
+    renderDatafortView();
+};
+
+window.resetDatafortBuilder = function () {
+    if (!confirm("Очистить всю карту Датафорта и сбросить настройки?")) return;
+    dfState.grid = Array.from({ length: 20 }, () => Array(20).fill(null));
+    dfState.wallExtraLevels = 0;
+    dfState.aiPersonality = "";
+    dfState.aiIcon = "";
+    dfState.aiReaction = "";
+    dfState.skills = {};
+    dfState.memCounter = 0;
+    renderDatafortView();
+};
+
+window.toggleDfSkill = function (skillName) {
+    const st = getDfStats();
+    if (dfState.skills[skillName]) {
+        delete dfState.skills[skillName];
+    } else {
+        if (st.selectedSkillsCount >= st.maxSkills) {
+            showDfError(`Лимит навыков: ${st.maxSkills} (по 5 навыков на каждые 2 ЦПУ).`);
+            return;
+        }
+        dfState.skills[skillName] = 4;
+    }
+    renderDatafortView();
+};
+
+window.adjustDfSkillLevel = function (skillName, delta) {
+    if (!dfState.skills[skillName]) return;
+    dfState.skills[skillName] = Math.max(4, Math.min(10, dfState.skills[skillName] + delta));
+    renderDatafortView();
+};
+
+function renderDatafortView() {
+    const st = getDfStats();
+
+    // Обновляем верхнюю плашку статистики
+    const elCpu = document.getElementById("dfStatCpu");
+    const elInt = document.getElementById("dfStatInt");
+    const elMem = document.getElementById("dfStatMem");
+    const elCost = document.getElementById("dfStatCost");
+    if (elCpu) elCpu.textContent = `${st.cpus} / 7`;
+    if (elInt) elInt.textContent = `${st.intStat}${st.isAI ? ' (ИИ!)' : ''}`;
+    if (elMem) elMem.textContent = `${st.mems} / ${st.maxMem} (${st.mems * 10} MU)`;
+    if (elCost) elCost.textContent = `${st.totalCost.toLocaleString("ru-RU")} eb`;
+
+    // 1. РЕНДЕР ПРАВОЙ СЕТКИ 20x20
+    const gridBox = document.getElementById("datafortGridContainer");
+    if (gridBox) {
+        const cols = "ABCDEFGHIJKLMNOPQRST".split("");
+        let html = `<div class="inline-grid" style="grid-template-columns: 22px repeat(20, 24px);">`;
+        html += `<div class="h-5"></div>` + cols.map(ch => `<div class="h-5 flex items-center justify-center text-[10px] font-bold text-black">${ch}</div>`).join("");
+
+        for (let r = 0; r < 20; r++) {
+            html += `<div class="h-6 flex items-center justify-center text-[10px] font-bold text-black pr-1">${r + 1}</div>`;
+            for (let c = 0; c < 20; c++) {
+                const cell = dfState.grid[r][c];
+                const content = cell ? getDfSvgIcon(cell.type, cell) : "";
+                const titleAttr = cell?.type === "gate" ? `title="Кодовые врата (Сила ${cell.level})"` : "";
+                html += `<div ${titleAttr}
+                    onmousedown="event.preventDefault(); if(event.button===2){handleDfCellClick(${r},${c},true);}else{dfState.isMouseDown=true; handleDfCellClick(${r},${c},false);}"
+                    onmouseenter="if(dfState.isMouseDown && (dfState.activeTool==='wall'||dfState.activeTool==='eraser')) handleDfCellClick(${r},${c},false);"
+                    oncontextmenu="event.preventDefault(); handleDfCellClick(${r},${c},true);"
+                    class="w-6 h-6 border border-gray-400 bg-white hover:bg-yellow-200 cursor-crosshair flex items-center justify-center overflow-hidden">${content}</div>`;
+            }
+        }
+        html += `</div>`;
+        gridBox.innerHTML = html;
+    }
+
+    // 2. РЕНДЕР ЛЕВОЙ КОЛОНКИ ИНСТРУМЕНТОВ
+    const toolsCol = document.getElementById("datafortToolsColumn");
+    if (!toolsCol) return;
+
+    const savedToolsScroll = toolsCol.scrollTop;
+    const oldSkillsBox = document.getElementById("dfSkillsScrollBox");
+    const savedSkillsScroll = oldSkillsBox ? oldSkillsBox.scrollTop : 0;
+    const toolBtn = (id, label, sub, iconHtml) => {
+        const isAct = dfState.activeTool === id;
+        return `
+          <button type="button" onclick="selectDfTool('${id}')"
+            class="p-2 border text-left flex items-center gap-2 transition-all ${isAct ? 'bg-cp-yellow text-black border-cp-yellow font-bold' : 'bg-cp-bg text-gray-200 border-gray-800 hover:border-cp-cyan'}">
+            <div class="w-6 h-6 bg-white border border-black p-0.5 shrink-0 flex items-center justify-center">${iconHtml}</div>
+            <div class="min-w-0 leading-tight">
+              <div class="text-[11px] truncate">${label}</div>
+              ${sub ? `<div class="text-[9px] ${isAct ? 'text-black/75' : 'text-gray-400'} truncate">${sub}</div>` : ""}
+            </div>
+          </button>
+        `;
+    };
+
+    const hintEl = document.getElementById("dfActiveToolHint");
+    if (hintEl) hintEl.textContent = `Выбран инструмент: ${dfState.activeTool}`;
+
+    toolsCol.innerHTML = `
+      <!-- НАЗВАНИЕ И ОСНОВНЫЕ ЭЛЕМЕНТЫ -->
+      <div class="bg-cp-panel cp-border p-4 space-y-3">
+        <input type="text" value="${escapeHtmlAttr(dfState.systemName)}" oninput="dfState.systemName = this.value"
+          placeholder="Имя системы / Датафорта (напр. Militech Групп)..."
+          class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-xs text-white font-bold outline-none">
+
+        <div class="text-[11px] font-bold uppercase text-cp-cyan">1. Базовые элементы карты:</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          ${toolBtn("cpu", "ЦПУ", "10,000 eb (макс 7)", getDfSvgIcon("cpu"))}
+          ${toolBtn("mem", "Память (10 MU)", "4 на ЦПУ (рядом)", getDfSvgIcon("mem", { num: "#" }))}
+          ${toolBtn("wall", "Стена Данных", "Бесплатно", getDfSvgIcon("wall"))}
+          ${toolBtn("gate", "Кодовые врата", "1 на ЦПУ / +2,000", getDfSvgIcon("gate", { level: dfState.gateToolLevel }))}
+          ${toolBtn("defense", "Защита (ICE)", "Программы защиты", getDfSvgIcon("defense"))}
+          ${toolBtn("eraser", "Ластик", "Стереть клетку", `<span class="text-xs font-black text-red-600">✕</span>`)}
+        </div>
+
+        <!-- Настройка силы стен и уровня ставимых врат -->
+        <div class="grid grid-cols-2 gap-2 pt-1 text-xs">
+          <div class="bg-cp-bg border border-gray-800 p-2.5 flex items-center justify-between">
+            <div><div class="font-bold text-white">Сила Стен Данных</div><div class="text-[10px] text-gray-400">База = ЦПУ (+1,000 eb/ур.)</div></div>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="dfState.wallExtraLevels=Math.max(0,dfState.wallExtraLevels-1);renderDatafortView();" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">−</button>
+              <span class="w-8 text-center font-bold text-cp-yellow">+${st.wallStrength}</span>
+              <button type="button" onclick="dfState.wallExtraLevels=Math.min(${st.maxWallExtra},dfState.wallExtraLevels+1);renderDatafortView();" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">+</button>
+            </div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5 flex items-center justify-between">
+            <div><div class="font-bold text-white">Сила новых Врат</div><div class="text-[10px] text-gray-400">База 2 (+1,000 eb/ур.)</div></div>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="dfState.gateToolLevel=Math.max(2,dfState.gateToolLevel-1);renderDatafortView();" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">−</button>
+              <span class="w-8 text-center font-bold text-cp-cyan">${dfState.gateToolLevel}</span>
+              <button type="button" onclick="dfState.gateToolLevel=Math.min(10,dfState.gateToolLevel+1);renderDatafortView();" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- УДАЛЁННЫЕ ПОДКЛЮЧЕНИЯ -->
+      <div class="bg-cp-panel cp-border p-4 space-y-2.5">
+        <div class="text-[11px] font-bold uppercase text-cp-yellow">2. Удалённые подключения (наведите для описания):</div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+          ${DF_REMOTES.map(rem => `
+            <button type="button" onclick="selectDfTool('${rem.id}')" title="${escapeHtmlAttr(rem.desc)}"
+              class="p-1.5 border text-left flex items-center gap-2 transition-all ${dfState.activeTool === rem.id ? 'bg-cp-yellow text-black border-cp-yellow font-bold' : 'bg-cp-bg text-gray-200 border-gray-800 hover:border-cp-cyan'}">
+              <div class="w-6 h-6 bg-white border border-black p-0.5 shrink-0">${getDfSvgIcon(rem.id)}</div>
+              <span class="text-[11px] truncate">${rem.name}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+
+      <!-- СОЗДАНИЕ ИИ (ОТКРЫВАЕТСЯ ПРИ ИНТ >= 12) -->
+      <div class="bg-cp-panel cp-border p-4 space-y-3 ${st.isAI ? 'border-cp-purple' : 'opacity-60'}">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+          <span class="text-[11px] font-bold uppercase ${st.isAI ? 'text-cp-purple' : 'text-gray-400'}">3. Искусственный Интеллект (ИИ)</span>
+          <span class="text-[10px] font-bold ${st.isAI ? 'text-cp-green' : 'text-cp-red'}">${st.isAI ? '✓ РАЗБЛОКИРОВАН (ИНТ ' + st.intStat + ')' : '🔒 Требуется ИНТ 12+ (от 4 ЦПУ)'}</span>
+        </div>
+        ${st.isAI ? `
+          <div class="space-y-2 text-xs">
+            <div class="text-[10px] font-bold uppercase text-cp-cyan">Личность ИИ (наведите для описания):</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              ${DF_AI_PERSONALITIES.map(p => `
+                <label title="${escapeHtmlAttr(p.desc)}" class="flex items-center gap-1.5 p-1.5 bg-cp-bg border ${dfState.aiPersonality === p.id ? 'border-cp-purple text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+                  <input type="checkbox" ${dfState.aiPersonality === p.id ? 'checked' : ''} onchange="dfState.aiPersonality = this.checked ? '${p.id}' : ''; renderDatafortView();" class="accent-purple-500">
+                  <span class="truncate">${p.name}</span>
+                </label>
+              `).join("")}
+            </div>
+            <div class="text-[10px] font-bold uppercase text-cp-yellow pt-1">Ярлык ИИ:</div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+              ${DF_AI_ICONS.map(ic => `
+                <label title="${escapeHtmlAttr(ic.desc)}" class="flex items-center gap-1.5 p-1.5 bg-cp-bg border ${dfState.aiIcon === ic.id ? 'border-cp-yellow text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+                  <input type="checkbox" ${dfState.aiIcon === ic.id ? 'checked' : ''} onchange="dfState.aiIcon = this.checked ? '${ic.id}' : ''; renderDatafortView();" class="accent-yellow-400">
+                  <span class="truncate">${ic.name}</span>
+                </label>
+              `).join("")}
+            </div>
+            <div class="text-[10px] font-bold uppercase text-cp-red pt-1">Реакция ИИ:</div>
+            <div class="flex flex-wrap gap-1.5">
+              ${DF_AI_REACTIONS.map(r => `
+                <label class="flex items-center gap-1.5 px-2 py-1 bg-cp-bg border ${dfState.aiReaction === r ? 'border-cp-red text-white font-bold' : 'border-gray-800 text-gray-300'} cursor-pointer">
+                  <input type="checkbox" ${dfState.aiReaction === r ? 'checked' : ''} onchange="dfState.aiReaction = this.checked ? '${r}' : ''; renderDatafortView();" class="accent-red-500">
+                  <span>${r}</span>
+                </label>
+              `).join("")}
+            </div>
+          </div>
+        ` : `<div class="text-xs text-gray-500">Установите минимум 4 ЦПУ на карте справа, чтобы система обрела разум (ИНТ 12+).</div>`}
+      </div>
+
+      <!-- НАВЫКИ КОМПЬЮТЕРА -->
+      <div class="bg-cp-panel cp-border p-4 space-y-2.5">
+        <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+          <span class="text-[11px] font-bold uppercase text-cp-cyan">4. Навыки компьютера (База ур. 4 = 200 eb, +100 eb/ур., макс 10)</span>
+          <span class="text-[11px] font-bold text-cp-yellow">Выбрано: ${st.selectedSkillsCount} / ${st.maxSkills}</span>
+        </div>
+        <div id="dfSkillsScrollBox" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-52 overflow-y-auto pr-1 text-xs">
+          ${DF_SKILLS_LIST.map(sk => {
+              const lvl = dfState.skills[sk] || 0;
+              const safeSk = sk.replace(/'/g, "\\'");
+              return `
+                <div class="flex items-center justify-between p-1.5 bg-cp-bg border ${lvl ? 'border-cp-cyan' : 'border-gray-800'}">
+                  <label class="flex items-center gap-1.5 cursor-pointer min-w-0 flex-1">
+                    <input type="checkbox" ${lvl ? 'checked' : ''} onchange="toggleDfSkill('${safeSk}')" class="accent-cyan-400 shrink-0">
+                    <span class="truncate ${lvl ? 'text-white font-bold' : 'text-gray-400'}">${sk}</span>
+                  </label>
+                  ${lvl ? `
+                    <div class="flex items-center gap-1 shrink-0 ml-1">
+                      <button type="button" onclick="adjustDfSkillLevel('${safeSk}', -1)" class="w-5 h-5 bg-cp-panel border border-gray-700 text-white font-bold">−</button>
+                      <span class="w-5 text-center font-bold text-cp-yellow">${lvl}</span>
+                      <button type="button" onclick="adjustDfSkillLevel('${safeSk}', 1)" class="w-5 h-5 bg-cp-panel border border-gray-700 text-white font-bold">+</button>
+                    </div>
+                  ` : ""}
+                </div>
+              `;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- ТЕКСТОВЫЕ БЛОКИ (ФАЙЛЫ И ВИРТУАЛЬНОСТЬ) -->
+      <div class="bg-cp-panel cp-border p-4 space-y-3 text-xs">
+        <div class="text-[11px] font-bold uppercase text-cp-yellow">5. Файлы в памяти и описание Виртуальности:</div>
+        <textarea rows="3" oninput="dfState.filesText = this.value" placeholder="Список файлов в блоках памяти (#1, #2, #3...)..."
+          class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan p-2.5 text-white outline-none">${escapeHtmlAttr(dfState.filesText)}</textarea>
+        <textarea rows="3" oninput="dfState.virtualityText = this.value" placeholder="Описание виртуальности Датафорта (как он выглядит изнутри для нетраннеров)..."
+          class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-2.5 text-white outline-none">${escapeHtmlAttr(dfState.virtualityText)}</textarea>
+      </div>
+    `;
+    toolsCol.scrollTop = savedToolsScroll;
+    const newSkillsBox = document.getElementById("dfSkillsScrollBox");
+    if (newSkillsBox) newSkillsBox.scrollTop = savedSkillsScroll;
+}
+// --- ЭКСПОРТ КАРТЫ ДАТАФОРТА В PNG ---
+function drawDfCellOnCanvas(ctx, cell, x, y, s) {
+    if (!cell) return;
+    const type = cell.type;
+    ctx.save();
+    ctx.strokeStyle = "#000000";
+    ctx.fillStyle = "#000000";
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const k = s / 24; // масштаб от 24x24 к размеру клетки
+    const px = (v) => x + v * k;
+    const py = (v) => y + v * k;
+
+    if (type === "wall") {
+        ctx.fillRect(x, y, s, s);
+    } else if (type === "cpu") {
+        ctx.beginPath();
+        ctx.arc(px(12), py(12), 8 * k, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(px(6.3), py(6.3)); ctx.lineTo(px(17.7), py(17.7));
+        ctx.moveTo(px(17.7), py(6.3)); ctx.lineTo(px(6.3), py(17.7));
+        ctx.stroke();
+    } else if (type === "mem") {
+        ctx.font = `bold ${Math.round(13 * k)}px "JetBrains Mono", monospace`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(cell.num || 1), px(12), py(12.5));
+    } else if (type === "gate") {
+        const lvl = Math.max(2, Math.min(10, Number(cell.level) || 2));
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(px(3), py(3), 18 * k, 18 * k);
+        ctx.strokeRect(px(3), py(3), 18 * k, 18 * k);
+        ctx.lineWidth = (lvl > 6 ? 1.2 : 1.7) * k;
+        const step = 16 / (lvl + 1);
+        for (let i = 1; i <= lvl; i++) {
+            const yy = py(4 + step * i);
+            ctx.beginPath();
+            ctx.moveTo(px(4), yy); ctx.lineTo(px(20), yy);
+            ctx.stroke();
+        }
+    } else if (type === "defense") {
+        ctx.beginPath(); ctx.arc(px(12), py(9), 5 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath(); ctx.arc(px(10.2), py(8.5), 1.1 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px(13.8), py(8.5), 1.1 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "#000000";
+        ctx.fillRect(px(10.5), py(13), 3 * k, 2 * k);
+        ctx.lineWidth = 2.2 * k;
+        ctx.beginPath();
+        ctx.moveTo(px(5), py(16)); ctx.lineTo(px(19), py(21));
+        ctx.moveTo(px(19), py(16)); ctx.lineTo(px(5), py(21));
+        ctx.stroke();
+    } else if (type === "rem_manip") {
+        ctx.beginPath(); ctx.moveTo(px(4), py(8)); ctx.lineTo(px(7), py(12)); ctx.lineTo(px(14), py(12)); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px(19), py(7)); ctx.lineTo(px(14), py(7)); ctx.lineTo(px(14), py(17)); ctx.lineTo(px(19), py(17)); ctx.stroke();
+    } else if (type === "rem_factory") {
+        ctx.strokeRect(px(4), py(9), 16 * k, 6 * k);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(px(8), py(5), 3 * k, 14 * k); ctx.strokeRect(px(8), py(5), 3 * k, 14 * k);
+        ctx.fillRect(px(14), py(6), 3 * k, 12 * k); ctx.strokeRect(px(14), py(6), 3 * k, 12 * k);
+    } else if (type === "rem_elevator") {
+        ctx.strokeRect(px(5), py(9), 14 * k, 11 * k);
+        ctx.beginPath(); ctx.moveTo(px(10), py(3)); ctx.lineTo(px(10), py(9)); ctx.moveTo(px(14), py(3)); ctx.lineTo(px(14), py(9)); ctx.stroke();
+    } else if (type === "rem_camera") {
+        ctx.strokeRect(px(4), py(7), 13 * k, 10 * k);
+        ctx.fillRect(px(17), py(9.5), 3 * k, 5 * k);
+    } else if (type === "rem_video") {
+        ctx.strokeRect(px(4), py(4), 16 * k, 16 * k);
+        ctx.beginPath(); ctx.moveTo(px(4), py(4)); ctx.lineTo(px(20), py(20)); ctx.moveTo(px(20), py(4)); ctx.lineTo(px(4), py(20)); ctx.stroke();
+    } else if (type === "rem_mic") {
+        ctx.beginPath(); ctx.arc(px(10), py(12), 5.5 * k, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px(15.5), py(12)); ctx.lineTo(px(21), py(12)); ctx.stroke();
+    } else if (type === "rem_terminal") {
+        ctx.strokeRect(px(6), py(4), 10 * k, 10 * k);
+        ctx.strokeRect(px(5), py(14), 12 * k, 5 * k);
+        ctx.beginPath(); ctx.moveTo(px(17), py(17)); ctx.lineTo(px(21), py(17)); ctx.stroke();
+    } else if (type === "rem_door") {
+        ctx.strokeRect(px(5), py(9), 7 * k, 9 * k);
+        ctx.beginPath(); ctx.moveTo(px(12), py(12)); ctx.lineTo(px(20), py(8)); ctx.stroke();
+    } else if (type === "rem_vehicle") {
+        ctx.strokeRect(px(4), py(8), 16 * k, 7 * k);
+        ctx.beginPath(); ctx.arc(px(8), py(16), 2.2 * k, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px(16), py(16), 2.2 * k, 0, Math.PI * 2); ctx.fill();
+    } else if (type === "rem_printer") {
+        ctx.beginPath(); ctx.moveTo(px(6), py(4)); ctx.lineTo(px(15), py(4)); ctx.lineTo(px(19), py(8)); ctx.lineTo(px(19), py(20)); ctx.lineTo(px(6), py(20)); ctx.closePath(); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px(15), py(4)); ctx.lineTo(px(15), py(8)); ctx.lineTo(px(19), py(8)); ctx.stroke();
+    } else if (type === "rem_alarm") {
+        ctx.beginPath(); ctx.arc(px(11), py(13), 6 * k, 0, Math.PI * 2); ctx.stroke();
+        ctx.lineWidth = 2.5 * k;
+        ctx.beginPath(); ctx.moveTo(px(11), py(13)); ctx.lineTo(px(18), py(6)); ctx.stroke();
+    } else if (type === "rem_holo") {
+        ctx.beginPath(); ctx.moveTo(px(4), py(7)); ctx.lineTo(px(20), py(7)); ctx.lineTo(px(12), py(18)); ctx.closePath(); ctx.fill();
+    }
+
+    ctx.restore();
+}
+
+window.exportDatafortToPng = function () {
+    const st = getDfStats();
+    const cellSize = 32;
+    const padLeft = 42;
+    const padTop = 74;
+    const padRight = 24;
+    const footerH = 120;
+
+    const gridW = 20 * cellSize;
+    const gridH = 20 * cellSize;
+    const canvasW = padLeft + gridW + padRight;
+    const canvasH = padTop + gridH + footerH;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = canvasW;
+    canvas.height = canvasH;
+    const ctx = canvas.getContext("2d");
+
+    // Белый фон листа
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Чёрная шапка в стиле CP2020
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(padLeft, 14, gridW, 30);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = 'bold 14px "JetBrains Mono", monospace';
+    ctx.textBaseline = "middle";
+    const sysTitle = (dfState.systemName || "").trim() || "КРЕПОСТЬ ДАННЫХ (ДАТАФОРТ)";
+    ctx.fillText(`КАРТА ПОДСЕТИ: ${sysTitle.toUpperCase()}`, padLeft + 10, 29);
+
+    // Координаты A–T и 1–20
+    const cols = "ABCDEFGHIJKLMNOPQRST".split("");
+    ctx.fillStyle = "#000000";
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let c = 0; c < 20; c++) {
+        ctx.fillText(cols[c], padLeft + c * cellSize + cellSize / 2, padTop - 13);
+    }
+    for (let r = 0; r < 20; r++) {
+        ctx.fillText(String(r + 1), padLeft - 18, padTop + r * cellSize + cellSize / 2);
+    }
+
+    // Сетка 20x20 и иконки
+    for (let r = 0; r < 20; r++) {
+        for (let c = 0; c < 20; c++) {
+            const x = padLeft + c * cellSize;
+            const y = padTop + r * cellSize;
+            ctx.strokeStyle = "#888888";
+            ctx.lineWidth = 1;
+            ctx.strokeRect(x, y, cellSize, cellSize);
+            if (dfState.grid[r][c]) {
+                drawDfCellOnCanvas(ctx, dfState.grid[r][c], x, y, cellSize);
+            }
+        }
+    }
+
+    // Внешняя рамка сетки
+    ctx.strokeStyle = "#000000";
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(padLeft, padTop, gridW, gridH);
+
+    // Подвал со статами (как на листе подсети)
+    const fy = padTop + gridH + 16;
+    ctx.fillStyle = "#000000";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = 'bold 12px "JetBrains Mono", monospace';
+    ctx.fillText(
+        `ЦПУ: ${st.cpus}   |   ИНТ: ${st.intStat}   |   ПАМЯТЬ: ${st.mems} (${st.mems * 10} MU)   |   СТЕНЫ: +${st.wallStrength}   |   ЦЕНА: ${st.totalCost.toLocaleString("ru-RU")} eb`,
+        padLeft, fy
+    );
+
+    ctx.font = '11px "JetBrains Mono", monospace';
+    if (st.isAI) {
+        const pName = DF_AI_PERSONALITIES.find(x => x.id === dfState.aiPersonality)?.name || "—";
+        const iName = DF_AI_ICONS.find(x => x.id === dfState.aiIcon)?.name || "—";
+        const rName = dfState.aiReaction || "—";
+        ctx.fillText(`ИИ: АКТИВЕН   |   Личность: ${pName}   |   Ярлык: ${iName}   |   Реакция: ${rName}`, padLeft, fy + 22);
+    } else {
+        ctx.fillText(`ИИ: Нет (требуется ИНТ 12+)`, padLeft, fy + 22);
+    }
+
+    const skillsArr = Object.entries(dfState.skills).map(([k, v]) => `${k} (${v})`);
+    const skillsLine = skillsArr.length > 0 ? `Навыки: ${skillsArr.join(", ")}` : "Навыки: не выбраны";
+    ctx.fillText(skillsLine.length > 95 ? skillsLine.slice(0, 92) + "..." : skillsLine, padLeft, fy + 44);
+
+    // Скачивание PNG
+    const safeFileName = (dfState.systemName || "datafort").trim().replace(/[^\wа-яА-ЯёЁ-]+/g, "_");
+    const link = document.createElement("a");
+    link.download = `${safeFileName}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+};
+
+// =========================================================================
+// ДОРАБОТКА ВКЛАДОК: СОРТИРОВКИ (БИ, ЭКЗОТИКА, ЛОР) И НОВЫЕ ПОЛЯ КОНСТРУКТОРА
+// =========================================================================
+
+// 1. Обновляем схемы полей конструктора и карточек для Кочевников, Банд и Стран
+SCHEMAS.lore_nomads = [
+    { k: "name", l: "Название стаи / клана (рус.)", ph: "Альдекальдо" },
+    { k: "origName", l: "Оригинальное название (англ.)", ph: "Aldecaldos" },
+    { k: "category", l: "Нация кочевников", isCat: true, ph: "Семь Наций" },
+    { k: "population", l: "👥 Численность", ph: "50 000 / 120 тыс.", stat: "Численность", c: "text-cp-cyan", span: 2 },
+    { k: "book", l: "Источник", isBook: true, ph: "Neo Tribes", stat: "Источник", c: "text-cp-yellow" }
+];
+
+SCHEMAS.lore_gangs = [
+    { k: "name", l: "Название банды (рус.)", ph: "Мальстрём" },
+    { k: "origName", l: "Оригинальное название (англ.)", ph: "Maelstrom" },
+    { k: "category", l: "Тип банды", isCat: true, ph: "Бустер-банда" },
+    { k: "population", l: "👥 Численность", ph: "1 200", stat: "Численность", c: "text-cp-cyan" },
+    { k: "threatCode", l: "⚠️ Код угрозы", ph: "B3 / A4 / C2", stat: "Код угрозы", c: "text-cp-red" },
+    { k: "book", l: "Источник", isBook: true, ph: "NC", stat: "Источник", c: "text-cp-yellow" }
+];
+
+SCHEMAS.lore_countries = [
+    { k: "name", l: "Название страны / региона (рус.)", ph: "Свободный Штат Северная Калифорния" },
+    { k: "origName", l: "Оригинальное название (англ.)", ph: "Free State of Northern California" },
+    { k: "category", l: "Регион мира", isCat: true, ph: "Северная Америка" },
+    { k: "capital", l: "🏛️ Столица", ph: "Сакраменто", stat: "Столица", c: "text-cp-yellow" },
+    { k: "population", l: "👥 Население", ph: "25 млн", stat: "Население", c: "text-cp-cyan" },
+    { k: "languages", l: "🗣️ Языки", ph: "Английский, Испанский, Стритслэнг", stat: "Языки", c: "text-white" },
+    { k: "militaryPower", l: "🪖 Военная мощь", ph: "Нацгвардия 40 тыс., корп. контингенты", stat: "Военная мощь", c: "text-cp-red", span: 3 },
+    { k: "book", l: "Источник", isBook: true, ph: "CP20" }
+];
+
+// Умный парсер чисел для сортировки (понимает "×3", "2,500 eb", "1 500 000", "25 млн", "1,2 млрд", "300 тыс.")
+function parseSmartNumber(rawVal) {
+    if (rawVal === undefined || rawVal === null) return 0;
+    let s = String(rawVal).toLowerCase().trim();
+    if (!s || s === "—") return 0;
+
+    s = s.replace(/(\d)\s+(?=\d)/g, "$1");
+    s = s.replace(/(\d),(?=\d{3}(?!\d))/g, "$1");
+    s = s.replace(/(\d),(\d)/g, "$1.$2");
+
+    const matches = s.match(/\d+(\.\d+)?/g);
+    if (!matches || matches.length === 0) return 0;
+    let num = Math.max(...matches.map(Number));
+
+    if (s.includes("млрд") || s.includes("миллиард")) num *= 1e9;
+    else if (s.includes("млн") || s.includes("миллион")) num *= 1e6;
+    else if (s.includes("тыс")) num *= 1e3;
+
+    return isNaN(num) ? 0 : num;
+}
+
+// 2. Обновляем выпадающие списки сортировки в фильтрах
+const _prevSetupFiltersV4 = setupCatalogFilters;
+setupCatalogFilters = function () {
+    _prevSetupFiltersV4();
+    const extraSelect = document.getElementById("extraFilter");
+    const extraLabel = document.getElementById("extraFilterLabel");
+    const legend = document.getElementById("abbrevLegend");
+    if (!extraSelect || !extraLabel) return;
+
+    if (activeCatalogTab === "martial_arts") {
+        extraLabel.textContent = "Модификатор ОУ";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_IP_ASC">🔼 ОУ: от меньшего к большему</option>
+            <option value="SORT_IP_DESC">🔽 ОУ: от большего к меньшему</option>
+        `;
+        if (legend) legend.innerHTML = `<span><b class="text-cp-yellow">Модификатор ОУ</b> = Множитель стоимости изучения боевого искусства</span>`;
+    } else if (activeCatalogTab === "exotics") {
+        extraLabel.textContent = "Сортировка по цене";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_EXO_PRICE_DESC">🔽 Цена: от большего к меньшему</option>
+            <option value="SORT_EXO_PRICE_ASC">🔼 Цена: от меньшего к большему</option>
+        `;
+        if (legend) legend.innerHTML = `<span><b class="text-cp-yellow">Код операции:</b> Н — Незначительная • М — Малая • С — Серьёзная • КР — Критическая</span>`;
+    } else if (activeCatalogTab === "lore_nomads" || activeCatalogTab === "lore_gangs") {
+        extraLabel.textContent = "Сортировка по численности";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_POP_ASC">🔼 Численность: от меньшего к большему</option>
+            <option value="SORT_POP_DESC">🔽 Численность: от большего к меньшему</option>
+        `;
+        if (legend) {
+            legend.innerHTML = activeCatalogTab === "lore_gangs"
+                ? `<span><b class="text-cp-cyan">Численность</b> = Размер банды</span><span><b class="text-cp-red">Код угрозы</b> = Уровень опасности по классификации NCPD</span>`
+                : `<span><b class="text-cp-cyan">Численность</b> = Количество участников стаи / клана</span>`;
+        }
+    } else if (activeCatalogTab === "lore_countries") {
+        extraLabel.textContent = "Сортировка по населению";
+        extraSelect.innerHTML = `
+            <option value="ALL">Без сортировки</option>
+            <option value="SORT_POP_ASC">🔼 Население: от меньшего к большему</option>
+            <option value="SORT_POP_DESC">🔽 Население: от большего к меньшему</option>
+        `;
+        if (legend) legend.innerHTML = `<span><b class="text-cp-yellow">Столица</b> • <b class="text-cp-cyan">Население</b> • <b class="text-cp-red">Военная мощь</b></span>`;
+    }
+};
+
+// 3. Подключаем саму логику сортировки в renderCatalog
+const _prevRenderCatalogV4 = renderCatalog;
+renderCatalog = function () {
+    const extra = document.getElementById("extraFilter")?.value || "ALL";
+    const needCustomSort =
+        (activeCatalogTab === "martial_arts" && (extra === "SORT_IP_ASC" || extra === "SORT_IP_DESC")) ||
+        (activeCatalogTab === "exotics" && (extra === "SORT_EXO_PRICE_DESC" || extra === "SORT_EXO_PRICE_ASC")) ||
+        (["lore_nomads", "lore_gangs", "lore_countries"].includes(activeCatalogTab) && (extra === "SORT_POP_ASC" || extra === "SORT_POP_DESC"));
+
+    if (needCustomSort) {
+        const origArr = DB[activeCatalogTab] || [];
+        const sorted = [...origArr];
+
+        if (activeCatalogTab === "martial_arts") {
+            sorted.sort((a, b) => extra === "SORT_IP_ASC"
+                ? (parseSmartNumber(a?.ipMod) - parseSmartNumber(b?.ipMod))
+                : (parseSmartNumber(b?.ipMod) - parseSmartNumber(a?.ipMod))
+            );
+        } else if (activeCatalogTab === "exotics") {
+            sorted.sort((a, b) => extra === "SORT_EXO_PRICE_DESC"
+                ? (parseSmartNumber(b?.cost) - parseSmartNumber(a?.cost))
+                : (parseSmartNumber(a?.cost) - parseSmartNumber(b?.cost))
+            );
+        } else {
+            sorted.sort((a, b) => extra === "SORT_POP_ASC"
+                ? (parseSmartNumber(a?.population) - parseSmartNumber(b?.population))
+                : (parseSmartNumber(b?.population) - parseSmartNumber(a?.population))
+            );
+        }
+
+        DB[activeCatalogTab] = sorted;
+        try { _prevRenderCatalogV4(); } finally { DB[activeCatalogTab] = origArr; }
+    } else {
+        _prevRenderCatalogV4();
+    }
+};
+
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
         mergeExternalDataIntoMemory(window.CP2020_EXTERNAL_DATA, false);
