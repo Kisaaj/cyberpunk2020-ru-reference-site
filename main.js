@@ -884,6 +884,45 @@ window.handleBuilderCasingCheckbox = function (clickedType) {
     }
 };
 
+window.handleQuickArmorTypeChange = function (armorId, clickedType, isChecked) {
+    if (!isCurrentUserAdmin()) return;
+    const armor = (DB.armor || []).find(a => a && a.id === armorId);
+    if (!armor) return;
+
+    if (clickedType === "soft") {
+        armor.armorType = isChecked ? "soft" : "";
+    } else if (clickedType === "hard") {
+        armor.armorType = isChecked ? "hard" : "";
+    }
+
+    addChangeLogEntry("edited", "armor", armor);
+    persistDatabase(true);
+    renderDetailCard(armor);
+};
+
+window.handleBuilderArmorTypeCheckbox = function (clickedType) {
+    const cbSoft = document.getElementById("builderCbArmorSoft");
+    const cbHard = document.getElementById("builderCbArmorHard");
+    const hiddenInp = document.getElementById("builderArmorTypeInput");
+    if (!cbSoft || !cbHard || !hiddenInp) return;
+
+    if (clickedType === "soft") {
+        if (cbSoft.checked) {
+            cbHard.checked = false;
+            hiddenInp.value = "soft";
+        } else {
+            hiddenInp.value = "";
+        }
+    } else if (clickedType === "hard") {
+        if (cbHard.checked) {
+            cbSoft.checked = false;
+            hiddenInp.value = "hard";
+        } else {
+            hiddenInp.value = "";
+        }
+    }
+};
+
 //UTIL
 
 
@@ -1522,6 +1561,22 @@ function setBuilderType(type, itemToEdit = null) {
           <input type="hidden" name="ammoCasing" id="builderAmmoCasingInput" value="${escapeHtmlAttr(v.ammoCasing || '')}">
         </div>
       ` : "";
+      const armorTypeBuilderHtml = type === "armor" ? `
+        <div class="bg-cp-panel border border-cp-cyan/40 p-3.5 space-y-2">
+          <div class="text-xs font-bold uppercase text-cp-cyan">🛡️ Тип брони</div>
+          <div class="flex flex-wrap items-center gap-4">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none bg-cp-bg border border-gray-700 px-3 py-2 text-xs font-bold text-gray-200">
+              <input type="checkbox" id="builderCbArmorSoft" ${v.armorType === 'soft' ? 'checked' : ''} onchange="handleBuilderArmorTypeCheckbox('soft')" class="w-4 h-4 accent-cyan-400">
+              <span>🔹 Мягкая броня</span>
+            </label>
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none bg-cp-bg border border-gray-700 px-3 py-2 text-xs font-bold text-gray-200">
+              <input type="checkbox" id="builderCbArmorHard" ${v.armorType === 'hard' ? 'checked' : ''} onchange="handleBuilderArmorTypeCheckbox('hard')" class="w-4 h-4 accent-yellow-400">
+              <span>🔸 Твёрдая броня</span>
+            </label>
+          </div>
+          <input type="hidden" name="armorType" id="builderArmorTypeInput" value="${escapeHtmlAttr(v.armorType || '')}">
+        </div>
+      ` : "";
 
     const roleAbilityDescHtml = type === "roles" ? `<div><label class="text-[11px] text-cp-cyan font-bold">⚡ Описание особой способности</label><textarea name="abilityDesc" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.abilityDesc || ''}</textarea></div>` : "";
     const vehicleExtraHtml = type === "vehicles" ? `<div><label class="text-[11px] text-cp-cyan font-bold">🔧 Особое снаряжение и вооружение</label><textarea name="specialEquipment" rows="2" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.specialEquipment || ''}</textarea></div>` : "";
@@ -1535,6 +1590,7 @@ function setBuilderType(type, itemToEdit = null) {
       ` : "";
 
     container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${weaponAmmoCasingHtml}${roleAbilityDescHtml}${deckChecksHtml}${vehicleExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
+    container.innerHTML = `${datalistHtml}${netSwitchHtml}<div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>${weaponAmmoCasingHtml}${armorTypeBuilderHtml}${roleAbilityDescHtml}${deckChecksHtml}${vehicleExtraHtml}<div><label class="text-[11px] text-gray-400">Описание (необязательно)</label><textarea name="desc" rows="3" class="w-full bg-cp-panel border border-gray-700 p-2 text-xs text-white">${v.desc || ''}</textarea></div>`;
     if (type === "roles") window.updateHiddenRoleSalaryRangeInput();
     attachRichToolbarsToBuilderTextareas();
 }
@@ -1562,7 +1618,7 @@ function saveBuilderItem(e) {
     const fd = new FormData(e.target);
     const raw = Object.fromEntries(fd.entries());
     const data = {};
-    const freeTextFields = ["desc", "abilityDesc", "content", "summary", "specialEquipment", "charSkills", "ammoCasing"];
+    const freeTextFields = ["desc", "abilityDesc", "content", "summary", "specialEquipment", "charSkills", "ammoCasing", "armorType"];
 
     Object.keys(raw).forEach(k => {
         if (k === "deckTypeCheck" || k === "deckOptionCheck" || k.startsWith("b_") || k.startsWith("s_")) return;
@@ -1737,6 +1793,8 @@ function renderCatalog() {
     } else if (activeCatalogTab === "armor") {
         if (extra === "SORT_OS_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.os) - extractMaxNumericValue(b.os));
         else if (extra === "SORT_OS_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.os) - extractMaxNumericValue(a.os));
+        else if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
+        else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
     } else if (activeCatalogTab === "acpa") {
         if (extra === "SORT_PRICE_ASC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(a.cost) - extractMaxNumericValue(b.cost));
         else if (extra === "SORT_PRICE_DESC") filtered = [...filtered].sort((a, b) => extractMaxNumericValue(b.cost) - extractMaxNumericValue(a.cost));
@@ -2127,7 +2185,39 @@ function renderDetailCard(item) {
             `;
             }
         }
-
+        // Панель взаимоисключающих галочек «Мягкая / Твёрдая» прямо в карточке брони
+        let armorTypeBarHtml = "";
+        if (activeCatalogTab === "armor") {
+            const aType = item.armorType || "";
+            const isSoft = (aType === "soft");
+            const isHard = (aType === "hard");
+            if (isCurrentUserAdmin()) {
+                armorTypeBarHtml = `
+              <div class="mb-3 p-2.5 bg-cp-bg border border-gray-800 flex flex-wrap items-center justify-between gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Тип брони:</span>
+                <div class="flex items-center gap-3">
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 border text-[11px] font-bold uppercase transition-all ${isSoft ? 'bg-cp-cyan/20 text-cp-cyan border-cp-cyan' : 'bg-cp-panel text-gray-300 border-gray-700 hover:border-cp-cyan/60'}">
+                    <input type="checkbox" ${isSoft ? 'checked' : ''} onchange="handleQuickArmorTypeChange('${item.id}', 'soft', this.checked)" class="w-3.5 h-3.5 accent-cyan-400 cursor-pointer">
+                    <span>Мягкая</span>
+                  </label>
+                  <label class="inline-flex items-center gap-1.5 cursor-pointer select-none px-2.5 py-1 border text-[11px] font-bold uppercase transition-all ${isHard ? 'bg-cp-yellow/20 text-cp-yellow border-cp-yellow' : 'bg-cp-panel text-gray-300 border-gray-700 hover:border-cp-yellow/60'}">
+                    <input type="checkbox" ${isHard ? 'checked' : ''} onchange="handleQuickArmorTypeChange('${item.id}', 'hard', this.checked)" class="w-3.5 h-3.5 accent-yellow-400 cursor-pointer">
+                    <span>Твёрдая</span>
+                  </label>
+                </div>
+              </div>
+            `;
+            } else if (isSoft || isHard) {
+                armorTypeBarHtml = `
+              <div class="mb-3 p-2 bg-cp-bg border border-gray-800 flex items-center justify-between">
+                <span class="text-[10px] font-bold uppercase text-gray-400">Тип брони:</span>
+                <span class="px-2.5 py-0.5 text-[10px] font-bold uppercase border ${isSoft ? 'bg-cp-cyan/15 text-cp-cyan border-cp-cyan/50' : 'bg-cp-yellow/15 text-cp-yellow border-cp-yellow/50'}">
+                  ${isSoft ? '🔹 Мягкая броня' : '🔸 Твёрдая броня'}
+                </span>
+              </div>
+            `;
+            }
+        }
         let extraSpecialHtml = "";
         if (isDeck) {
             const activeTypes = Array.isArray(item.deckTypes) ? item.deckTypes : [];
@@ -2313,6 +2403,7 @@ function renderDetailCard(item) {
             ${renderCardActionButtons(activeCatalogTab, item.id)}
           </div>
           ${weaponCasingBarHtml}
+          ${armorTypeBarHtml}
           <div class="grid ${gridCols} gap-2.5 text-center mb-4">${statsHtml}</div>
           ${extraSpecialHtml}
           ${item.desc && String(item.desc).trim() !== "" ? `<div class="bg-cp-bg/90 border-l-2 border-cp-yellow p-3.5 text-xs leading-relaxed text-gray-200 whitespace-pre-line">${item.desc}</div>` : ""}
@@ -3402,8 +3493,14 @@ function setupCatalogFilters() {
           <span><b class="text-cp-yellow">💥 Боеприпасы (1 пуля):</b> <b class="text-cp-cyan">Безгильзовое</b> = 0.5 eb • <b class="text-cp-yellow">Гильзовое</b> = 1 eb • <b class="text-cp-red">Тяжёлое</b> = 2–3 eb</span>
         `;
     } else if (activeCatalogTab === "armor") {
-        extraLabel.textContent = "Бронированность";
-        extraSelect.innerHTML = `<option value="ALL">Без сортировки ОС</option><option value="SORT_OS_ASC">🔼 По возрастанию ОС</option><option value="SORT_OS_DESC">🔽 По убыванию ОС</option>`;
+        extraLabel.textContent = "Сортировка (ОС / Цена)";
+        extraSelect.innerHTML = `
+          <option value="ALL">Без сортировки</option>
+          <option value="SORT_OS_ASC">🛡️ ОС: по возрастанию</option>
+          <option value="SORT_OS_DESC">🛡️ ОС: по убыванию</option>
+          <option value="SORT_PRICE_ASC">💰 Цена: от меньшей к большей</option>
+          <option value="SORT_PRICE_DESC">💰 Цена: от большей к меньшей</option>
+        `;
         legend.innerHTML = `<span><b class="text-cp-cyan">ОС</b> = Останавливающая способность (SP)</span><span><b class="text-cp-cyan">ЗУ</b> = Значение утяжеления (EV)</span>`;
     } else if (activeCatalogTab === "gear" || activeCatalogTab === "services") {
         extraLabel.textContent = "Цена";
