@@ -1864,7 +1864,17 @@ function renderCatalog() {
             subline = `ИНТ <b>${dash(item.stat_int)}</b> • РЕФ <b>${dash(item.stat_ref)}</b> • ТЕХ <b>${dash(item.stat_tech)}</b> • КРУТ <b>${dash(item.stat_cool)}</b> • ТЕЛО <b>${dash(item.stat_body)}</b> • ЭМП <b>${dash(item.stat_emp)}</b>`;
             rightTop = `<span class="px-2 py-0.5 bg-cp-yellow/20 border border-cp-yellow/50 text-cp-yellow font-bold text-xs">РЕП: ${dash(item.reputation)}</span>`;
             rightBottom = `Роль: ${dash(item.category)}`;
+        } else if (activeCatalogTab === "lore_countries") {
+            subline = `Столица: <b class="text-cp-yellow">${dash(item.capital)}</b> • Грамотность: <b class="text-cp-green">${dash(item.literacy)}</b>`;
+            rightBottom = `👥 ${dash(item.population)}`;
+        } else if (activeCatalogTab === "lore_gangs") {
+            subline = `Код угрозы: <b class="text-cp-red">${dash(item.threatCode)}</b>`;
+            rightBottom = `👥 ${dash(item.population)}`;
+        } else if (activeCatalogTab === "lore_nomads") {
+            subline = `Нация: <b class="text-cp-cyan">${dash(item.category)}</b>`;
+            rightBottom = `👥 ${dash(item.population)}`;
         }
+
 
         return `
           <div onclick="selectCatalogItem('${item.id}')" class="border ${borderCls} p-3.5 cursor-pointer transition-all flex items-center justify-between gap-3">
@@ -7968,7 +7978,8 @@ SCHEMAS.lore_countries = [
     { k: "category", l: "Регион мира", isCat: true, ph: "Северная Америка" },
     { k: "capital", l: "🏛️ Столица", ph: "Сакраменто", stat: "Столица", c: "text-cp-yellow" },
     { k: "population", l: "👥 Население", ph: "25 млн", stat: "Население", c: "text-cp-cyan" },
-    { k: "languages", l: "🗣️ Языки", ph: "Английский, Испанский, Стритслэнг", stat: "Языки", c: "text-white" },
+    { k: "literacy", l: "📖 % грамотности", ph: "92%", stat: "% грамотности", c: "text-cp-green" },
+    { k: "languages", l: "🗣️ Языки", ph: "Английский, Испанский, Стритслэнг...", stat: "Языки", c: "text-white", span: 3 },
     { k: "militaryPower", l: "🪖 Военная мощь", ph: "Нацгвардия 40 тыс., корп. контингенты", stat: "Военная мощь", c: "text-cp-red", span: 3 },
     { k: "book", l: "Источник", isBook: true, ph: "CP20" }
 ];
@@ -8032,13 +8043,15 @@ setupCatalogFilters = function () {
                 : `<span><b class="text-cp-cyan">Численность</b> = Количество участников стаи / клана</span>`;
         }
     } else if (activeCatalogTab === "lore_countries") {
-        extraLabel.textContent = "Сортировка по населению";
+        extraLabel.textContent = "Население / Грамотность";
         extraSelect.innerHTML = `
             <option value="ALL">Без сортировки</option>
             <option value="SORT_POP_ASC">🔼 Население: от меньшего к большему</option>
             <option value="SORT_POP_DESC">🔽 Население: от большего к меньшему</option>
+            <option value="SORT_LIT_DESC">📖 Грамотность: от большего к меньшему</option>
+            <option value="SORT_LIT_ASC">📖 Грамотность: от меньшего к большему</option>
         `;
-        if (legend) legend.innerHTML = `<span><b class="text-cp-yellow">Столица</b> • <b class="text-cp-cyan">Население</b> • <b class="text-cp-red">Военная мощь</b></span>`;
+        if (legend) legend.innerHTML = `<span><b class="text-cp-yellow">Столица</b> • <b class="text-cp-cyan">Население</b> • <b class="text-cp-green">% грамотности</b> • <b class="text-cp-red">Военная мощь</b></span>`;
     }
 };
 
@@ -8049,7 +8062,7 @@ renderCatalog = function () {
     const needCustomSort =
         (activeCatalogTab === "martial_arts" && (extra === "SORT_IP_ASC" || extra === "SORT_IP_DESC")) ||
         (activeCatalogTab === "exotics" && (extra === "SORT_EXO_PRICE_DESC" || extra === "SORT_EXO_PRICE_ASC")) ||
-        (["lore_nomads", "lore_gangs", "lore_countries"].includes(activeCatalogTab) && (extra === "SORT_POP_ASC" || extra === "SORT_POP_DESC"));
+        (["lore_nomads", "lore_gangs", "lore_countries"].includes(activeCatalogTab) && ["SORT_POP_ASC", "SORT_POP_DESC", "SORT_LIT_DESC", "SORT_LIT_ASC"].includes(extra));
 
     if (needCustomSort) {
         const origArr = DB[activeCatalogTab] || [];
@@ -8064,6 +8077,11 @@ renderCatalog = function () {
             sorted.sort((a, b) => extra === "SORT_EXO_PRICE_DESC"
                 ? (parseSmartNumber(b?.cost) - parseSmartNumber(a?.cost))
                 : (parseSmartNumber(a?.cost) - parseSmartNumber(b?.cost))
+            );
+        } else if (extra === "SORT_LIT_DESC" || extra === "SORT_LIT_ASC") {
+            sorted.sort((a, b) => extra === "SORT_LIT_DESC"
+                ? (parseSmartNumber(b?.literacy) - parseSmartNumber(a?.literacy))
+                : (parseSmartNumber(a?.literacy) - parseSmartNumber(b?.literacy))
             );
         } else {
             sorted.sort((a, b) => extra === "SORT_POP_ASC"
