@@ -6024,6 +6024,7 @@ const PARENT_NAV_MAP = {
     lore_gangs: "lore_group",
     lore_countries: "lore_group",
     characters: "characters_group",
+    npc_gen: "characters_group",
     rules: "rules"
 };
 
@@ -6061,7 +6062,7 @@ switchMainView = function (view, catalogTab = null) {
     activeMainView = view;
     if (catalogTab) activeCatalogTab = catalogTab;
 
-    ["home", "catalog", "fashion", "deck_builder", "datafort", "wip", "rules", "profile", "admin"].forEach(v => {
+    ["home", "catalog", "fashion", "deck_builder", "datafort", "npc_gen", "wip", "rules", "profile", "admin"].forEach(v => {
         const el = document.getElementById("view-" + v);
         if (el) el.classList.toggle("hidden", view !== v);
     });
@@ -6081,6 +6082,7 @@ switchMainView = function (view, catalogTab = null) {
     else if (view === "fashion") renderFashionView();
     else if (view === "deck_builder") renderDeckBuilderView();
     else if (view === "datafort") renderDatafortView();
+    else if (view === "npc_gen") initNpcGeneratorView();
     else if (view === "rules") renderRulesView();
     else if (view === "profile") renderProfileView();
     else if (view === "admin") switchAdminSubtab(activeAdminSubtab);
@@ -8110,6 +8112,709 @@ renderCatalog = function () {
     } else {
         _prevRenderCatalogV4();
     }
+};
+
+// =========================================================================
+// ГЕНЕРАТОР NPC (5-СТУПЕНЧАТАЯ СИСТЕМА CYBERPUNK 2020)
+// =========================================================================
+
+const NPC_DIFFICULTIES = {
+    novice:     { label: "Новичок",      minSkillLow: 0, minSkillHigh: 0, specialMin: 1, minCap: 1, maxCap: 2,  extraPoints: false, highTierGear: false },
+    amateur:    { label: "Любитель",     minSkillLow: 1, minSkillHigh: 2, specialMin: 3, minCap: 3, maxCap: 4,  extraPoints: false, highTierGear: false },
+    specialist: { label: "Специалист",   minSkillLow: 3, minSkillHigh: 4, specialMin: 5, minCap: 5, maxCap: 6,  extraPoints: false, highTierGear: true  },
+    pro:        { label: "Профессионал", minSkillLow: 5, minSkillHigh: 6, specialMin: 7, minCap: 7, maxCap: 8,  extraPoints: true,  highTierGear: true  },
+    veteran:    { label: "Ветеран",      minSkillLow: 7, minSkillHigh: 8, specialMin: 8, minCap: 9, maxCap: 10, extraPoints: true,  highTierGear: true  }
+};
+
+const NPC_STYLE_CLOTHES = [
+    "Байкерская кожа", "Синяя джинса", "Корпоративный костюм", "Комбинезон",
+    "Мини-юбка", "Высокая мода", "Камуфляж", "Нормальная одежда",
+    "Обнажённый", "Бездомный шик"
+];
+const NPC_STYLE_HAIR = [
+    "Ирокез", "Длинная и распущенная", "Короткая и колючая", "Полностью растрёпанная",
+    "Выбритая", "Полосатая", "Покрашенная", "Аккуратная, короткая",
+    "Короткая вьющаяся", "Длинная прямая"
+];
+const NPC_STYLE_FEATURES = [
+    "Татуировки", "Зеркальные очки", "Ритуальные шрамы", "Перчатки с шипами",
+    "Кольцо в носу", "Серьги", "Длинные ногти", "Ботинки на каблуке",
+    "Странные контактные линзы", "Перчатки без пальцев"
+];
+
+const NPC_ETHNICITIES = [
+    { region: "Англо-Американец", origins: ["США (Восточное побережье)", "Северная Калифорния", "Южная Калифорния", "Техас", "Канада", "Великобритания", "Австралия", "Новая Зеландия", "Ирландия", "Аляска"] },
+    { region: "Африканец", origins: ["Нигерия", "Кения", "ЮАР", "Египет", "Эфиопия", "Гана", "Марокко", "Танзания", "Сенегал", "Конго", "Ангола"] },
+    { region: "Японец / Кореец", origins: ["Япония (Токио)", "Япония (Осака)", "Япония (Киото)", "Япония (Окинава)", "Япония (Иокогама)", "Япония (Саппоро)", "Корея (Сеул)", "Корея (Пусан)", "Корея (Инчхон)", "Корея (Тэгу)"] },
+    { region: "Центральноевропейский / Из Советов", origins: ["РСФСР (Россия)", "Украинская ССР", "Белорусская ССР", "Казахская ССР", "Грузинская ССР", "Узбекская ССР", "Польша", "Чехословакия", "Венгрия", "Румыния", "Болгария", "Прибалтика"] },
+    { region: "Тихоокеанский архипелаг", origins: ["Филиппины", "Индонезия", "Гавайи", "Новая Гвинея", "Фиджи", "Самоа", "Таити", "Малайзия", "Сингапур", "Бруней"] },
+    { region: "Китаец / Из Южной Азии", origins: ["Китай (Пекин)", "Китай (Шанхай)", "Гонконг", "Тайвань", "Индия", "Вьетнам", "Таиланд", "Пакистан", "Бангладеш", "Мьянма", "Непал", "Шри-Ланка"] },
+    { region: "Чёрный американец", origins: ["США (Найт-Сити)", "США (Нью-Йорк)", "США (Чикаго)", "США (Атланта)", "США (Детройт)", "США (Новый Орлеан)", "Ямайка", "Гаити", "Багамы", "Барбадос"] },
+    { region: "Латиноамериканец", origins: ["Мексика", "Пуэрто-Рико", "Куба", "Доминиканская Республика", "США (Юго-Запад)", "США (Майами)", "Техас", "Калифорния", "Панама", "Коста-Рика"] },
+    { region: "Центральная / Южная Америка", origins: ["Бразилия", "Аргентина", "Колумбия", "Чили", "Перу", "Венесуэла", "Эквадор", "Боливия", "Уругвай", "Гватемала", "Никарагуа", "Сальвадор"] },
+    { region: "Европа", origins: ["Германия", "Франция", "Италия", "Испания", "Нидерланды", "Бельгия", "Швейцария", "Австрия", "Швеция", "Норвегия", "Дания", "Португалия"] }
+];
+
+const NPC_MOTIVATIONS = {
+    traits: [
+        "Застенчивый и скрытный", "Мятежный, асоциальный, жестокий", "Высокомерный, гордый и равнодушный",
+        "Угрюмый, безрассудный и упрямый", "Придирчивый, суетливый и нервный", "Решительный и серьёзный",
+        "Бесхитростный простак", "Подлый обманщик", "Интеллектуальный и обособленный", "Дружелюбный и общительный"
+    ],
+    valuedPerson: [
+        "Родитель", "Брат или сестра", "Возлюбленный", "Друг", "Он сам",
+        "Питомец", "Учитель или наставник", "Публичная фигура", "Личный герой", "Никто"
+    ],
+    valuedMost: [
+        "Деньги", "Честь", "Своё слово", "Честность", "Знания",
+        "Месть", "Любовь", "Власть", "Хорошо проводить время", "Дружба"
+    ],
+    feelAboutPeople: [
+        "Нейтрален", "Ему нравятся почти все", "Он ненавидит почти всех",
+        "Люди — инструменты. Использует их для своих целей и выбрасывает", "Каждая личность — ценная индивидуальность",
+        "Люди — препятствия, которые нужно уничтожить, если встанут на пути", "Люди не заслуживают доверия",
+        "Независим ни от кого", "Стереть их всех и отдать место тараканам", "Люди прекрасны"
+    ],
+    valuedPossession: [
+        "Оружие", "Инструменты", "Элементы одежды", "Фотографии", "Книги и дневники",
+        "Звукозапись", "Музыкальные инструменты", "Ювелирные изделия", "Игрушки", "Прописное письмо"
+    ]
+};
+
+let lastGeneratedNpc = null;
+
+function npcRandInt(min, max) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+// Производные показатели от ТЕЛО: МТЕЛ и УР Бонус
+function getNpcBodyDerived(bodyVal) {
+    const b = Number(bodyVal) || 2;
+    if (b <= 2) return { btm: "0",  dmgBonus: "-2" };
+    if (b <= 4) return { btm: "-1", dmgBonus: "-1" };
+    if (b <= 6) return { btm: "-2", dmgBonus: "0"  };
+    if (b <= 8) return { btm: "-3", dmgBonus: "+1" };
+    return             { btm: "-4", dmgBonus: "+2" };
+}
+
+// Бросок ПЧ (Потери Человечности) по формуле из карточки (напр. "2d6", "1d6/2", "3d6+1", "1d6 / 2d6", "2")
+function rollNpcHumanityLoss(pchRaw) {
+    if (!pchRaw || pchRaw === "—") return 0;
+    // Если указано несколько вариантов через " / " (с пробелами) или "или" — берём первый
+    const firstPart = String(pchRaw).split(/\s+\/\s+|\s+или\s+/i)[0].trim();
+
+    const diceMatch = firstPart.match(/(\d+)?\s*[dд]\s*(\d+)(?:\s*\/\s*(\d+))?(?:\s*([+-])\s*(\d+))?/i);
+    if (diceMatch) {
+        const count = parseInt(diceMatch[1] || "1", 10);
+        const sides = parseInt(diceMatch[2], 10);
+        const div = diceMatch[3] ? parseInt(diceMatch[3], 10) : 1;
+        const sign = diceMatch[4];
+        const mod = diceMatch[5] ? parseInt(diceMatch[5], 10) : 0;
+
+        let total = 0;
+        for (let i = 0; i < count; i++) total += npcRandInt(1, sides);
+        if (div > 1) total = Math.ceil(total / div);
+        if (sign === "+") total += mod;
+        else if (sign === "-") total -= mod;
+        return Math.max(0, total);
+    }
+
+    const numMatch = firstPart.replace(",", ".").match(/\d+(\.\d+)?/);
+    return numMatch ? Math.round(parseFloat(numMatch[0])) : 0;
+}
+
+function initNpcGeneratorView() {
+    const sel = document.getElementById("npcGenRoleSelect");
+    if (!sel) return;
+    const prev = sel.value || "RANDOM";
+    const roles = (DB.roles || []).filter(r => r && !r.isCommunity);
+    sel.innerHTML = `<option value="RANDOM">🎲 Случайная роль</option>` +
+        roles.map(r => `<option value="${escapeHtmlAttr(r.id)}">${escapeHtmlAttr(r.name)}</option>`).join("");
+    if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+}
+
+function getNpcRoleGearBonus(roleName) {
+    const low = String(roleName || "").toLowerCase();
+    if (low.includes("соло") || low.includes("solo")) return 3;
+    if (low.includes("кочевник") || low.includes("nomad") || low.includes("коп") || low.includes("законник") || low.includes("cop")) return 2;
+    return 0;
+}
+
+// Умный минимум ключевого СТАТа в зависимости от роли и сложности
+function getNpcRoleKeyStatMin(roleObj, diffKey) {
+    const nameStr = `${roleObj?.name || ""} ${roleObj?.origName || ""}`.toLowerCase();
+
+    const soloMins = {
+        novice: [3, 4], amateur: [4, 5], specialist: [5, 6], pro: [7, 8], veteran: [9, 10]
+    };
+    const stdMins = {
+        novice: [3, 3], amateur: [4, 5], specialist: [6, 7], pro: [8, 8], veteran: [9, 9]
+    };
+
+    let statKey = null;
+    let table = stdMins;
+
+    if (/соло|solo/.test(nameStr)) {
+        statKey = "stat_ref";
+        table = soloMins;
+    } else if (/фиксер|fixer|коп|законник|cop|рокер|rocker/.test(nameStr)) {
+        statKey = "stat_cool";
+    } else if (/нетраннер|netrunner|кочевник|nomad|медиа|media/.test(nameStr)) {
+        statKey = "stat_int";
+    } else if (/медтех|medtech|техник|techie/.test(nameStr)) {
+        statKey = "stat_tech";
+    }
+
+    if (!statKey) return null;
+    const [minLow, minHigh] = table[diffKey] || [2, 2];
+    return { statKey, minVal: npcRandInt(minLow, minHigh) };
+}
+
+// Подбор реальной брони из DB.armor по диапазону ОС
+function pickNpcArmorFromDB(rollVal) {
+    const armorList = (DB.armor || []).filter(a => a && !a.isCommunity);
+    const findByOs = (minOs, maxOs, fallbackName, fallbackOs, fallbackCovers) => {
+        const matches = armorList.filter(a => {
+            const osNum = parseInt(String(a.os || a.sp || "").replace(/[^\d]/g, ""), 10);
+            return !isNaN(osNum) && osNum >= minOs && osNum <= maxOs;
+        });
+        if (matches.length > 0) return matches[npcRandInt(0, matches.length - 1)];
+        return { name: fallbackName, os: String(fallbackOs), zu: "0", covers: fallbackCovers };
+    };
+
+    if (rollVal <= 1) return findByOs(3, 5, "Тяжёлая кожа", 4, "Торс, Руки");
+    if (rollVal === 2) return findByOs(6, 10, "Бронежилет", 10, "Торс");
+    if (rollVal <= 4) return findByOs(11, 13, "Лёгкая броня", 12, "Торс, Руки");
+    if (rollVal <= 7) return findByOs(14, 17, "Средняя броня", 16, "Торс, Руки");
+    if (rollVal <= 9) return findByOs(18, 23, "Тяжёлая броня", 20, "Торс, Руки");
+
+    const mg = armorList.find(a => /metal\s*gear/i.test(a.name || "") || /metal\s*gear/i.test(a.origName || ""));
+    return mg || { name: "MetalGear™", os: "25", zu: "-2", covers: "Всё тело" };
+}
+
+// Подбор реального оружия из DB.weapons по таблице
+function isWeaponDamageAtLeast2d6(w) {
+    const m = String(w?.damage || "").match(/(\d+)\s*[dд]\s*(\d+)/i);
+    if (!m) return false;
+    const count = parseInt(m[1], 10);
+    const sides = parseInt(m[2], 10);
+    return (count >= 2 && sides >= 6) || sides >= 10;
+}
+
+function pickNpcWeaponFromDB(rollVal, requireMin2d6 = false) {
+    const weaponsList = (DB.weapons || []).filter(w => w && !w.isCommunity && (!requireMin2d6 || isWeaponDamageAtLeast2d6(w)));
+    const pickByFilter = (predicate, fallback) => {
+        const matches = weaponsList.filter(predicate);
+        return matches.length > 0 ? matches[npcRandInt(0, matches.length - 1)] : fallback;
+    };
+    const cat = (w) => String(w.category || "").toLowerCase();
+    const dmg = (w) => String(w.damage || "").toLowerCase();
+
+    if (rollVal <= 1) {
+        return pickByFilter(
+            w => /нож|knife/i.test(w.name || "") || /нож|knife/i.test(w.origName || ""),
+            { name: "Нож", typeCode: "ХОЛ", to: "0", skr: "Кар", damage: "1d6", mag: "—", sko: "—", range: "Ближний", nad: "—" }
+        );
+    }
+    if (rollVal === 2) {
+        return pickByFilter(
+            w => cat(w).includes("лёгкие пистолеты"),
+            { name: "Лёгкий пистолет", typeCode: "П", to: "0", skr: "Кар", damage: "1d6+1", mag: "10", sko: "2", range: "50м", nad: "ОБ" }
+        );
+    }
+    if (rollVal === 3) {
+        return pickByFilter(
+            w => cat(w).includes("средние пистолеты"),
+            { name: "Средний пистолет", typeCode: "П", to: "0", skr: "Кур", damage: "2d6+1", mag: "12", sko: "2", range: "50м", nad: "ОН" }
+        );
+    }
+    if (rollVal <= 5) {
+        return pickByFilter(
+            w => cat(w).includes("тяжёлые пистолеты"),
+            { name: "Тяжёлый пистолет", typeCode: "П", to: "0", skr: "Кур", damage: "3d6", mag: "8", sko: "2", range: "50м", nad: "ОН" }
+        );
+    }
+    if (rollVal === 6) {
+        return pickByFilter(
+            w => cat(w).includes("лёгкие пп") || cat(w).includes("лёгкие пистолеты-пулемёты"),
+            { name: "Лёгкий ПП", typeCode: "ПП", to: "+1", skr: "Кур", damage: "2d6+1", mag: "30", sko: "25", range: "150м", nad: "ОБ" }
+        );
+    }
+    if (rollVal === 7) {
+        return pickByFilter(
+            w => cat(w).includes("штурмовые винтовки") && (dmg(w).includes("4d6") || dmg(w).includes("5d6")),
+            { name: "Лёгкая штурмовая винтовка", typeCode: "ВИН", to: "+1", skr: "Нет", damage: "5d6", mag: "35", sko: "3/30", range: "400м", nad: "ОН" }
+        );
+    }
+    if (rollVal === 8) {
+        return pickByFilter(
+            w => cat(w).includes("штурмовые винтовки") && (dmg(w).includes("5d6") || dmg(w).includes("6d6")),
+            { name: "Средняя штурмовая винтовка", typeCode: "ВИН", to: "0", skr: "Нет", damage: "5d6+3", mag: "30", sko: "3/30", range: "400м", nad: "ОН" }
+        );
+    }
+    return pickByFilter(
+        w => cat(w).includes("штурмовые винтовки") && (dmg(w).includes("6d6+1") || dmg(w).includes("6d6+2") || dmg(w).includes("6d6+3")),
+        { name: "Тяжёлая штурмовая винтовка", typeCode: "ВИН", to: "-1", skr: "Нет", damage: "6d6+2", mag: "30", sko: "3/30", range: "400м", nad: "ОН" }
+    );
+}
+
+window.generateRandomNpc = function () {
+    const diffKey = document.getElementById("npcGenDifficulty")?.value || "specialist";
+    const diff = NPC_DIFFICULTIES[diffKey] || NPC_DIFFICULTIES.specialist;
+    const roleChoice = document.getElementById("npcGenRoleSelect")?.value || "RANDOM";
+
+    const rolesPool = (DB.roles || []).filter(r => r && !r.isCommunity);
+    let roleObj = roleChoice !== "RANDOM"
+        ? rolesPool.find(r => r.id === roleChoice)
+        : rolesPool[npcRandInt(0, Math.max(0, rolesPool.length - 1))];
+    if (!roleObj) {
+        roleObj = { name: "Соло", ability: "Чувство Боя", skills: ["Чувство Боя", "Внимательность", "Пистолеты", "Драка", "Ближний бой", "Винтовки", "Атлетика", "Пистолеты-Пулемёты", "Скрытность", "Уклонение"] };
+    }
+
+    const isSolo = /соло|solo/i.test(roleObj.name || "") || /solo/i.test(roleObj.origName || "");
+
+    // ШАГ 1: Генерация СТАТов (2–10, а для ключевого СТАТа роли — с учётом минимума сложности)
+    const stats = {};
+    CHARACTER_STAT_KEYS.forEach(st => {
+        stats[st.k] = npcRandInt(2, 10);
+    });
+    const keyStatMin = getNpcRoleKeyStatMin(roleObj, diffKey);
+    if (keyStatMin) {
+        stats[keyStatMin.statKey] = npcRandInt(keyStatMin.minVal, 10);
+    }
+    const derived = getNpcBodyDerived(stats.stat_body);
+    const runSpeed = stats.stat_ma * 3;
+    // ШАГ 2: Навыки роли (минимум по сложности + особая способность первой в списке + 40 базовых очков)
+    const rawSkills = Array.isArray(roleObj.skills) && roleObj.skills.length > 0
+        ? roleObj.skills.filter(s => s && s !== "—")
+        : [roleObj.ability || "Особая способность", "Внимательность", "Пистолеты", "Драка", "Атлетика"];
+
+    let spentOnMins = 0;
+    const skillsMap = rawSkills.map((name, idx) => {
+        const minLvl = idx === 0
+            ? diff.specialMin
+            : npcRandInt(diff.minSkillLow, diff.minSkillHigh);
+        const cap = Math.max(minLvl, npcRandInt(diff.minCap, diff.maxCap));
+        spentOnMins += minLvl;
+        return { name, level: minLvl, cap };
+    });
+
+    let pool = Math.max(0, 40 - spentOnMins);
+    let safety = 500;
+    while (pool > 0 && safety-- > 0) {
+        const avail = skillsMap.filter(s => s.level < s.cap);
+        if (avail.length === 0) break;
+        const pick = avail[npcRandInt(0, avail.length - 1)];
+        pick.level++;
+        pool--;
+    }
+
+    let extraPoolRolled = 0;
+    if (diff.extraPoints && skillsMap.length > 0) {
+        extraPoolRolled = npcRandInt(2, 20);
+        const shuffled = [...skillsMap].sort(() => Math.random() - 0.5).slice(0, 5);
+        let extraLeft = extraPoolRolled;
+        let guard = 200;
+        while (extraLeft > 0 && guard-- > 0) {
+            const avail = shuffled.filter(s => s.level < diff.maxCap);
+            if (avail.length === 0) break;
+            const pick = avail[npcRandInt(0, avail.length - 1)];
+            pick.level++;
+            extraLeft--;
+        }
+    }
+
+    // ШАГ 3: Киберимпланты из карточек DB.cyberware
+    // 3 импланта для обычных ролей, 6 для Соло. 10% шанс на пустой слот. +50% шанс на +1 доп. опцию.
+    const cyberPool = (DB.cyberware || []).filter(c => c && !c.isCommunity);
+    const usedCyberIds = new Set();
+    const cyberware = [];
+    let totalHl = 0;
+
+    const addRandomCyber = (isBonusOption = false) => {
+        const available = cyberPool.filter(c => !usedCyberIds.has(c.id));
+        if (available.length === 0) return;
+        const picked = available[npcRandInt(0, available.length - 1)];
+        usedCyberIds.add(picked.id);
+        const rolledHl = rollNpcHumanityLoss(picked.pch);
+        totalHl += rolledHl;
+        cyberware.push({ item: picked, rolledHl, isBonusOption });
+    };
+
+    const baseCyberCount = isSolo ? 6 : 3;
+    for (let i = 0; i < baseCyberCount; i++) {
+        if (Math.random() < 0.10) continue; // 10% шанс, что импланта нет
+        addRandomCyber(false);
+    }
+    if (Math.random() < 0.50) {
+        addRandomCyber(true); // 50% шанс на +1 опцию кибероснащения
+    }
+
+    // Расчёт Человечности и текущей ЭМП по правилам CP2020 (1 ЭМП = 10 Человечности)
+    const baseEmp = stats.stat_emp;
+    const baseHumanity = baseEmp * 10;
+    const currentHumanity = Math.max(0, baseHumanity - totalHl);
+    const currentEmp = Math.floor(currentHumanity / 10);
+
+    // ШАГ 4: Броня и оружие (1d10 + бонус роли; со «Специалиста» броня не ниже ОС 10, оружие не слабее 2d6)
+    const roleBonus = getNpcRoleGearBonus(roleObj.name);
+    const gearRollRaw = npcRandInt(1, 10);
+    const gearRollTotal = gearRollRaw + roleBonus;
+    const effectiveGearRoll = diff.highTierGear ? Math.max(3, gearRollTotal) : gearRollTotal;
+    const armor = pickNpcArmorFromDB(effectiveGearRoll);
+    const weapon = pickNpcWeaponFromDB(effectiveGearRoll, diff.highTierGear);
+
+    // ШАГ 5: Стиль, Этнос и Мотивы
+    const style = {
+        clothes: NPC_STYLE_CLOTHES[npcRandInt(0, 9)],
+        hair: NPC_STYLE_HAIR[npcRandInt(0, 9)],
+        feature: NPC_STYLE_FEATURES[npcRandInt(0, 9)]
+    };
+    const ethObj = NPC_ETHNICITIES[npcRandInt(0, NPC_ETHNICITIES.length - 1)];
+    const ethnicity = {
+        region: ethObj.region,
+        origin: ethObj.origins[npcRandInt(0, ethObj.origins.length - 1)]
+    };
+    const motivations = {
+        trait: NPC_MOTIVATIONS.traits[npcRandInt(0, 9)],
+        valuedPerson: NPC_MOTIVATIONS.valuedPerson[npcRandInt(0, 9)],
+        valuedMost: NPC_MOTIVATIONS.valuedMost[npcRandInt(0, 9)],
+        feelAboutPeople: NPC_MOTIVATIONS.feelAboutPeople[npcRandInt(0, 9)],
+        valuedPossession: NPC_MOTIVATIONS.valuedPossession[npcRandInt(0, 9)]
+    };
+
+    lastGeneratedNpc = {
+        difficulty: diff.label,
+        roleObj,
+        role: roleObj.name,
+        ability: roleObj.ability || "—",
+        stats,
+        baseEmp,
+        currentEmp,
+        baseHumanity,
+        currentHumanity,
+        totalHl,
+        runSpeed,
+        btm: derived.btm,
+        dmgBonus: derived.dmgBonus,
+        skills: skillsMap,
+        extraPoolRolled,
+        cyberware,
+        armor,
+        weapon,
+        gearRollRaw,
+        roleBonus,
+        gearRollTotal,
+        style,
+        ethnicity,
+        motivations
+    };
+
+    renderGeneratedNpcResult(lastGeneratedNpc);
+};
+
+function renderGeneratedNpcResult(npc) {
+    const box = document.getElementById("npcGenResultBox");
+    const copyBtn = document.getElementById("npcGenCopyBtn");
+    if (!box) return;
+    if (copyBtn) copyBtn.classList.remove("hidden");
+
+    const statsHtml = CHARACTER_STAT_KEYS.map(st => {
+        const isEmp = st.k === "stat_emp";
+        const valText = isEmp ? `${npc.currentEmp}/${npc.baseEmp}` : npc.stats[st.k];
+        const valColor = isEmp && npc.currentEmp <= 2 ? "text-cp-red" : "text-cp-cyan";
+        return `
+          <div class="bg-cp-bg border border-gray-800 p-2.5 text-center">
+            <div class="text-[10px] text-gray-400 font-bold">${st.l}</div>
+            <div class="text-lg font-display font-black ${valColor} mt-0.5">${valText}</div>
+          </div>
+        `;
+    }).join("");
+
+    const skillsHtml = npc.skills.map(sk => `
+      <div class="bg-cp-bg border border-gray-800 px-3 py-1.5 flex items-center justify-between gap-2 text-xs">
+        <span class="text-gray-200 truncate">${escapeHtmlAttr(sk.name)}</span>
+        <span class="font-display font-black text-cp-yellow shrink-0">+${sk.level}</span>
+      </div>
+    `).join("");
+
+    const roleClickAttr = npc.roleObj && npc.roleObj.id
+        ? `onclick="navigateToCardReference('roles', '${escapeHtmlAttr(npc.roleObj.id)}')" class="font-display text-2xl font-black text-white hover:text-cp-yellow hover:underline cursor-pointer mt-0.5 inline-block transition-colors"`
+        : `class="font-display text-2xl font-black text-white mt-0.5"`;
+
+    const w = npc.weapon;
+    const a = npc.armor;
+
+    const armorTitleHtml = a.id
+        ? `<button type="button" onclick="navigateToCardReference('armor', '${escapeHtmlAttr(a.id)}')" class="font-bold text-sm text-white hover:text-cp-cyan hover:underline text-left transition-colors">${escapeHtmlAttr(a.name)} ↗</button>`
+        : `<span class="font-bold text-sm text-white">${escapeHtmlAttr(a.name)}</span>`;
+
+    const weaponTitleHtml = w.id
+        ? `<button type="button" onclick="navigateToCardReference('weapons', '${escapeHtmlAttr(w.id)}')" class="font-bold text-sm text-white hover:text-cp-yellow hover:underline text-left transition-colors">${escapeHtmlAttr(w.name)} ↗</button>`
+        : `<div class="font-bold text-sm text-white">${escapeHtmlAttr(w.name)}</div>`;
+
+    const cyberListHtml = npc.cyberware.length === 0
+        ? `<div class="text-xs text-gray-500 italic">Без киберимплантов</div>`
+        : npc.cyberware.map(({ item, rolledHl, isBonusOption }) => {
+            const shortDesc = item.desc ? truncateQuote(item.desc, 130) : "—";
+            return `
+              <div class="bg-cp-panel border border-purple-500/40 p-2.5 space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                  <button type="button" onclick="navigateToCardReference('cyberware', '${escapeHtmlAttr(item.id)}')"
+                    class="text-xs font-bold text-white hover:text-cp-cyan hover:underline text-left transition-colors">
+                    ${escapeHtmlAttr(item.name)} ↗
+                  </button>
+                  <div class="flex items-center gap-1.5 shrink-0">
+                    ${isBonusOption ? `<span class="px-1.5 py-0.5 bg-cp-cyan/15 text-cp-cyan text-[9px] font-bold uppercase">+опция</span>` : ""}
+                    <span class="px-1.5 py-0.5 bg-cp-red/20 border border-cp-red/40 text-cp-red font-bold text-[10px]">ПЧ: ${dash(item.pch)} (−${rolledHl})</span>
+                  </div>
+                </div>
+                <div class="text-[11px] text-gray-400 leading-snug">${escapeHtmlAttr(shortDesc)}</div>
+              </div>
+            `;
+        }).join("");
+
+    box.innerHTML = `
+      <div class="space-y-5">
+        <div class="border-b border-gray-800 pb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">СГЕНЕРИРОВАННЫЙ NPC // ${escapeHtmlAttr(npc.difficulty)}</div>
+            <h2 ${roleClickAttr}>${escapeHtmlAttr(npc.role)}${npc.roleObj?.id ? ' <span class="text-xs text-cp-cyan">↗</span>' : ''}</h2>
+            <div class="text-xs text-gray-400">Особая способность: <b class="text-cp-yellow">${escapeHtmlAttr(npc.ability)}</b></div>
+          </div>
+          <div class="text-right text-xs text-gray-400 space-y-0.5">
+            <div>Человечность: <b class="${npc.currentEmp <= 2 ? 'text-cp-red' : 'text-cp-green'}">${npc.currentHumanity} / ${npc.baseHumanity}</b> (ПЧ: <b class="text-cp-red">−${npc.totalHl}</b>)</div>
+            <div>Бросок экипировки: <b class="text-white">${npc.gearRollRaw}</b>${npc.roleBonus ? ` <b class="text-cp-green">+${npc.roleBonus}</b>` : ""} = <b class="text-cp-yellow">${npc.gearRollTotal}</b></div>
+            ${npc.extraPoolRolled > 0 ? `<div>Доп. очки навыков: <b class="text-cp-cyan">+${npc.extraPoolRolled}</b></div>` : ""}
+          </div>
+        </div>
+
+        <!-- СТАТЫ И ПРОИЗВОДНЫЕ ПОКАЗАТЕЛИ -->
+        <div class="space-y-2.5">
+          <div class="text-[11px] font-bold uppercase text-cp-yellow">📊 Характеристики (СТАТы):</div>
+          <div class="grid grid-cols-3 sm:grid-cols-9 gap-2">${statsHtml}</div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div class="bg-cp-bg border border-gray-800 p-2">
+              <div class="text-[10px] text-gray-400 uppercase font-bold">🏃 Бег (ПЕР × 3)</div>
+              <div class="text-sm font-display font-black text-cp-green mt-0.5">${npc.runSpeed} м</div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2">
+              <div class="text-[10px] text-gray-400 uppercase font-bold">🛡️ МТЕЛ</div>
+              <div class="text-sm font-display font-black text-cp-yellow mt-0.5">${npc.btm}</div>
+            </div>
+            <div class="bg-cp-bg border border-gray-800 p-2">
+              <div class="text-[10px] text-gray-400 uppercase font-bold">👊 УР Бонус</div>
+              <div class="text-sm font-display font-black text-cp-red mt-0.5">${npc.dmgBonus}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-12 gap-5 items-start">
+          <!-- НАВЫКИ + ВНЕШНИЙ ВИД, ЭТНОС И МОТИВЫ -->
+          <div class="col-span-12 lg:col-span-6 space-y-4">
+            <div class="space-y-2">
+              <div class="text-[11px] font-bold uppercase text-cp-cyan">🎯 Профессиональные навыки:</div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">${skillsHtml}</div>
+            </div>
+
+            <div class="bg-cp-bg border-l-2 border-cp-yellow p-3.5 space-y-2 text-xs">
+              <div class="text-[11px] font-bold uppercase text-cp-yellow">🕶️ Внешний вид и Этнос:</div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <div class="bg-cp-panel border border-gray-800 px-2.5 py-1.5"><span class="text-gray-400">Одежда:</span> <b class="text-white">${escapeHtmlAttr(npc.style.clothes)}</b></div>
+                <div class="bg-cp-panel border border-gray-800 px-2.5 py-1.5"><span class="text-gray-400">Причёска:</span> <b class="text-white">${escapeHtmlAttr(npc.style.hair)}</b></div>
+                <div class="bg-cp-panel border border-gray-800 px-2.5 py-1.5"><span class="text-gray-400">Особенность:</span> <b class="text-cp-cyan">${escapeHtmlAttr(npc.style.feature)}</b></div>
+                <div class="bg-cp-panel border border-gray-800 px-2.5 py-1.5"><span class="text-gray-400">Этнос:</span> <b class="text-cp-yellow">${escapeHtmlAttr(npc.ethnicity.region)}</b> <span class="text-gray-400">(${escapeHtmlAttr(npc.ethnicity.origin)})</span></div>
+              </div>
+            </div>
+
+            <div class="bg-cp-bg border-l-2 border-cp-green p-3.5 space-y-1.5 text-xs">
+              <div class="text-[11px] font-bold uppercase text-cp-green">🧠 Мотивы и Характер:</div>
+              <div class="space-y-1 text-gray-300">
+                <div><span class="text-gray-500">Характер:</span> <b class="text-white">${escapeHtmlAttr(npc.motivations.trait)}</b></div>
+                <div><span class="text-gray-500">Самый ценный человек:</span> <b class="text-white">${escapeHtmlAttr(npc.motivations.valuedPerson)}</b></div>
+                <div><span class="text-gray-500">Ценит больше всего:</span> <b class="text-cp-yellow">${escapeHtmlAttr(npc.motivations.valuedMost)}</b></div>
+                <div><span class="text-gray-500">Отношение к людям:</span> <b class="text-gray-200">${escapeHtmlAttr(npc.motivations.feelAboutPeople)}</b></div>
+                <div><span class="text-gray-500">Ценная вещь / увлечение:</span> <b class="text-cp-cyan">${escapeHtmlAttr(npc.motivations.valuedPossession)}</b></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- КИБЕРИМПЛАНТЫ, БРОНЯ И ОРУЖИЕ -->
+          <div class="col-span-12 lg:col-span-6 space-y-4">
+            <div class="bg-cp-bg border-l-2 border-purple-500 p-3.5 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-[11px] font-bold uppercase text-purple-400">🦾 Киберимпланты (${npc.cyberware.length}):</span>
+                <span class="text-[10px] text-cp-red font-bold">Суммарная ПЧ: −${npc.totalHl}</span>
+              </div>
+              <div class="space-y-1.5">${cyberListHtml}</div>
+            </div>
+
+            <div class="bg-cp-bg border-l-2 border-cp-cyan p-3.5 space-y-1.5">
+              <div class="text-[11px] font-bold uppercase text-cp-cyan">🛡️ Броня:</div>
+              <div class="flex items-center justify-between gap-2">
+                ${armorTitleHtml}
+                <span class="px-2 py-0.5 bg-cp-cyan/15 border border-cp-cyan/50 text-cp-cyan font-bold text-xs shrink-0">ОС: ${dash(a.os || a.sp)}</span>
+              </div>
+              <div class="text-xs text-gray-400">Зона защиты: <b class="text-gray-200">${dash(a.covers || a.coverage)}</b> • ЗУ: <b class="text-cp-yellow">${dash(a.zu || a.ev)}</b></div>
+            </div>
+
+            <div class="bg-cp-bg border-l-2 border-cp-red p-3.5 space-y-2">
+              <div class="text-[11px] font-bold uppercase text-cp-red">🔫 Оружие:</div>
+              ${weaponTitleHtml}
+              <div class="grid grid-cols-4 sm:grid-cols-7 gap-1 text-center text-[11px]">
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Тип</div><b>${dash(w.typeCode)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ТО</div><b class="text-cp-yellow">${dash(w.to)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">Урон</div><b class="text-cp-red">${dash(w.damage)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">МАГ</div><b>${dash(w.mag)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">СКО</div><b>${dash(w.sko)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">ДИС</div><b class="text-cp-cyan">${dash(w.range)}</b></div>
+                <div class="bg-cp-panel p-1 border border-gray-800"><div class="text-[8px] text-gray-400">НАД</div><b class="text-cp-green">${dash(w.nad)}</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+}
+
+window.copyGeneratedNpcToClipboard = function () {
+    if (!lastGeneratedNpc) return;
+    const n = lastGeneratedNpc;
+
+    // 1. Маппинг статов под ключи плагина (ТЕЛ и УДАЧ вместо ТЕЛО и УДАЧА)
+    const obrStatsMap = [
+        ["ИНТ",  n.stats.stat_int],
+        ["КРУТ", n.stats.stat_cool],
+        ["ПЕР",  n.stats.stat_ma],
+        ["РЕФ",  n.stats.stat_ref],
+        ["ПРВЛ", n.stats.stat_attr],
+        ["ТЕЛ",  n.stats.stat_body],
+        ["ТЕХ",  n.stats.stat_tech],
+        ["УДАЧ", n.stats.stat_luck],
+        ["ЭМП",  n.currentEmp]
+    ];
+    const statsRows = obrStatsMap.map(([k, v]) => `| ${k} | ${v} |`).join("\n");
+
+    // 2. Разделяем навыки на боевые и прочие
+    const combatRegex = /пистолет|винтовк|пп|пулем|дробов|тяж[её]л|драк|ближн|боев|уклонен|фехтован|стрельб|метан|лук|арбалет/i;
+    const combatList = [];
+    const otherList = [];
+    (n.skills || []).forEach(s => {
+        const entry = `${s.name} +${s.level}`;
+        if (combatRegex.test(s.name)) combatList.push(entry);
+        else otherList.push(entry);
+    });
+
+    const specialSkillLvl = n.skills?.[0]?.level ?? 0;
+    const roleLine = `${n.role} (${n.ability} +${specialSkillLvl})`;
+
+    // 3. Кибернетика
+    const cyberText = n.cyberware.length > 0
+        ? n.cyberware.map(c => `- ${c.item.name} (ПЧ −${c.rolledHl})`).join("\n")
+        : "*При отсутствии кибернетики раздел пропускается.*";
+
+    // 4. Раскладываем ОС брони по 6 зонам плагина
+    const spNum = parseInt(String(n.armor?.os || n.armor?.sp || "0").replace(/[^\d]/g, ""), 10) || 0;
+    const cov = String(n.armor?.covers || n.armor?.coverage || "Торс").toLowerCase();
+    const isAll = cov.includes("вс") || cov.includes("все");
+    const zoneSp = (cond) => (isAll || cond) ? `${spNum} / ${spNum}` : "0 / 0";
+
+    const armorRows = [
+        `| ТОРС | ${zoneSp(cov.includes("торс") || cov.includes("тело"))} |`,
+        `| ГОЛОВА | ${zoneSp(cov.includes("голов"))} |`,
+        `| ПРАВАЯ РУКА | ${zoneSp(cov.includes("рук"))} |`,
+        `| ЛЕВАЯ РУКА | ${zoneSp(cov.includes("рук"))} |`,
+        `| ПРАВАЯ НОГА | ${zoneSp(cov.includes("ног"))} |`,
+        `| ЛЕВАЯ НОГА | ${zoneSp(cov.includes("ног"))} |`
+    ].join("\n");
+
+    // 5. Оружие (нормализуем скрытность, магазин и СКО под парсер плагина)
+    const w = n.weapon || {};
+    const skrLow = String(w.skr || "").toLowerCase();
+    const concealObr = skrLow.includes("кар") ? "Карман"
+        : skrLow.includes("кур") ? "Куртка"
+        : skrLow.includes("плащ") ? "Длинный плащ"
+        : "Нет";
+
+    const magNum = parseInt(String(w.mag || "0").replace(/[^\d]/g, ""), 10) || 0;
+    const rofMatch = String(w.sko || "1").match(/\d+/g);
+    const rofNum = rofMatch ? Math.max(...rofMatch.map(Number)) : 1;
+    const rangeNum = String(w.range || "").replace(/[^\d.,]/g, "") || "-";
+
+    // Подбираем подходящий боевой навык для оружия (если есть)
+    const matchedSkill = (n.skills || []).find(s => combatRegex.test(s.name));
+    const weaponSkillStr = matchedSkill ? `+${matchedSkill.level}` : "+4";
+    const weaponDesc = w.desc ? String(w.desc).replace(/\s+/g, " ").trim() : "-";
+
+    const mdText = `# ${n.role} (${n.difficulty})
+
+## ХАРАКТЕРИСТИКИ
+| Характеристика | Значение |
+|---|---:|
+${statsRows}
+
+**Производные показатели:**
+- МТЕЛ: ${n.btm}
+- УРбонус: ${n.dmgBonus}
+- БЕГ: ${n.runSpeed} м
+
+## НАВЫКИ
+**Способность роли:**
+- Роль: ${roleLine}
+- Боевые навыки: ${combatList.length ? combatList.join(", ") : "+0"}
+- Прочее: ${otherList.length ? otherList.join(", ") : "-"}
+
+## КИБЕРНЕТИКА
+${cyberText}
+
+## ЗАЩИТА И СНАРЯЖЕНИЕ
+**БРОНЯ (SP):**
+| Часть тела | Текущий SP / Максимальный SP |
+|---|---:|
+${armorRows}
+
+**ОРУЖИЕ:**
+- **${w.name || "Оружие"}:**
+  - Тип: ${dash(w.typeCode)}
+  - Навык: ${weaponSkillStr}
+  - ТО: ${dash(w.to)}
+  - Скрыт: ${concealObr}
+  - Урон: ${dash(w.damage)}
+  - Боезапас: ${magNum} / ${magNum}
+  - СКО: ${rofNum}
+  - НАД: ${dash(w.nad)}
+  - Дистанция: ${rangeNum}
+  - Примечания: Броня: ${n.armor?.name || "—"} (ЗУ ${dash(n.armor?.zu || n.armor?.ev)}), Человечность: ${n.currentHumanity}/${n.baseHumanity}
+  - Зарядники: 2 запасных
+  - Описание: ${weaponDesc}
+
+**ПРОЧЕЕ СНАРЯЖЕНИЕ:**
+- Внешний вид: ${n.style.clothes}, причёска: ${n.style.hair}, особенность: ${n.style.feature}
+- Этнос: ${n.ethnicity.region} (${n.ethnicity.origin})
+- Характер: ${n.motivations.trait}
+- Ценит больше всего: ${n.motivations.valuedMost} | Важный человек: ${n.motivations.valuedPerson}
+- Отношение к людям: ${n.motivations.feelAboutPeople}
+- Ценная вещь: ${n.motivations.valuedPossession}
+
+## ЗДОРОВЬЕ
+Текущие ранения: 0 / 40 (ЗДОРОВ — Без штрафов, ОГЛ -0)
+
+## SDP КИБЕРНЕТИЧЕСКИХ КОНЕЧНОСТЕЙ
+| Конечность | SDP (текущий / максимум) |
+|---|---:|
+| Правая рука | ? / ? |
+| Левая рука | ? / ? |
+| Правая нога | ? / ? |
+| Левая нога | ? / ? |
+`;
+
+    navigator.clipboard?.writeText(mdText).then(() => {
+        const btn = document.getElementById("npcGenCopyBtn");
+        if (btn) {
+            btn.textContent = "✓ Скопировано (OBR)";
+            setTimeout(() => { btn.textContent = "📋 Копировать"; }, 1500);
+        }
+    });
 };
 
 async function initApp() {

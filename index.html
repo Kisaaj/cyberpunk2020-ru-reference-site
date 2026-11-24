@@ -572,7 +572,7 @@
                 <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
                   <button type="button" onclick="openCharactersSubtab('named')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">⭐ Именные</button>
                   <button type="button" onclick="openCharactersSubtab('npc')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">👤 NPC</button>
-                  <button type="button" onclick="openWipView('characters_group', 'Генератор NPC')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-400 hover:bg-cp-yellow hover:text-black transition-colors">🎲 Генератор NPC</button>
+                  <button type="button" onclick="switchMainView('npc_gen')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🎲 Генератор NPC</button>
                 </div>
               </div>
             </div>
@@ -982,6 +982,48 @@
         </div>
         <div id="datafortGridContainer" class="bg-white p-2 border-2 border-black shadow-2xl select-none overflow-auto max-w-full"></div>
         <div id="dfGridErrorMsg" class="hidden w-full text-center text-xs font-bold text-cp-red bg-cp-red/10 border border-cp-red/40 py-1.5 px-3"></div>
+      </div>
+    </div>
+  </main>
+  <!-- ОКНО 1.57: ГЕНЕРАТОР NPC -->
+  <main id="view-npc_gen" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4"
+    aria-label="npc_gen">
+    <section class="bg-cp-panel cp-border p-4 border-l-4 border-l-cp-yellow">
+      <div class="grid grid-cols-12 gap-3 items-end">
+        <div class="col-span-4">
+          <label class="block text-[11px] uppercase text-cp-yellow font-bold mb-1 tracking-wider">Сложность NPC</label>
+          <select id="npcGenDifficulty"
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow text-xs text-white px-3 py-2 outline-none font-bold">
+            <option value="novice">Новичок (макс. навык 1–2)</option>
+            <option value="amateur">Любитель (макс. навык 3–4)</option>
+            <option value="specialist" selected>Специалист (макс. навык 5–6)</option>
+            <option value="pro">Профессионал (макс. навык 7–8, +2–20 доп. очков)</option>
+            <option value="veteran">Ветеран (макс. навык 9–10, +2–20 доп. очков)</option>
+          </select>
+        </div>
+        <div class="col-span-4">
+          <label class="block text-[11px] uppercase text-cp-cyan font-bold mb-1 tracking-wider">Роль персонажа</label>
+          <select id="npcGenRoleSelect"
+            class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan text-xs text-white px-3 py-2 outline-none">
+            <option value="RANDOM">🎲 Случайная роль</option>
+          </select>
+        </div>
+        <div class="col-span-4 flex items-center gap-2">
+          <button type="button" onclick="generateRandomNpc()"
+            class="flex-1 py-2 px-4 bg-cp-yellow hover:bg-yellow-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip shadow-[0_0_15px_rgba(252,238,10,0.3)] transition-all">
+            🎲 Сгенерировать NPC
+          </button>
+          <button type="button" id="npcGenCopyBtn" onclick="copyGeneratedNpcToClipboard()"
+            class="hidden py-2 px-3 bg-cp-bg hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/60 text-xs font-bold uppercase transition-colors shrink-0">
+            📋 Копировать
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <div id="npcGenResultBox" class="bg-cp-panel cp-border p-6 min-h-[500px]">
+      <div class="text-center py-20 text-xs text-gray-500">
+        Выберите сложность и нажмите <b class="text-cp-yellow">«🎲 Сгенерировать NPC»</b> для создания персонажа.
       </div>
     </div>
   </main>
