@@ -1982,7 +1982,12 @@ function renderCardActionButtons(sectionKey, itemId) {
 
     const fav = isItemFavorited(itemId);
     const favBtn = `<button type="button" onclick="toggleFavoriteItem('${itemId}')" class="px-2.5 py-1 border text-xs font-bold transition-colors ${fav ? 'bg-cp-yellow text-black border-cp-yellow' : 'bg-cp-bg text-gray-300 border-gray-700 hover:border-cp-yellow'}">${fav ? '★ В избранном' : '☆ В избранное'}</button>`;
-    if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${buyBtn}${favBtn}</div>`;
+
+    const copyObrBtn = sectionKey === "characters"
+        ? `<button type="button" onclick="copyCharacterCardToObr('${itemId}', this)" title="Скопировать статблок в формате Markdown для Owlbear Rodeo" class="px-2.5 py-1 border text-xs font-bold transition-colors bg-cp-cyan/15 text-cp-cyan border-cp-cyan/60 hover:bg-cp-cyan hover:text-black">📋 Скопировать</button>`
+        : "";
+
+    if (!isCurrentUserAdmin()) return `<div class="flex items-center gap-1.5 shrink-0">${copyObrBtn}${buyBtn}${favBtn}</div>`;
 
     const targetObj = (DB[sectionKey] || []).find(i => i.id === itemId);
     const isAddedChecked = Boolean(targetObj && targetObj.isUser);
@@ -1996,6 +2001,7 @@ function renderCardActionButtons(sectionKey, itemId) {
             <button type="button" onclick="startEditItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-xs font-bold">✏️ Ред.</button>
             <button type="button" onclick="deleteItem('${sectionKey}', '${itemId}')" class="px-2.5 py-1 bg-cp-red/15 hover:bg-cp-red text-cp-red hover:text-white border border-cp-red/50 text-xs font-bold">🗑️</button>
           </div>
+          ${copyObrBtn ? `<div class="flex items-center justify-end">${copyObrBtn}</div>` : ""}
           <div class="flex items-center gap-2 flex-wrap justify-end">
             ${sectionKey === "characters" ? `
               <label class="flex items-center gap-1.5 text-[10px] text-gray-400 hover:text-cp-cyan cursor-pointer select-none bg-cp-bg border border-gray-800 px-2 py-0.5">
@@ -8813,6 +8819,187 @@ ${armorRows}
         if (btn) {
             btn.textContent = "✓ Скопировано (OBR)";
             setTimeout(() => { btn.textContent = "📋 Копировать"; }, 1500);
+        }
+    });
+};
+
+// Копирование статблока прописанного персонажа («Именные» / «NPC») в формате Markdown для Owlbear Rodeo
+window.copyCharacterCardToObr = function (itemId, btnEl) {
+    const ch = (DB.characters || []).find(x => x && x.id === itemId);
+    if (!ch) return;
+
+    const toNum = (v, fb = 5) => {
+        const m = String(v ?? "").match(/\d+/);
+        return m ? parseInt(m[0], 10) : fb;
+    };
+
+    const bodyVal = toNum(ch.stat_body, 5);
+    const maVal = toNum(ch.stat_ma, 5);
+    const derived = typeof getNpcBodyDerived === "function"
+        ? getNpcBodyDerived(bodyVal)
+        : { btm: "-2", dmgBonus: "0" };
+
+    // 1. Характеристики (ключи строго под плагин: ТЕЛ и УДАЧ)
+    const statsRows = [
+        ["ИНТ",  toNum(ch.stat_int, 5)],
+        ["КРУТ", toNum(ch.stat_cool, 5)],
+        ["ПЕР",  maVal],
+        ["РЕФ",  toNum(ch.stat_ref, 5)],
+        ["ПРВЛ", toNum(ch.stat_attr, 5)],
+        ["ТЕЛ",  bodyVal],
+        ["ТЕХ",  toNum(ch.stat_tech, 5)],
+        ["УДАЧ", toNum(ch.stat_luck, 5)],
+        ["ЭМП",  toNum(ch.stat_emp, 5)]
+    ].map(([k, v]) => `| ${k} | ${v} |`).join("\n");
+
+    // 2. Разделяем навыки на боевые и прочие
+    const combatRegex = /пистолет|винтовк|пп|пулем|дробов|тяж[её]л|драк|ближн|боев|уклонен|фехтован|стрельб|метан|лук|арбалет/i;
+    const combatList = [];
+    const otherList = [];
+    const rawSkillsStr = (ch.charSkills && ch.charSkills !== "—") ? String(ch.charSkills) : "";
+    rawSkillsStr.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean).forEach(sk => {
+        if (combatRegex.test(sk)) combatList.push(sk);
+        else otherList.push(sk);
+    });
+
+    // 3. Кибернетика (поддержка нового списка и старого текстового поля)
+    const cyberArr = Array.isArray(ch.charCyberwareList) && ch.charCyberwareList.length > 0
+        ? ch.charCyberwareList.map(c => c.desc ? `${c.name} (${c.desc})` : c.name)
+        : (ch.charCyberware && ch.charCyberware !== "—" ? String(ch.charCyberware).split(/,\s*(?=[А-ЯA-Z])|\n+/).map(s => s.trim()).filter(Boolean) : []);
+    const cyberText = cyberArr.length > 0
+        ? cyberArr.map(c => `- ${c}`).join("\n")
+        : "*При отсутствии кибернетики раздел пропускается.*";
+
+    // 4. Броня: парсим ОС и зоны защиты из списка или текста
+    const armorArr = Array.isArray(ch.charArmorList) && ch.charArmorList.length > 0
+        ? ch.charArmorList.map(a => a.desc ? `${a.name} (${a.desc})` : a.name)
+        : (ch.charArmor && ch.charArmor !== "—" ? String(ch.charArmor).split(/,\s*(?=[А-ЯA-Z])|\n+/).map(s => s.trim()).filter(Boolean) : []);
+
+    const zones = { TORSO: 0, HEAD: 0, R_ARM: 0, L_ARM: 0, R_LEG: 0, L_LEG: 0 };
+    armorArr.forEach(str => {
+        const spMatch = str.match(/(\d+)\s*(?:ос|sp)/i) || str.match(/(?:ос|sp)\s*[:=]?\s*(\d+)/i);
+        const sp = spMatch ? parseInt(spMatch[1], 10) : 0;
+        if (!sp) return;
+        const low = str.toLowerCase();
+        const isAll = /вс[её]\s*тел|скафандр|metal\s*gear/.test(low);
+        const isHead = isAll || /голов|шлем|шапк/.test(low);
+        const isTorso = isAll || /торс|куртк|жилет|пальто|плащ|костюм|бронежилет|рубашк/.test(low);
+        const isArms = isAll || /рук|куртк|пальто|плащ|костюм|наруч/.test(low);
+        const isLegs = isAll || /ног|джинс|штан|брюк|понож|пальто|плащ|костюм|ботин/.test(low);
+
+        if (isHead) zones.HEAD = Math.max(zones.HEAD, sp);
+        if (isTorso) zones.TORSO = Math.max(zones.TORSO, sp);
+        if (isArms) { zones.R_ARM = Math.max(zones.R_ARM, sp); zones.L_ARM = Math.max(zones.L_ARM, sp); }
+        if (isLegs) { zones.R_LEG = Math.max(zones.R_LEG, sp); zones.L_LEG = Math.max(zones.L_LEG, sp); }
+        if (!isHead && !isTorso && !isArms && !isLegs) zones.TORSO = Math.max(zones.TORSO, sp);
+    });
+
+    const armorRows = [
+        `| ТОРС | ${zones.TORSO} / ${zones.TORSO} |`,
+        `| ГОЛОВА | ${zones.HEAD} / ${zones.HEAD} |`,
+        `| ПРАВАЯ РУКА | ${zones.R_ARM} / ${zones.R_ARM} |`,
+        `| ЛЕВАЯ РУКА | ${zones.L_ARM} / ${zones.L_ARM} |`,
+        `| ПРАВАЯ НОГА | ${zones.R_LEG} / ${zones.R_LEG} |`,
+        `| ЛЕВАЯ НОГА | ${zones.L_LEG} / ${zones.L_LEG} |`
+    ].join("\n");
+
+    // 5. Оружие (новый массив или старая строка)
+    const weaponsArr = Array.isArray(ch.charWeaponsList) && ch.charWeaponsList.length > 0
+        ? ch.charWeaponsList
+        : (ch.charWeapons && ch.charWeapons !== "—"
+            ? String(ch.charWeapons).split(/,\s*(?=[А-ЯA-Z])|\n+/).map(s => s.trim()).filter(Boolean).map(line => {
+                const dmgM = line.match(/(\d+[dд]\d+(?:[+-]\d+)?)/i);
+                return { name: line, type: "-", skr: "Нет", to: "+0", damage: dmgM ? dmgM[1] : "2d6", mag: "10", sko: "2", range: "50", nad: "-", desc: "" };
+            })
+            : []);
+
+    const firstCombatSkill = combatList[0]?.match(/([+-]?\d+)/)?.[1] || "4";
+    const weaponsText = weaponsArr.length > 0
+        ? weaponsArr.map(w => {
+            const skrLow = String(w.skr || "").toLowerCase();
+            const concealObr = skrLow.includes("кар") ? "Карман"
+                : skrLow.includes("кур") ? "Куртка"
+                : skrLow.includes("плащ") ? "Длинный плащ"
+                : "Нет";
+            const magNum = parseInt(String(w.mag || "0").replace(/[^\d]/g, ""), 10) || 0;
+            const rofMatch = String(w.sko || "1").match(/\d+/g);
+            const rofNum = rofMatch ? Math.max(...rofMatch.map(Number)) : 1;
+            const rangeNum = String(w.range || "").replace(/[^\d.,]/g, "") || "-";
+            const wDesc = w.desc ? String(w.desc).replace(/\s+/g, " ").trim() : "-";
+            return `- **${dash(w.name)}:**\n` +
+                `  - Тип: ${dash(w.type)}\n` +
+                `  - Навык: +${firstCombatSkill.replace(/^[+]/, "")}\n` +
+                `  - ТО: ${dash(w.to)}\n` +
+                `  - Скрыт: ${concealObr}\n` +
+                `  - Урон: ${dash(w.damage)}\n` +
+                `  - Боезапас: ${magNum} / ${magNum}\n` +
+                `  - СКО: ${rofNum}\n` +
+                `  - НАД: ${dash(w.nad)}\n` +
+                `  - Дистанция: ${rangeNum}\n` +
+                `  - Примечания: -\n` +
+                `  - Зарядники: -\n` +
+                `  - Описание: ${wDesc}`;
+        }).join("\n")
+        : "- Нет";
+
+    // 6. Снаряжение + список брони текстом + репутация
+    const gearArr = Array.isArray(ch.charGearList) && ch.charGearList.length > 0
+        ? ch.charGearList.map(g => g.desc ? `${g.name} (${g.desc})` : g.name)
+        : (ch.charGear && ch.charGear !== "—" ? String(ch.charGear).split(/,\s*|\n+/).map(s => s.trim()).filter(Boolean) : []);
+    if (armorArr.length > 0) gearArr.unshift(`Броня: ${armorArr.join("; ")}`);
+    if (ch.reputation && ch.reputation !== "—") gearArr.push(`Репутация: ${ch.reputation}`);
+    const gearText = gearArr.length > 0 ? gearArr.map(g => `- ${g}`).join("\n") : "-";
+
+    const mdText = `# ${dash(ch.name)}
+
+## ХАРАКТЕРИСТИКИ
+| Характеристика | Значение |
+|---|---:|
+${statsRows}
+
+**Производные показатели:**
+- МТЕЛ: ${derived.btm}
+- УРбонус: ${derived.dmgBonus}
+- БЕГ: ${maVal * 3} м
+
+## НАВЫКИ
+**Способность роли:**
+- Роль: ${dash(ch.category)}
+- Боевые навыки: ${combatList.length ? combatList.join(", ") : "+0"}
+- Прочее: ${otherList.length ? otherList.join(", ") : "-"}
+
+## КИБЕРНЕТИКА
+${cyberText}
+
+## ЗАЩИТА И СНАРЯЖЕНИЕ
+**БРОНЯ (SP):**
+| Часть тела | Текущий SP / Максимальный SP |
+|---|---:|
+${armorRows}
+
+**ОРУЖИЕ:**
+${weaponsText}
+
+**ПРОЧЕЕ СНАРЯЖЕНИЕ:**
+${gearText}
+
+## ЗДОРОВЬЕ
+Текущие ранения: 0 / 40 (ЗДОРОВ — Без штрафов, ОГЛ -0)
+
+## SDP КИБЕРНЕТИЧЕСКИХ КОНЕЧНОСТЕЙ
+| Конечность | SDP (текущий / максимум) |
+|---|---:|
+| Правая рука | ? / ? |
+| Левая рука | ? / ? |
+| Правая нога | ? / ? |
+| Левая нога | ? / ? |
+`;
+
+    navigator.clipboard?.writeText(mdText).then(() => {
+        if (btnEl) {
+            const orig = btnEl.textContent;
+            btnEl.textContent = "✓ Скопировано";
+            setTimeout(() => { btnEl.textContent = orig; }, 1500);
         }
     });
 };
