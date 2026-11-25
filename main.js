@@ -6889,8 +6889,7 @@ const MA_TABLE_2 = [
     { k: "ma_grapple",  short: "Захват", full: "Захват (Grapple)" },
     { k: "ma_hold",     short: "Удерж",  full: "Удержание и залом (Hold / Break)" },
     { k: "ma_escape",   short: "Освоб",  full: "Освобождение (Escape)" },
-    { k: "ma_cast",     short: "Метан",  full: "Метание (Cast)" },
-    { k: "ma_jumpkick", short: "ДКик",   full: "Прыжковый удар (Jump Kick)" }
+    { k: "ma_cast",     short: "Метан",  full: "Метание (Cast)" }
 ];
 
 const MA_ACTION_TOOLTIPS = {
@@ -7130,22 +7129,6 @@ const MA_ACTION_TOOLTIPS = {
 Штрафы дистанции:
 • Рукопашная: −5  |  Близкая: 0  |  Средняя: −5  |  Дальняя: −10  |  Предельная: −15`
     },
-    ma_jumpkick: {
-        title: "Прыжковый удар (Jump Kick)",
-        text: `Одновременный прыжок и удар ногой (требуется ключевая атака «Удар ногой»). Дистанция: от 1/2 Прыжка до 1/2 Бега.
-Автоматический штраф −5 к попаданию. Позволяет перепрыгивать небольшие препятствия (мины, канавы, тела).
-
-Урон при попадании:
-• Обычная нога — 1D6+5
-• Стандартная кибернога — 2D6+5
-• Утолщённые миомары — 4D6+5
-• Гидравлические усилители — 6D6+5
-
-Навык: только Боевые искусства (Martial Arts).
-Модификаторы: Бонус ключевой атаки «Удар ногой» + WA встроенного оружия (Spike Heels, Talon Feet, Spiked Boots и др.).
-
-Стили, позволяющие Прыжковый удар: Каратэ, Тхэквондо, Коппо, Ниндзюцу, Джит Кун До, Звериное кунг-фу, Чой Ли Фут, Тайцзицюань, Самбо, Тайский бокс, Сават, Капоэйра.`
-    },
     ma_weapons: {
         title: "Список оружия боевых искусств",
         text: `Не любое оружие можно использовать с любым боевым искусством. Если стиль не соответствует конкретному оружию, персонаж использует Ближний бой для проверки попадания и не получает бонус к урону от Боевых искусств.`
@@ -7230,7 +7213,7 @@ setBuilderType = function (type, itemToEdit = null) {
         <div class="text-[11px] font-bold uppercase text-cp-cyan">🥋 Таблица 1 (Ключевые действия и бонусы):</div>
         <div class="grid grid-cols-7 gap-1.5">${makeTableInputs(MA_TABLE_1)}</div>
         <div class="text-[11px] font-bold uppercase text-cp-yellow pt-1">🥋 Таблица 2 (Ключевые действия и бонусы):</div>
-        <div class="grid grid-cols-4 sm:grid-cols-8 gap-1.5">${makeTableInputs(MA_TABLE_2)}</div>
+        <div class="grid grid-cols-7 gap-1.5">${makeTableInputs(MA_TABLE_2)}</div>
       </div>
 
       <div>
@@ -7260,7 +7243,7 @@ renderDetailCard = function (item) {
     const addedHeaderBadge = item.isUser ? `<span class="ml-2 text-[10px] bg-cp-yellow/20 text-cp-yellow border border-cp-yellow/40 px-1.5 py-0.5 font-bold align-middle">HOMEBREW</span>` : "";
 
     const renderActionRow = (cols) => `
-      <div class="grid ${cols.length === 7 ? 'grid-cols-7' : 'grid-cols-8'} gap-1 text-center">
+      <div class="grid grid-cols-7 gap-1 text-center">
         ${cols.map(c => {
             const rawVal = dash(item[c.k]);
             const hasBonus = rawVal !== "—" && rawVal !== "0";
