@@ -547,8 +547,9 @@
             <div class="hidden group-hover:flex flex-col absolute right-0 top-full pt-1 min-w-[180px] z-50">
               <div class="bg-cp-panel border border-cp-cyan shadow-[0_10px_25px_rgba(0,0,0,0.95)] p-1 flex flex-col gap-0.5">
                 <button type="button" onclick="switchMainView('catalog', 'vehicles')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🚗 Транспорт</button>
+                <button type="button" onclick="switchMainView('catalog', 'vehicle_weapons')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🔫 Вооружение</button>
                 <button type="button" onclick="switchMainView('catalog', 'vehicle_tuning')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">⚙️ Тюнинг</button>
-                <button type="button" onclick="openWipView('vehicles_group', 'Сборка транспорта')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-400 hover:bg-cp-yellow hover:text-black transition-colors">🔧 Сборка</button>
+                <button type="button" onclick="switchMainView('vehicle_builder')" class="text-left px-3 py-1.5 text-xs font-bold text-gray-200 hover:bg-cp-yellow hover:text-black transition-colors">🔧 Сборка</button>
               </div>
             </div>
           </div>
@@ -1031,13 +1032,34 @@
         </div>
       </div>
     </section>
-
     <div id="npcGenResultBox" class="bg-cp-panel cp-border p-6 min-h-[500px]">
       <div class="text-center py-20 text-xs text-gray-500">
         Выберите сложность и нажмите <b class="text-cp-yellow">«🎲 Сгенерировать NPC»</b> для создания персонажа.
       </div>
     </div>
   </main>
+  <!-- ОКНО 1.58: СБОРКА ТРАНСПОРТА (MAXIMUM METAL) -->
+    <main id="view-vehicle_builder" class="hidden max-w-[1880px] w-full mx-auto px-6 py-4 flex-1 flex flex-col gap-4"
+      aria-label="vehicle_builder">
+      <div class="bg-cp-panel cp-border p-4 flex flex-wrap items-center justify-between gap-4 border-l-4 border-l-cp-yellow">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">MAXIMUM METAL // КОНСТРУКТОР ШАССИ</div>
+          <h2 class="font-display text-lg font-black text-white uppercase mt-0.5">🔧 Сборка транспорта (базовая конфигурация)</h2>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="addBuiltVehicleToCart()"
+            class="px-4 py-2 bg-cp-green hover:bg-green-400 text-black font-display font-black text-xs uppercase tracking-wider cp-clip   transition-all">
+            🛒 В корзину
+          </button>
+          <button type="button" onclick="resetVehicleBuilder()"
+            class="px-3.5 py-2 bg-gray-800 hover:bg-cp-red text-gray-200 hover:text-white border border-gray-700 text-xs font-bold uppercase  transition-colors">
+            🔄 Сбросить
+          </button>
+        </div>
+      </div>
+  
+      <div class="grid grid-cols-12 gap-5 items-start" id="vehicleBuilderGrid"></div>
+    </main>
   <!-- МОДАЛЬНОЕ ОКНО: ПРОСМОТР КАРТОЧКИ СОБРАННОЙ КИБЕРДЕКИ / ОДЕЖДЫ ИЗ КОРЗИНЫ -->
   <div id="customCartItemModal"
     class="hidden fixed inset-0 z-[85] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
@@ -1409,6 +1431,8 @@
             class="btype-btn px-3 py-2 text-xs font-bold border">🧬 Экзотика</button>
           <button type="button" onclick="setBuilderType('vehicle_tuning')" data-btype="vehicle_tuning"
             class="btype-btn px-3 py-2 text-xs font-bold border">⚙️ Тюнинг</button>
+          <button type="button" onclick="setBuilderType('vehicle_weapons')" data-btype="vehicle_weapons"
+            class="btype-btn px-3 py-2 text-xs font-bold border">🔫 Вооружение транспорта</button>  
           <button type="button" onclick="setBuilderType('lore_nomads')" data-btype="lore_nomads"
             class="btype-btn px-3 py-2 text-xs font-bold border">🏜️ Кочевники</button>
           <button type="button" onclick="setBuilderType('lore_gangs')" data-btype="lore_gangs"

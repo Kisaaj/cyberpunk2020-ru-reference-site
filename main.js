@@ -379,7 +379,7 @@ const SCHEMAS = {
         { k: "range", l: "Дистанция (запас хода)", ph: "800 км", stat: "Дистанция", c: "text-cp-cyan" },
         { k: "cargo", l: "Груз (грузоподъёмность в кг)", ph: "1300 кг", stat: "Груз" },
         { k: "sdp", l: "ОСТ (Очки Структуры)", ph: "100", stat: "ОСТ (Структура)", c: "text-cp-red" },
-        { k: "os", l: "ОС (Броня = ОС / 10 с округлением вниз)", ph: "40", stat: "ОС (Броня)", c: "text-cp-yellow" },
+        { k: "os", l: "ОС (Броня = ОС / 20 с округлением вниз)", ph: "40", stat: "ОС (Броня)", c: "text-cp-yellow" },
         { k: "mass", l: "Масса транспорта", ph: "4 тонны", stat: "Масса" },
         { k: "cost", l: "Стоимость (eb)", ph: "600,000 eb", stat: "Стоимость", c: "text-cp-green" },
         { k: "book", l: "Источник", isBook: true, ph: "CP20 / MM" }
@@ -488,7 +488,7 @@ function formatVehicleArmorOS(osVal) {
     if (osVal === undefined || osVal === null || String(osVal).trim() === "" || String(osVal).trim() === "—") return "—";
     const num = parseInt(String(osVal).replace(/[^\d]/g, ""), 10);
     if (isNaN(num)) return String(osVal);
-    return `${num} (Броня: ${Math.floor(num / 10)})`;
+    return `${num} (Броня: ${Math.floor(num / 20)})`;
 }
 
 function extractMaxNumericValue(str) {
@@ -1931,6 +1931,11 @@ function renderCatalog() {
         } else if (activeCatalogTab === "lore_nomads") {
             subline = `Нация: <b class="text-cp-cyan">${dash(item.category)}</b>`;
             rightBottom = `👥 ${dash(item.population)}`;
+        } else if (activeCatalogTab === "vehicle_weapons") {
+          subline = `ТО: <b class="text-cp-yellow">${dash(item.to)}</b> • Проб: <b>${dash(item.penetration)}</b> • СКО: <b>${dash(item.sko)}</b> • ДИС: <b class="text-cp-cyan">${dash(item.range)}</b> • Места: <b class="text-cp-yellow">${dash(item.spaces)}</b>`;
+          rightTop = `<span class="px-2 py-0.5 bg-cp-red/20 border border-cp-red/50 text-cp-red font-bold text-xs">${dash(item.damage)}</span>`;
+        } else if (activeCatalogTab === "vehicle_tuning") {
+          subline = `ДОС: <b>${dash(item.dos)}</b> • Места: <b class="text-cp-yellow">${dash(item.spaces)}</b> • Эффект: <b class="text-cp-cyan">${dash(item.effect)}</b>`;
         }
 
 
@@ -3563,7 +3568,7 @@ function setupCatalogFilters() {
           <option value="SORT_TYPE_DESC">🔤 По типу транспорта (Я → А)</option>
           <option value="SORT_SDP_DESC">🛡️ Сначала самые прочные (по ОСТ)</option>
         `;
-        legend.innerHTML = `<span><b class="text-cp-cyan">УСК/ТОРМ</b> = Ускорение и Торможение</span><span><b class="text-cp-cyan">ОСТ</b> = Очки Структуры (ХП)</span><span><b class="text-cp-cyan">ОС (Броня)</b> = ОС / 10</span>`;
+        legend.innerHTML = `<span><b class="text-cp-cyan">УСК/ТОРМ</b> = Ускорение и Торможение</span><span><b class="text-cp-cyan">ОСТ</b> = Очки Структуры (ХП)</span><span><b class="text-cp-cyan">ОС (Броня)</b> = ОС / 20</span>`;
     } else if (activeCatalogTab === "characters") {
         extraLabel.textContent = "Статус (Именной) / Сортировка";
         extraSelect.innerHTML = `
@@ -5937,6 +5942,7 @@ Object.assign(SECTION_LABELS, {
     martial_arts: "🥋 Боевые Искусства",
     exotics: "🧬 Экзотика",
     vehicle_tuning: "⚙️ Тюнинг",
+    vehicle_weapons: "🔫 Вооружение транспорта",
     lore_nomads: "🏜️ Кочевники",
     lore_gangs: "💀 Банды",
     lore_countries: "🌍 Страны"
@@ -5946,6 +5952,7 @@ PURCHASABLE_SECTIONS.add("weapon_options");
 PURCHASABLE_SECTIONS.add("ammo");
 PURCHASABLE_SECTIONS.add("exotics");
 PURCHASABLE_SECTIONS.add("vehicle_tuning");
+PURCHASABLE_SECTIONS.add("vehicle_weapons");
 
 Object.assign(SCHEMAS, {
     weapon_options: [
@@ -5980,11 +5987,31 @@ Object.assign(SCHEMAS, {
         { k: "cost", l: "Цена", ph: "2,500 eb", stat: "Цена", c: "text-cp-green" },
         { k: "book", l: "Источник", isBook: true, ph: "Chr2" }
     ],
+    vehicle_weapons: [
+        { k: "name", l: "Название вооружения (рус.)", ph: "20-мм автопушка" },
+        { k: "origName", l: "Оригинальное название (англ.)", ph: "20mm Autocannon" },
+        { k: "category", l: "Категория вооружения", isCat: true, ph: "Автопушки" },
+        { k: "to", l: "ТО (Точность)", ph: "+0", stat: "ТО", c: "text-cp-yellow" },
+        { k: "damage", l: "Урон", ph: "8d10", stat: "Урон", c: "text-cp-red" },
+        { k: "penetration", l: "Пробитие", ph: "4 / ББ", stat: "Пробитие", c: "text-cp-yellow" },
+        { k: "blast", l: "Взрыв (радиус / урон)", ph: "2м", stat: "Взрыв", c: "text-cp-red" },
+        { k: "shots", l: "#Выстрелов (Боезапас)", ph: "100", stat: "#Выстрелов", c: "text-white" },
+        { k: "sko", l: "СКО (Скорострельность)", ph: "10", stat: "СКО", c: "text-white" },
+        { k: "dos", l: "Доступность (ДОС)", ph: "Ред", stat: "Доступность", c: "text-gray-200" },
+        { k: "nad", l: "Надёжность (НАД)", ph: "ОН", stat: "Надёжность", c: "text-cp-green" },
+        { k: "range", l: "Дистанция", ph: "1000м", stat: "Дистанция", c: "text-cp-cyan" },
+        { k: "spaces", l: "Занимаемые места", ph: "2", stat: "Места", c: "text-cp-yellow" },
+        { k: "cost", l: "Цена", ph: "12,000 eb", stat: "Цена", c: "text-cp-green", span: 2 },
+        { k: "book", l: "Источник", isBook: true, ph: "MM (Max Metal)" }
+    ],
     vehicle_tuning: [
-        { k: "name", l: "Название модификации", ph: "Нитро-ускоритель" },
+        { k: "name", l: "Название модификации (рус.)", ph: "Нитро-ускоритель" },
         { k: "origName", l: "Оригинальное название (англ.)", ph: "Nitrous Oxide" },
         { k: "category", l: "Категория тюнинга", isCat: true, ph: "Двигатель" },
+        { k: "dos", l: "Доступность (ДОС)", ph: "Обы", stat: "Доступность", c: "text-gray-200" },
+        { k: "spaces", l: "Занимаемые места", ph: "1", stat: "Места", c: "text-cp-yellow" },
         { k: "cost", l: "Цена", ph: "1,500 eb", stat: "Цена", c: "text-cp-green" },
+        { k: "effect", l: "Игромеханика", ph: "+20% скорости на 3 раунда", stat: "Игромеханика", c: "text-cp-cyan", span: 3 },
         { k: "book", l: "Источник", isBook: true, ph: "MM (Max Metal)" }
     ],
     lore_nomads: [
@@ -6025,6 +6052,8 @@ const PARENT_NAV_MAP = {
     netrunning: "netrunning_group",
     vehicles: "vehicles_group",
     vehicle_tuning: "vehicles_group",
+    vehicle_builder: "vehicles_group",
+    vehicle_weapons: "vehicles_group",
     corporations: "lore_group",
     lore_nomads: "lore_group",
     lore_gangs: "lore_group",
@@ -6068,7 +6097,7 @@ switchMainView = function (view, catalogTab = null) {
     activeMainView = view;
     if (catalogTab) activeCatalogTab = catalogTab;
 
-    ["home", "catalog", "fashion", "deck_builder", "datafort", "npc_gen", "wip", "rules", "profile", "admin"].forEach(v => {
+    ["home", "catalog", "fashion", "deck_builder", "datafort", "npc_gen", "vehicle_builder", "wip", "rules", "profile", "admin"].forEach(v => {
         const el = document.getElementById("view-" + v);
         if (el) el.classList.toggle("hidden", view !== v);
     });
@@ -6087,6 +6116,7 @@ switchMainView = function (view, catalogTab = null) {
     else if (view === "catalog") { setupCatalogFilters(); renderCatalog(); }
     else if (view === "fashion") renderFashionView();
     else if (view === "deck_builder") renderDeckBuilderView();
+    else if (view === "vehicle_builder") renderVehicleBuilderView();
     else if (view === "datafort") renderDatafortView();
     else if (view === "npc_gen") initNpcGeneratorView();
     else if (view === "rules") renderRulesView();
@@ -6105,7 +6135,7 @@ setupCatalogFilters = function () {
     const extraLabel = document.getElementById("extraFilterLabel");
     const legend = document.getElementById("abbrevLegend");
 
-    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning") {
+    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning" || activeCatalogTab === "vehicle_weapons") {
         extraLabel.textContent = "Сортировка по цене";
         extraSelect.innerHTML = `
             <option value="ALL">Без сортировки</option>
@@ -6129,7 +6159,7 @@ setupCatalogFilters = function () {
 // Расширяем renderCatalog, чтобы сортировка цены и фильтр типа оружия работали в weapon_options и ammo
 const _prevRenderCatalogV2 = renderCatalog;
 renderCatalog = function () {
-    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "ammo" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning") {
+    if (activeCatalogTab === "weapon_options" || activeCatalogTab === "ammo" || activeCatalogTab === "exotics" || activeCatalogTab === "vehicle_tuning" || activeCatalogTab === "vehicle_weapons") {
         const extra = document.getElementById("extraFilter")?.value || "ALL";
         const origArr = DB[activeCatalogTab] || [];
         let temp = [...origArr];
@@ -8986,6 +9016,559 @@ ${gearText}
         }
     });
 };
+
+// =========================================================================
+// СБОРКА ТРАНСПОРТА (MAXIMUM METAL — БАЗОВОЕ ШАССИ И ОПЦИИ)
+// =========================================================================
+
+const MM_VEHICLE_TYPES = [
+    { id: "moto",       name: "Мотоцикл",            sdpMin: 15,  sdpMax: 30,   sdpPerSeat: 10,  sdpCost: 100,   seatsMin: 1,  seatsMax: 1,   speed: 200,  range: 650,  massKgPerSdp: 4,     acc: 30, dec: 50, isAir: false },
+    { id: "car",        name: "Автомобиль",          sdpMin: 25,  sdpMax: 80,   sdpPerSeat: 8,   sdpCost: 250,   seatsMin: 3,  seatsMax: 10,  speed: 150,  range: 500,  sdpPerTon: 25,       acc: 25, dec: 65, isAir: false },
+    { id: "pickup",     name: "Пикап",               sdpMin: 30,  sdpMax: 90,   sdpPerSeat: 4,   sdpCost: 400,   seatsMin: 8,  seatsMax: 20,  speed: 150,  range: 500,  sdpPerTon: 25,       acc: 25, dec: 65, isAir: false },
+    { id: "truck",      name: "Грузовик",            sdpMin: 50,  sdpMax: 125,  sdpPerSeat: 12.5,sdpCost: 750,   seatsMin: 4,  seatsMax: 10,  speed: 150,  range: 1300, sdpPerTon: 15,       acc: 15, dec: 50, isAir: false, isTruck: true },
+    { id: "apc",        name: "БТР",                 sdpMin: 75,  sdpMax: 150,  sdpPerSeat: 12,  sdpCost: 1000,  seatsMin: 10, seatsMax: 15,  speed: 150,  range: 500,  sdpPerTon: 10,       acc: 15, dec: 80, isAir: false, canTrack: true, autoOffroad: true, noCargo: true },
+    { id: "ifv",        name: "БМП",                 sdpMin: 75,  sdpMax: 200,  sdpPerSeat: 10,  sdpCost: 1200,  seatsMin: 10, seatsMax: 20,  speed: 150,  range: 500,  sdpPerTon: 10,       acc: 20, dec: 80, isAir: false, canTrack: true, autoOffroad: true },
+    { id: "mbt",        name: "ОБТ (Танк)",          sdpMin: 200, sdpMax: 600,  sdpPerSeat: 4,   sdpCost: 3000,  seatsMin: 50, seatsMax: 160, speed: 70,   range: 320,  sdpPerTon: 6,        acc: 15, dec: 80, isAir: false, autoTracked: true, autoOffroad: true },
+    { id: "hover",      name: "Ховер",               sdpMin: 25,  sdpMax: 100,  sdpPerSeat: 0,   sdpCost: 2000,  seatsMin: 4,  seatsMax: 20,  speed: 250,  range: 650,  sdpPerTon: 10,       acc: 25, dec: 15, isAir: false },
+    { id: "heli_l",     name: "Лёгкий вертолёт",     sdpMin: 15,  sdpMax: 40,   sdpPerSeat: 0,   sdpCost: 1500,  seatsMin: 1,  seatsMax: 4,   speed: 250,  range: 300,  sdpPerTon: 10,       acc: 25, dec: 25, isAir: true, armorPenalty20: true },
+    { id: "heli_m",     name: "Средний вертолёт",    sdpMin: 25,  sdpMax: 80,   sdpPerSeat: 5,   sdpCost: 2500,  seatsMin: 4,  seatsMax: 15,  speed: 250,  range: 650,  sdpPerTon: 10,       acc: 25, dec: 25, isAir: true, armorPenalty20: true },
+    { id: "heli_h",     name: "Тяжёлый вертолёт",    sdpMin: 100, sdpMax: 250,  sdpPerSeat: 5,   sdpCost: 3000,  seatsMin: 20, seatsMax: 50,  speed: 250,  range: 1000, sdpPerTon: 25,       acc: 25, dec: 25, isAir: true, armorPenalty20: true },
+    { id: "av",         name: "AV (Аэродайн)",       sdpMin: 30,  sdpMax: 200,  sdpPerSeat: 4,   sdpCost: 3500,  seatsMin: 5,  seatsMax: 50,  speed: 750,  range: 1300, sdpPerTon: 25,       acc: 80, dec: 80, isAir: true },
+    { id: "osprey",     name: "Оспри",               sdpMin: 75,  sdpMax: 240,  sdpPerSeat: 4,   sdpCost: 3000,  seatsMin: 8,  seatsMax: 60,  speed: 600,  range: 2000, sdpPerTon: 8,        acc: 15, dec: 30, isAir: true, armorMaxRatio: 0.25, armorPenalty20: true },
+    { id: "plane_l",    name: "Лёгкий самолёт",      sdpMin: 25,  sdpMax: 100,  sdpPerSeat: 10,  sdpCost: 2000,  seatsMin: 5,  seatsMax: 10,  speed: 400,  range: 800,  sdpPerTon: 20,       acc: 25, dec: 30, isAir: true, armorMaxRatio: 0.25 },
+    { id: "plane_m",    name: "Средний самолёт",     sdpMin: 75,  sdpMax: 250,  sdpPerSeat: 5,   sdpCost: 2500,  seatsMin: 15, seatsMax: 50,  speed: 650,  range: 1600, sdpPerTon: 8,        acc: 15, dec: 40, isAir: true, armorMaxRatio: 0.25 },
+    { id: "plane_h",    name: "Тяжёлый самолёт",     sdpMin: 150, sdpMax: 300,  sdpPerSeat: 5,   sdpCost: 4000,  seatsMin: 75, seatsMax: 150, speed: 650,  range: 2000, sdpPerTon: 4,        acc: 15, dec: 40, isAir: true, armorMaxRatio: 0.25 },
+    { id: "jet_s",      name: "Малый Джет",          sdpMin: 100, sdpMax: 250,  sdpPerSeat: 10,  sdpCost: 10000, seatsMin: 10, seatsMax: 25,  speed: 1300, range: 2500, sdpPerTon: 12.5,     acc: 30, dec: 40, isAir: true, armorMaxRatio: 0.25 },
+    { id: "jet_l",      name: "Большой Джет",        sdpMin: 100, sdpMax: 400,  sdpPerSeat: 2,   sdpCost: 20000, seatsMin: 50, seatsMax: 200, speed: 1000, range: 5000, sdpPerTon: 2.5,      acc: 30, dec: 40, isAir: true, armorMaxRatio: 0.25 },
+    { id: "dirigible",  name: "Дирижабль",           sdpMin: 100, sdpMax: 3000, sdpPerSeat: 10,  sdpCost: 300,   seatsMin: 10, seatsMax: 300, speed: 120,  range: 2400, sdpPerTon: 20,       acc: 10, dec: 50, isAir: true, isDirigible: true }
+];
+
+let vbState = {
+    name: "",
+    typeId: "car",
+    sdp: 40,
+    seats: 5,
+    extraSdp: 0,
+    tracked: false,
+    armor: 0,
+    speedSteps: 0,   // шаги по 10% (-5 .. +10)
+    accSteps: 0,     // шаги по 10% (0 .. 10)
+    decSteps: 0,     // шаги по 25% (0 .. 4 наземный, 0 .. 2 воздушный)
+    maneuver: 0,     // 0 .. 3
+    offroad: false,
+    cargoSteps: 0,   // шаги (0..5 обычный/дирижабль, 0..2 грузовик)
+    rangeSteps: 0,   // шаги по 33% (-2 .. +3)
+    weapons: [],     // [{ id, qty }]
+    tuning: []       // [{ id, qty }]
+};
+
+function getVbType() {
+    return MM_VEHICLE_TYPES.find(t => t.id === vbState.typeId) || MM_VEHICLE_TYPES[1];
+}
+
+function vbClamp(val, min, max) {
+    const n = Number(val);
+    if (isNaN(n)) return min;
+    return Math.max(min, Math.min(max, n));
+}
+function parseVbSpaces(raw) {
+    if (raw === undefined || raw === null) return 0;
+    const s = String(raw).replace(",", ".").trim();
+    if (!s || s === "—") return 0;
+    const m = s.match(/\d+(\.\d+)?/);
+    return m ? parseFloat(m[0]) : 0;
+}
+
+window.addVbEquipment = function (kind) {
+    const selId = kind === "weapons" ? "vbAddWeaponSelect" : "vbAddTuningSelect";
+    const itemId = document.getElementById(selId)?.value;
+    if (!itemId) return;
+    const list = kind === "weapons" ? vbState.weapons : vbState.tuning;
+    const existing = list.find(x => x.id === itemId);
+    if (existing) existing.qty++;
+    else list.push({ id: itemId, qty: 1 });
+    renderVehicleBuilderView();
+};
+
+window.changeVbEquipmentQty = function (kind, itemId, delta) {
+    const list = kind === "weapons" ? vbState.weapons : vbState.tuning;
+    const idx = list.findIndex(x => x.id === itemId);
+    if (idx === -1) return;
+    list[idx].qty += delta;
+    if (list[idx].qty <= 0) list.splice(idx, 1);
+    renderVehicleBuilderView();
+};
+
+// Жёсткое выравнивание всех параметров в рамках правил Maximum Metal
+function enforceVbConstraints() {
+    const t = getVbType();
+
+    // 1. ОСТ в рамках типа
+    vbState.sdp = Math.round(vbClamp(vbState.sdp, t.sdpMin, t.sdpMax));
+
+    // 2. Места с учётом ограничений ОСТ
+    let maxSeatsAllowed = t.seatsMax;
+    if (t.sdpPerSeat > 0) {
+        maxSeatsAllowed = Math.min(t.seatsMax, Math.floor(vbState.sdp / t.sdpPerSeat));
+    }
+    if (maxSeatsAllowed < t.seatsMin) {
+        // Если текущий ОСТ не вмещает даже минимум мест — подтягиваем ОСТ вверх
+        const neededSdp = Math.min(t.sdpMax, Math.ceil(t.seatsMin * t.sdpPerSeat));
+        if (neededSdp > vbState.sdp) vbState.sdp = neededSdp;
+        maxSeatsAllowed = Math.max(t.seatsMin, Math.min(t.seatsMax, Math.floor(vbState.sdp / t.sdpPerSeat)));
+    }
+    vbState.seats = Math.round(vbClamp(vbState.seats, t.seatsMin, maxSeatsAllowed));
+
+    // 3. Добавленная структура (до +25% от макс. ОСТ типа)
+    const maxExtraSdp = Math.floor(t.sdpMax * 0.25);
+    vbState.extraSdp = Math.round(vbClamp(vbState.extraSdp, 0, maxExtraSdp));
+
+    // 4. Гусеницы и внедорожность
+    if (t.autoTracked) vbState.tracked = true;
+    else if (!t.canTrack) vbState.tracked = false;
+    if (t.autoOffroad) vbState.offroad = true;
+    if (t.isAir) vbState.offroad = false;
+
+    // 5. Броня (макс 1/2 ОСТ, для Оспри и самолётов 1/4 ОСТ)
+    const totalSdp = vbState.sdp + vbState.extraSdp;
+    const maxArmor = Math.floor(totalSdp * (t.armorMaxRatio || 0.5));
+    vbState.armor = Math.round(vbClamp(vbState.armor, 0, maxArmor));
+
+    // 6. Опции с жёсткими лимитами
+    vbState.speedSteps = Math.round(vbClamp(vbState.speedSteps, -5, 10));
+    vbState.accSteps = Math.round(vbClamp(vbState.accSteps, 0, 10));
+    vbState.decSteps = Math.round(vbClamp(vbState.decSteps, 0, t.isAir ? 2 : 4));
+    vbState.maneuver = Math.round(vbClamp(vbState.maneuver, 0, 3));
+    vbState.rangeSteps = Math.round(vbClamp(vbState.rangeSteps, -2, 3));
+
+    const maxCargoSteps = t.noCargo ? 0 : t.isTruck ? 2 : 5;
+    vbState.cargoSteps = Math.round(vbClamp(vbState.cargoSteps, 0, maxCargoSteps));
+}
+
+function calcVbStats() {
+    enforceVbConstraints();
+    const t = getVbType();
+    const totalSdp = vbState.sdp + vbState.extraSdp;
+    const maxExtraSdp = Math.floor(t.sdpMax * 0.25);
+    const maxArmor = Math.floor(totalSdp * (t.armorMaxRatio || 0.5));
+
+    // Базовая цена ОСТ (для БТР/БМП на гусеницах x2)
+    const unitSdpCost = t.sdpCost * (t.canTrack && vbState.tracked ? 2 : 1);
+    const baseSdpCost = vbState.sdp * unitSdpCost;
+    const extraSdpCost = vbState.extraSdp * unitSdpCost * 2;
+
+    // Цена брони по ступеням
+    let armorRate = 0;
+    if (vbState.armor >= 1 && vbState.armor <= 20) armorRate = 500;
+    else if (vbState.armor <= 40) armorRate = 1000;
+    else if (vbState.armor <= 60) armorRate = 5000;
+    else if (vbState.armor > 60) armorRate = 7000;
+    const armorCost = vbState.armor * armorRate;
+
+    // Процентные модификаторы от базовой цены ОСТ
+    let pctCostMod = 0;
+    if (vbState.speedSteps > 0) pctCostMod += vbState.speedSteps * 25;
+    else if (vbState.speedSteps < 0) pctCostMod += vbState.speedSteps * 10;
+    pctCostMod += vbState.accSteps * 5;
+    pctCostMod += vbState.decSteps * 5;
+    pctCostMod += vbState.maneuver * 50;
+    if (vbState.offroad && !t.autoOffroad) pctCostMod += 15;
+
+    const optionsCost = Math.round(baseSdpCost * (pctCostMod / 100));
+
+    // Вооружение и тюнинг из базы данных
+    const resolvedWeapons = (vbState.weapons || []).map(entry => {
+        const item = (DB.vehicle_weapons || []).find(w => w && w.id === entry.id);
+        if (!item) return null;
+        const unitCost = parseItemUnitPriceEb(item.cost);
+        const unitSpaces = parseVbSpaces(item.spaces);
+        return { item, qty: entry.qty, cost: unitCost * entry.qty, spaces: unitSpaces * entry.qty };
+    }).filter(Boolean);
+
+    const resolvedTuning = (vbState.tuning || []).map(entry => {
+        const item = (DB.vehicle_tuning || []).find(tw => tw && tw.id === entry.id);
+        if (!item) return null;
+        const unitCost = parseItemUnitPriceEb(item.cost);
+        const unitSpaces = parseVbSpaces(item.spaces);
+        return { item, qty: entry.qty, cost: unitCost * entry.qty, spaces: unitSpaces * entry.qty };
+    }).filter(Boolean);
+
+    const weaponsCost = resolvedWeapons.reduce((s, x) => s + x.cost, 0);
+    const tuningCost = resolvedTuning.reduce((s, x) => s + x.cost, 0);
+    const weaponsSpaces = resolvedWeapons.reduce((s, x) => s + x.spaces, 0);
+    const tuningSpaces = resolvedTuning.reduce((s, x) => s + x.spaces, 0);
+    const usedEquipSpaces = Math.round((weaponsSpaces + tuningSpaces) * 100) / 100;
+
+    const totalCost = Math.max(0, baseSdpCost + extraSdpCost + armorCost + optionsCost + weaponsCost + tuningCost);
+
+    // Скорость
+    let baseSpeed = t.speed;
+    if (t.canTrack && vbState.tracked) baseSpeed = Math.floor(baseSpeed / 2);
+
+    const armorSpeedSteps = vbState.armor > 0 ? Math.ceil((vbState.armor / totalSdp) * 10) : 0;
+    const armorSpeedPenaltyPct = armorSpeedSteps * (t.armorPenalty20 ? 20 : 10);
+    const cargoSpeedPenaltyPct = t.isTruck ? vbState.cargoSteps * 20 : vbState.cargoSteps * 10;
+    const totalSpeedPct = 100 + (vbState.speedSteps * 10) - armorSpeedPenaltyPct - cargoSpeedPenaltyPct;
+    const finalSpeed = Math.max(10, Math.round(baseSpeed * (totalSpeedPct / 100)));
+
+    // Ускорение и торможение (колёсные БТР/БМП = грузовик: 15 / 50)
+    const baseAcc = (t.canTrack && !vbState.tracked) ? 15 : t.acc;
+    const baseDec = (t.canTrack && !vbState.tracked) ? 50 : t.dec;
+    const accAdd = vbState.accSteps > 0 ? Math.max(10, Math.round(baseAcc * (vbState.accSteps * 0.1))) : 0;
+    const decAdd = vbState.decSteps > 0 ? Math.max(10, Math.round(baseDec * (vbState.decSteps * 0.25))) : 0;
+    const finalAcc = baseAcc + accAdd;
+    const finalDec = baseDec + decAdd;
+
+    // Места (минимум 1 место для водителя)
+    let seatsPctMod = 0;
+    if (vbState.speedSteps > 0) seatsPctMod -= vbState.speedSteps * 5;
+    else if (vbState.speedSteps < 0) seatsPctMod += Math.abs(vbState.speedSteps) * 10;
+    seatsPctMod -= vbState.rangeSteps * 10;
+    const finalSeats = Math.max(1, Math.floor(vbState.seats * (1 + seatsPctMod / 100)));
+    const remainingSeats = Math.round((finalSeats - usedEquipSpaces) * 100) / 100;
+
+    // Радиус
+    const finalRange = Math.max(50, Math.round(t.range * (1 + vbState.rangeSteps * 0.33)));
+
+    // Масса (без брони = половина массы)
+    let massKg = t.massKgPerSdp
+        ? totalSdp * t.massKgPerSdp
+        : (totalSdp / t.sdpPerTon) * 1000;
+    if (vbState.armor === 0) massKg = massKg / 2;
+
+    // Грузоподъёмность
+    let cargoKg = 0;
+    if (t.noCargo) {
+        cargoKg = 0;
+    } else if (t.isTruck) {
+        cargoKg = Math.round(36000 * (1 + vbState.cargoSteps * 0.1));
+    } else if (t.isDirigible) {
+        cargoKg = Math.round(massKg * (1 + vbState.cargoSteps * 0.33));
+    } else {
+        cargoKg = Math.round(massKg * (0.33 + vbState.cargoSteps * 0.1));
+    }
+
+    const armorValue = Math.floor(vbState.armor / 20);
+    const bodyValue = Math.floor(totalSdp / 20);
+
+    return {
+        t, totalSdp, maxExtraSdp, maxArmor,
+        baseSdpCost, extraSdpCost, armorCost, optionsCost, totalCost,
+        finalSpeed, finalAcc, finalDec, finalSeats, finalRange,
+        massKg, cargoKg, armorValue, bodyValue,
+        armorSpeedPenaltyPct, cargoSpeedPenaltyPct,
+        resolvedWeapons, resolvedTuning, weaponsCost, tuningCost, usedEquipSpaces, remainingSeats
+    };
+}
+
+window.changeVbType = function (newTypeId) {
+    vbState.typeId = newTypeId;
+    const t = getVbType();
+    vbState.sdp = t.sdpMin;
+    vbState.seats = t.seatsMin;
+    vbState.extraSdp = 0;
+    vbState.tracked = Boolean(t.autoTracked);
+    vbState.offroad = Boolean(t.autoOffroad);
+    vbState.armor = 0;
+    vbState.speedSteps = 0;
+    vbState.accSteps = 0;
+    vbState.decSteps = 0;
+    vbState.maneuver = 0;
+    vbState.cargoSteps = 0;
+    vbState.rangeSteps = 0;
+    vbState.weapons = [];
+    vbState.tuning = [];
+    renderVehicleBuilderView();
+};
+
+window.updateVbField = function (field, val) {
+    vbState[field] = val;
+    renderVehicleBuilderView();
+};
+
+window.resetVehicleBuilder = function () {
+    vbState.name = "";
+    window.changeVbType(vbState.typeId);
+};
+
+window.addBuiltVehicleToCart = function () {
+    const c = calcVbStats();
+    const title = (vbState.name || "").trim() || `${c.t.name} (Сборка)`;
+    const id = "custom-veh-" + Date.now();
+    const massStr = c.massKg >= 1000 ? `${(c.massKg / 1000).toFixed(2)} т` : `${Math.round(c.massKg)} кг`;
+    const customItem = {
+        id,
+        name: title,
+        category: c.t.name,
+        cost: `${c.totalCost.toLocaleString("ru-RU")} eb`,
+        customSummary: `ОСТ: ${c.totalSdp} (Тело ${c.bodyValue}) | ОС: ${vbState.armor} (Броня ${c.armorValue}) | Скор: ${c.finalSpeed} км/ч | Мест: ${c.finalSeats} | Масса: ${massStr} | Груз: ${c.cargoKg.toLocaleString("ru-RU")} кг`
+    };
+    SHOPPING_CART.push({ sectionKey: "vehicles", itemId: id, qty: 1, customItem });
+    saveShoppingCartToStorage();
+    renderCartDropdownList();
+    alert(`«${title}» (${customItem.cost}) добавлен в Корзину!`);
+};
+
+function renderVehicleBuilderView() {
+    const grid = document.getElementById("vehicleBuilderGrid");
+    if (!grid) return;
+
+    const c = calcVbStats();
+    const t = c.t;
+    const massStr = c.massKg >= 1000 ? `${(c.massKg / 1000).toFixed(2)} т` : `${Math.round(c.massKg)} кг`;
+    const maxSeatsBySdp = t.sdpPerSeat > 0 ? Math.min(t.seatsMax, Math.floor(vbState.sdp / t.sdpPerSeat)) : t.seatsMax;
+
+    const stepControl = (label, sub, valText, field, curVal, minVal, maxVal) => `
+      <div class="bg-cp-bg border border-gray-800 p-2.5 flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="text-xs font-bold text-white">${label}</div>
+          <div class="text-[10px] text-gray-400">${sub}</div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <button type="button" onclick="updateVbField('${field}', ${curVal - 1})" ${curVal <= minVal ? "disabled" : ""}
+            class="w-7 h-7 bg-cp-panel border border-gray-700 hover:border-cp-yellow text-white font-bold disabled:opacity-30">−</button>
+          <span class="w-16 text-center text-xs font-display font-bold text-cp-yellow">${valText}</span>
+          <button type="button" onclick="updateVbField('${field}', ${curVal + 1})" ${curVal >= maxVal ? "disabled" : ""}
+            class="w-7 h-7 bg-cp-panel border border-gray-700 hover:border-cp-cyan text-white font-bold disabled:opacity-30">+</button>
+        </div>
+      </div>
+    `;
+
+    grid.innerHTML = `
+      <!-- ЛЕВАЯ КОЛОНКА: ПАРАМЕТРЫ И ОПЦИИ -->
+      <div class="col-span-12 xl:col-span-7 space-y-4">
+        <div class="bg-cp-panel cp-border p-4 space-y-3.5">
+          <div class="text-[11px] font-bold uppercase text-cp-cyan">1. Тип транспорта и базовое шасси:</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-gray-400 mb-1">Название модели (необязательно)</label>
+              <input type="text" value="${escapeHtmlAttr(vbState.name)}" oninput="vbState.name = this.value"
+                placeholder="Напр. Nomad Interceptor Mk.2"
+                class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow px-3 py-2 text-xs text-white outline-none">
+            </div>
+            <div>
+              <label class="block text-[11px] text-cp-yellow font-bold mb-1">Тип транспорта</label>
+              <select onchange="changeVbType(this.value)"
+                class="w-full bg-cp-bg border border-gray-700 focus:border-cp-cyan px-3 py-2 text-xs text-white font-bold outline-none">
+                ${MM_VEHICLE_TYPES.map(vt => `<option value="${vt.id}" ${vt.id === t.id ? "selected" : ""}>${vt.name} (ОСТ ${vt.sdpMin}–${vt.sdpMax}, ${vt.sdpCost.toLocaleString("ru-RU")} eb/ОСТ)</option>`).join("")}
+              </select>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <label class="block text-[10px] text-cp-cyan font-bold uppercase mb-1">Базовые ОСТ (${t.sdpMin}–${t.sdpMax})</label>
+              <input type="number" min="${t.sdpMin}" max="${t.sdpMax}" value="${vbState.sdp}"
+                onchange="updateVbField('sdp', Number(this.value))"
+                class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+              <div class="text-[10px] text-gray-500 mt-1">Цена: ${c.baseSdpCost.toLocaleString("ru-RU")} eb</div>
+            </div>
+
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <label class="block text-[10px] text-cp-yellow font-bold uppercase mb-1">Базовые места (${t.seatsMin}–${maxSeatsBySdp})</label>
+              <input type="number" min="${t.seatsMin}" max="${maxSeatsBySdp}" value="${vbState.seats}"
+                onchange="updateVbField('seats', Number(this.value))"
+                class="w-full bg-cp-panel border border-gray-700 focus:border-cp-yellow px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+              <div class="text-[10px] text-gray-500 mt-1">${t.sdpPerSeat > 0 ? `Лимит: ${t.sdpPerSeat} ОСТ/место` : "Без привязки к ОСТ"}</div>
+            </div>
+
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <label class="block text-[10px] text-cp-red font-bold uppercase mb-1">Доп. структура (0–${c.maxExtraSdp})</label>
+              <input type="number" min="0" max="${c.maxExtraSdp}" value="${vbState.extraSdp}"
+                onchange="updateVbField('extraSdp', Number(this.value))"
+                class="w-full bg-cp-panel border border-gray-700 focus:border-cp-red px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+              <div class="text-[10px] text-gray-500 mt-1">×2 цена ОСТ (+${c.extraSdpCost.toLocaleString("ru-RU")} eb)</div>
+            </div>
+          </div>
+
+          <!-- Броня + Гусеницы / Внедорожный -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <div class="bg-cp-bg border border-gray-800 p-2.5">
+              <div class="flex items-center justify-between mb-1">
+                <label class="text-[10px] text-cp-cyan font-bold uppercase">🛡️ Броня ОС (0–${c.maxArmor})</label>
+                <span class="text-[10px] text-cp-green font-bold">+${c.armorCost.toLocaleString("ru-RU")} eb</span>
+              </div>
+              <input type="number" min="0" max="${c.maxArmor}" value="${vbState.armor}"
+                onchange="updateVbField('armor', Number(this.value))"
+                class="w-full bg-cp-panel border border-gray-700 focus:border-cp-cyan px-2.5 py-1.5 text-xs text-white font-bold outline-none">
+              <div class="text-[10px] text-gray-500 mt-1">
+                ${vbState.armor === 0 ? "Без брони: масса снижена вдвое!" : `Штраф скорости от брони: −${c.armorSpeedPenaltyPct}%`}
+                ${t.isDirigible ? " • Бронируется только гондола" : ""}
+              </div>
+            </div>
+
+            <div class="bg-cp-bg border border-gray-800 p-2.5 flex flex-col justify-center gap-2 text-xs">
+              ${t.canTrack ? `
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" ${vbState.tracked ? "checked" : ""} onchange="updateVbField('tracked', this.checked)" class="accent-yellow-400">
+                  <span>Гусеничный ход <span class="text-[10px] text-gray-400">(цена ОСТ ×2, макс. скор ÷2)</span></span>
+                </label>
+              ` : t.autoTracked ? `<div class="text-[11px] text-cp-yellow font-bold">✓ Автоматически гусеничный</div>` : ""}
+
+              ${!t.isAir ? `
+                <label class="flex items-center gap-2 ${t.autoOffroad ? "opacity-75" : "cursor-pointer"}">
+                  <input type="checkbox" ${vbState.offroad ? "checked" : ""} ${t.autoOffroad ? "disabled" : ""} onchange="updateVbField('offroad', this.checked)" class="accent-cyan-400">
+                  <span>Внедорожный ${t.autoOffroad ? "<span class='text-cp-green text-[10px]'>(включено по типу)</span>" : "<span class='text-[10px] text-gray-400'>(+15% цены ОСТ, 1/3 скор. по грунту)</span>"}</span>
+                </label>
+              ` : `<div class="text-[11px] text-gray-500">Воздушный транспорт (тормоза макс. +50%)</div>`}
+            </div>
+          </div>
+        </div>
+
+        <!-- ОПЦИИ МОДИФИКАЦИИ -->
+        <div class="bg-cp-panel cp-border p-4 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase text-cp-yellow">2. Опции характеристик:</div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${stepControl("Скорость", "+10%: +25% цены, −5% мест | −10%: −10% цены, +10% мест", `${vbState.speedSteps >= 0 ? "+" : ""}${vbState.speedSteps * 10}%`, "speedSteps", vbState.speedSteps, -5, 10)}
+            ${stepControl("Ускорение", "+10% (мин. +10 км/ч) = +5% цены ОСТ (макс +100%)", `+${vbState.accSteps * 10}%`, "accSteps", vbState.accSteps, 0, 10)}
+            ${stepControl("Усиленные тормоза", "+25% (мин. +10 км/ч) = +5% цены ОСТ", `+${vbState.decSteps * 25}%`, "decSteps", vbState.decSteps, 0, t.isAir ? 2 : 4)}
+            ${stepControl("Улучшенное управление", "+1 манёвр = +50% цены ОСТ (макс +3)", `+${vbState.maneuver}`, "maneuver", vbState.maneuver, 0, 3)}
+            ${stepControl("Радиус хода", "+33% = −10% мест | −33% = +10% мест", `${vbState.rangeSteps >= 0 ? "+" : ""}${vbState.rangeSteps * 33}%`, "rangeSteps", vbState.rangeSteps, -2, 3)}
+            ${!t.noCargo
+                ? stepControl(
+                    t.isTruck ? "Рейтинг груза" : "Грузоподъёмность",
+                    t.isTruck ? "+10% груза = −20% скор. (макс +20%)" : t.isDirigible ? "+33% груза = −10% скор." : "+10% груза = −10% скор. (макс +50%)",
+                    `+${t.isDirigible ? vbState.cargoSteps * 33 : vbState.cargoSteps * 10}%`,
+                    "cargoSteps", vbState.cargoSteps, 0, t.isTruck ? 2 : 5
+                  )
+                : `<div class="bg-cp-bg border border-gray-800 p-2.5 text-[11px] text-gray-500 flex items-center">БТР не поддерживает расширение грузоподъёмности.</div>`}
+          </div>
+        </div>
+        <!-- 3. ВООРУЖЕНИЕ ТРАНСПОРТА -->
+        <div class="bg-cp-panel cp-border p-4 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase text-cp-red">3. Вооружение транспорта:</div>
+          ${(DB.vehicle_weapons || []).length > 0 ? `
+            <div class="flex gap-2">
+              <select id="vbAddWeaponSelect" class="flex-1 bg-cp-bg border border-gray-700 focus:border-cp-red px-2.5 py-1.5 text-xs text-white outline-none">
+                ${(DB.vehicle_weapons || []).map(w => `<option value="${escapeHtmlAttr(w.id)}">${escapeHtmlAttr(w.name)} (${dash(w.damage)}, мест: ${dash(w.spaces)}, ${dash(w.cost)})</option>`).join("")}
+              </select>
+              <button type="button" onclick="addVbEquipment('weapons')" class="px-3.5 py-1.5 bg-cp-red hover:bg-red-600 text-white font-bold text-xs uppercase shrink-0">+ Добавить</button>
+            </div>
+          ` : `<div class="text-xs text-gray-500 italic">В разделе «Транспорт → Вооружение» пока нет карточек.</div>`}
+          ${c.resolvedWeapons.length > 0 ? `
+            <div class="space-y-1.5 pt-1">
+              ${c.resolvedWeapons.map(x => `
+                <div class="bg-cp-bg border border-cp-red/40 px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                  <div class="min-w-0">
+                    <div class="font-bold text-white truncate">${escapeHtmlAttr(x.item.name)}</div>
+                    <div class="text-[10px] text-gray-400">Урон: <b class="text-cp-red">${dash(x.item.damage)}</b> • Мест: <b class="text-cp-yellow">${x.spaces}</b> • Цена: <b class="text-cp-green">${x.cost.toLocaleString("ru-RU")} eb</b></div>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" onclick="changeVbEquipmentQty('weapons', '${escapeHtmlAttr(x.item.id)}', -1)" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">−</button>
+                    <span class="w-6 text-center font-bold text-cp-yellow">${x.qty}</span>
+                    <button type="button" onclick="changeVbEquipmentQty('weapons', '${escapeHtmlAttr(x.item.id)}', 1)" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">+</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+        </div>
+
+        <!-- 4. ТЮНИНГ И ОБОРУДОВАНИЕ -->
+        <div class="bg-cp-panel cp-border p-4 space-y-2.5">
+          <div class="text-[11px] font-bold uppercase text-cp-cyan">4. Тюнинг и оборудование:</div>
+          ${(DB.vehicle_tuning || []).length > 0 ? `
+            <div class="flex gap-2">
+              <select id="vbAddTuningSelect" class="flex-1 bg-cp-bg border border-gray-700 focus:border-cp-cyan px-2.5 py-1.5 text-xs text-white outline-none">
+                ${(DB.vehicle_tuning || []).map(tw => `<option value="${escapeHtmlAttr(tw.id)}">${escapeHtmlAttr(tw.name)} (мест: ${dash(tw.spaces)}, ${dash(tw.cost)})</option>`).join("")}
+              </select>
+              <button type="button" onclick="addVbEquipment('tuning')" class="px-3.5 py-1.5 bg-cp-cyan hover:bg-cyan-300 text-black font-bold text-xs uppercase shrink-0">+ Добавить</button>
+            </div>
+          ` : `<div class="text-xs text-gray-500 italic">В разделе «Транспорт → Тюнинг» пока нет карточек.</div>`}
+          ${c.resolvedTuning.length > 0 ? `
+            <div class="space-y-1.5 pt-1">
+              ${c.resolvedTuning.map(x => `
+                <div class="bg-cp-bg border border-cp-cyan/40 px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                  <div class="min-w-0">
+                    <div class="font-bold text-white truncate">${escapeHtmlAttr(x.item.name)}</div>
+                    <div class="text-[10px] text-gray-400">Мест: <b class="text-cp-yellow">${x.spaces}</b> • Цена: <b class="text-cp-green">${x.cost.toLocaleString("ru-RU")} eb</b>${x.item.effect && x.item.effect !== "—" ? ` • <span class="text-cp-cyan">${escapeHtmlAttr(x.item.effect)}</span>` : ""}</div>
+                  </div>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <button type="button" onclick="changeVbEquipmentQty('tuning', '${escapeHtmlAttr(x.item.id)}', -1)" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">−</button>
+                    <span class="w-6 text-center font-bold text-cp-yellow">${x.qty}</span>
+                    <button type="button" onclick="changeVbEquipmentQty('tuning', '${escapeHtmlAttr(x.item.id)}', 1)" class="w-6 h-6 bg-cp-panel border border-gray-700 text-white font-bold">+</button>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          ` : ""}
+        </div>    
+      </div>
+
+      <!-- ПРАВАЯ КОЛОНКА: ИТОГОВАЯ КАРТОЧКА -->
+      <div class="col-span-12 xl:col-span-5 sticky top-20 bg-cp-panel cp-border p-5 space-y-4">
+        <div class="border-b border-gray-800 pb-3 flex items-start justify-between gap-2">
+          <div>
+            <div class="text-[10px] font-bold uppercase text-cp-cyan">${t.name} ${vbState.tracked ? "• Гусеничный" : ""} ${vbState.offroad ? "• Внедорожный" : ""}</div>
+            <h3 class="font-display text-xl font-black text-white mt-0.5">${escapeHtmlAttr((vbState.name || "").trim() || t.name)}</h3>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] text-gray-400 uppercase">Итоговая стоимость</div>
+            <div class="font-display text-xl font-black text-cp-green">${c.totalCost.toLocaleString("ru-RU")} eb</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">ОСТ (Тело)</div>
+            <div class="text-sm font-display font-black text-cp-red mt-0.5">${c.totalSdp} <span class="text-[11px] text-gray-400">(${c.bodyValue})</span></div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">ОС (Броня)</div>
+            <div class="text-sm font-display font-black text-cp-cyan mt-0.5">${vbState.armor} <span class="text-[11px] text-gray-400">(${c.armorValue})</span></div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">Манёвренность</div>
+            <div class="text-sm font-display font-black text-cp-green mt-0.5">+${vbState.maneuver}</div>
+          </div>
+
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">Макс. скорость</div>
+            <div class="text-sm font-display font-black text-cp-yellow mt-0.5">${c.finalSpeed} км/ч</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">УСК / ТОРМ</div>
+            <div class="text-sm font-display font-black text-white mt-0.5">${c.finalAcc} / ${c.finalDec}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">Радиус хода</div>
+            <div class="text-sm font-display font-black text-cp-cyan mt-0.5">${c.finalRange} км</div>
+          </div>
+
+          <div class="bg-cp-bg border ${c.remainingSeats < 1 ? 'border-cp-red' : 'border-gray-800'} p-2.5">
+            <div class="text-[10px] text-gray-400">Свободных мест</div>
+            <div class="text-sm font-display font-black ${c.remainingSeats < 1 ? 'text-cp-red' : 'text-white'} mt-0.5">${c.remainingSeats} <span class="text-[10px] text-gray-500">/ ${c.finalSeats}</span></div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">Масса</div>
+            <div class="text-sm font-display font-black text-gray-200 mt-0.5">${massStr}</div>
+          </div>
+          <div class="bg-cp-bg border border-gray-800 p-2.5">
+            <div class="text-[10px] text-gray-400">Груз</div>
+            <div class="text-sm font-display font-black text-cp-yellow mt-0.5">${c.cargoKg > 0 ? c.cargoKg.toLocaleString("ru-RU") + " кг" : "—"}</div>
+          </div>
+        </div>
+
+        <div class="bg-cp-bg border-l-2 border-cp-yellow p-3 text-[11px] text-gray-300 space-y-1">
+          <div class="font-bold text-cp-yellow uppercase text-[10px]">Смета сборки:</div>
+          <div class="flex justify-between"><span>Базовые ОСТ (${vbState.sdp} ед.):</span><b>${c.baseSdpCost.toLocaleString("ru-RU")} eb</b></div>
+          ${c.extraSdpCost > 0 ? `<div class="flex justify-between"><span>Доп. структура (+${vbState.extraSdp} ОСТ ×2):</span><b>+${c.extraSdpCost.toLocaleString("ru-RU")} eb</b></div>` : ""}
+          ${c.armorCost > 0 ? `<div class="flex justify-between"><span>Броня (${vbState.armor} ОС ≈ ${(vbState.armor * 2.5).toFixed(1)} мм стали):</span><b>+${c.armorCost.toLocaleString("ru-RU")} eb</b></div>` : ""}
+          ${c.optionsCost !== 0 ? `<div class="flex justify-between"><span>Опции шасси:</span><b class="${c.optionsCost > 0 ? 'text-cp-yellow' : 'text-cp-green'}">${c.optionsCost > 0 ? "+" : ""}${c.optionsCost.toLocaleString("ru-RU")} eb</b></div>` : ""}
+          ${c.weaponsCost > 0 ? `<div class="flex justify-between"><span>Вооружение:</span><b class="text-cp-red">+${c.weaponsCost.toLocaleString("ru-RU")} eb</b></div>` : ""}
+          ${c.tuningCost > 0 ? `<div class="flex justify-between"><span>Тюнинг:</span><b class="text-cp-cyan">+${c.tuningCost.toLocaleString("ru-RU")} eb</b></div>` : ""}
+        </div>
+          ${(c.resolvedWeapons.length > 0 || c.resolvedTuning.length > 0) ? `
+          <div class="bg-cp-bg border border-gray-800 p-3 text-[11px] space-y-2">
+            <div class="font-bold text-cp-cyan uppercase text-[10px]">Установленное вооружение и тюнинг (занято мест: ${c.usedEquipSpaces}):</div>
+            ${c.resolvedWeapons.map(x => `<div class="text-gray-300"><b class="text-cp-red">🔫 ${escapeHtmlAttr(x.item.name)}${x.qty > 1 ? ` ×${x.qty}` : ""}:</b> урон ${dash(x.item.damage)}, ТО ${dash(x.item.to)}, СКО ${dash(x.item.sko)}, мест −${x.spaces}</div>`).join("")}
+            ${c.resolvedTuning.map(x => `<div class="text-gray-300"><b class="text-cp-cyan">⚙️ ${escapeHtmlAttr(x.item.name)}${x.qty > 1 ? ` ×${x.qty}` : ""}:</b> ${x.item.effect && x.item.effect !== "—" ? escapeHtmlAttr(x.item.effect) : "установлено"}${x.spaces > 0 ? ` (мест −${x.spaces})` : ""}</div>`).join("")}
+            ${c.remainingSeats < 1 ? `<div class="text-cp-red font-bold pt-1">⚠️ Недостаточно свободных мест! Минимум 1 место должно оставаться для водителя.</div>` : ""}
+          </div>
+        ` : ""}
+      </div>
+    `;
+}
 
 async function initApp() {
     if (window.CP2020_EXTERNAL_DATA) {
