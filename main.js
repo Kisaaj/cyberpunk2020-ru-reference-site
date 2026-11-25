@@ -1393,6 +1393,7 @@ function setBuilderType(type, itemToEdit = null) {
         return;
     }
 
+
     if (type === "characters") {
         initCharBuilderStateFromItem(itemToEdit);
         const fields = SCHEMAS.characters || [];
@@ -1404,6 +1405,13 @@ function setBuilderType(type, itemToEdit = null) {
 
         container.innerHTML = `
           ${datalistHtml}
+          <div class="bg-cp-panel border border-cp-cyan/50 p-3 flex items-center justify-between gap-3">
+            <div class="text-xs text-gray-300">Есть готовый статблок из <b class="text-cp-cyan">Owlbear Rodeo</b> или <b class="text-cp-yellow">Генератора NPC</b>?</div>
+            <button type="button" onclick="openCharMdImportModal()"
+              class="px-3.5 py-1.5 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-bold text-xs uppercase shrink-0 transition-colors">
+              📥 Импорт из Markdown
+            </button>
+          </div>
           <div class="grid grid-cols-2 gap-3.5">${inputsHtml}</div>
           <div class="bg-cp-panel border border-gray-700 p-3.5 space-y-2">
             <div class="text-[11px] font-bold text-cp-yellow uppercase">📊 СТАТЫ (Основные характеристики КП2020):</div>
@@ -1421,6 +1429,7 @@ function setBuilderType(type, itemToEdit = null) {
         renderCharEquipmentBuilderBoxes();
         attachRichToolbarsToBuilderTextareas();
         return;
+
     }
 
     if (type === "borging") {
@@ -9015,6 +9024,208 @@ ${gearText}
             setTimeout(() => { btnEl.textContent = orig; }, 1500);
         }
     });
+};
+
+// =========================================================================
+// ИМПОРТ ПЕРСОНАЖА ИЗ MARKDOWN (ОБРАТНАЯ СОВМЕСТИМОСТЬ С OWLBEAR RODEO)
+// =========================================================================
+
+window.openCharMdImportModal = function () {
+    const area = document.getElementById("charMdImportTextarea");
+    if (area) area.value = "";
+    document.getElementById("charMdImportModal")?.classList.remove("hidden");
+    setTimeout(() => area?.focus(), 40);
+};
+
+window.closeCharMdImportModal = function () {
+    document.getElementById("charMdImportModal")?.classList.add("hidden");
+};
+
+function parseObrMarkdownToCharItem(mdText) {
+    const lines = String(mdText || "").replace(/\r\n/g, "\n").split("\n");
+    const out = {
+        name: "",
+        origName: "",
+        category: "",
+        reputation: "",
+        book: "CP20",
+        stat_int: "", stat_cool: "", stat_ma: "",
+        stat_ref: "", stat_attr: "", stat_body: "",
+        stat_tech: "", stat_luck: "", stat_emp: "",
+        charSkills: "",
+        charWeaponsList: [],
+        charCyberwareList: [],
+        charArmorList: [],
+        charGearList: [],
+        desc: ""
+    };
+
+    const statKeyMap = {
+        "ИНТ": "stat_int", "КРУТ": "stat_cool", "ПЕР": "stat_ma",
+        "РЕФ": "stat_ref", "ПРВЛ": "stat_attr",
+        "ТЕЛ": "stat_body", "ТЕЛО": "stat_body",
+        "ТЕХ": "stat_tech",
+        "УДАЧ": "stat_luck", "УДАЧА": "stat_luck",
+        "ЭМП": "stat_emp"
+    };
+
+    for (const raw of lines) {
+        const h = raw.trim().match(/^#{1,2}\s+(.+)$/);
+        if (h) {
+            const t = h[1].trim();
+            if (!/^(ХАРАКТЕРИСТИКИ|НАВЫКИ|КИБЕРНЕТИКА|ЗАЩИТА|ЗДОРОВЬЕ|SDP)/i.test(t)) {
+                out.name = t;
+            }
+            break;
+        }
+    }
+
+    let section = "";
+    let subSection = "";
+    const skillsParts = [];
+    const armorZonesFound = [];
+    let currentWeapon = null;
+
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const line = rawLine.trim();
+        if (!line) continue;
+
+        const hMatch = line.match(/^#{1,3}\s+(.+)$/);
+        if (hMatch) {
+            const title = hMatch[1].toUpperCase();
+            subSection = "";
+            currentWeapon = null;
+            if (title.includes("ХАРАКТЕРИСТИК")) section = "STATS";
+            else if (title.includes("НАВЫК")) section = "SKILLS";
+            else if (title.includes("КИБЕРНЕТИК") && !title.includes("SDP")) section = "CYBER";
+            else if (title.includes("ЗАЩИТ") || title.includes("СНАРЯЖЕНИ")) section = "DEFENSE";
+            else if (title.includes("ЗДОРОВЬ")) section = "HEALTH";
+            else if (title.includes("SDP")) section = "SDP";
+            continue;
+        }
+
+        if (/^\*\*БРОНЯ/i.test(line)) { subSection = "ARMOR"; currentWeapon = null; continue; }
+        if (/^\*\*ОРУЖИЕ/i.test(line)) { subSection = "WEAPONS"; currentWeapon = null; continue; }
+        if (/^\*\*ПРОЧЕЕ СНАРЯЖЕНИЕ/i.test(line)) { subSection = "GEAR"; currentWeapon = null; continue; }
+        if (/^\*\*(Производные показатели|Способность роли)/i.test(line)) { subSection = ""; continue; }
+
+        if (/^\|[\s:-]+\|/.test(line)) continue;
+        const tableMatch = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|\n]+?)\s*\|?\s*$/);
+
+        if (section === "STATS" && tableMatch) {
+            const k = tableMatch[1].trim().toUpperCase();
+            const valMatch = tableMatch[2].trim().match(/\d+/);
+            if (statKeyMap[k] && valMatch) {
+                out[statKeyMap[k]] = valMatch[0];
+            }
+        } else if (section === "SKILLS") {
+            const mRole = line.match(/Роль\s*:\s*(.+)$/i);
+            const mCombat = line.match(/Боевые навыки\s*:\s*(.+)$/i);
+            const mOther = line.match(/Прочее\s*:\s*(.+)$/i);
+            if (mRole) {
+                const rawRole = mRole[1].trim();
+                if (rawRole && rawRole !== "?") {
+                    const parenMatch = rawRole.match(/^([^(]+)\(([^)]+)\)/);
+                    if (parenMatch) {
+                        out.category = parenMatch[1].trim();
+                        skillsParts.unshift(parenMatch[2].trim());
+                    } else {
+                        out.category = rawRole;
+                    }
+                }
+            } else if (mCombat) {
+                const val = mCombat[1].trim();
+                if (val && !/^(\+\?|\?|-|\+0)$/.test(val)) skillsParts.push(val);
+            } else if (mOther) {
+                const val = mOther[1].trim();
+                if (val && !/^(\+\?|\?|-)$/.test(val)) skillsParts.push(val);
+            } else if (!/^\*\*/.test(line)) {
+                const clean = line.replace(/^[-*]\s*/, "").trim();
+                if (clean && clean !== "-") skillsParts.push(clean);
+            }
+        } else if (section === "CYBER") {
+            if (/При отсутствии кибернетики/i.test(line)) continue;
+            const clean = line.replace(/^[-*]\s*/, "").trim();
+            if (!clean || clean === "-") continue;
+            const m = clean.match(/^([^(]+)\((.+)\)$/);
+            if (m) out.charCyberwareList.push({ name: m[1].trim(), desc: m[2].trim() });
+            else out.charCyberwareList.push({ name: clean, desc: "" });
+        } else if (section === "DEFENSE") {
+            if (subSection === "ARMOR" && tableMatch) {
+                const loc = tableMatch[1].trim();
+                const val = tableMatch[2].trim();
+                if (/Часть тела/i.test(loc)) continue;
+                const pair = val.match(/(\d+)\s*\/\s*(\d+)/);
+                const sp = pair ? parseInt(pair[2], 10) : (parseInt(val, 10) || 0);
+                if (sp > 0) armorZonesFound.push(`${loc}: ${sp} ОС`);
+            } else if (subSection === "WEAPONS") {
+                const wHead = rawLine.match(/^\s*[-*]\s*\*\*(.+?)\*\*\s*(.*)$/);
+                if (wHead && !/^(Тип|Навык|WA|ТО|Скрыт|Урон|ROF|СКО|НАД|Боезапас|#|Дальность|Дистанция|Особенности|Примечания|Зарядники|Описание)\s*:/i.test(wHead[1])) {
+                    const wName = wHead[1].replace(/:$/, "").trim();
+                    currentWeapon = { name: wName || "Оружие", type: "", skr: "", to: "", damage: "", mag: "", sko: "", range: "", nad: "", cost: "", desc: "" };
+                    out.charWeaponsList.push(currentWeapon);
+                } else if (currentWeapon) {
+                    const clean = line.replace(/^[-*]\s*/, "");
+                    const kv = clean.match(/^([^:]+):\s*(.*)$/);
+                    if (kv) {
+                        const k = kv[1].trim().toLowerCase();
+                        const v = kv[2].trim();
+                        if (!v || v === "-") continue;
+                        if (k === "тип") currentWeapon.type = v;
+                        else if (k === "wa" || k === "то") currentWeapon.to = v;
+                        else if (k.includes("скрыт")) {
+                            const low = v.toLowerCase();
+                            currentWeapon.skr = low.includes("карм") ? "Кар" : low.includes("курт") ? "Кур" : low.includes("плащ") ? "Плащ" : "Нет";
+                        } else if (k.includes("урон")) currentWeapon.damage = v;
+                        else if (k === "rof" || k === "ско") currentWeapon.sko = v;
+                        else if (k === "над") currentWeapon.nad = v;
+                        else if (k.includes("боезапас") || k === "#") {
+                            const pair = v.match(/(\d+)\s*\/\s*(\d+)/);
+                            currentWeapon.mag = pair ? pair[2] : v;
+                        } else if (k.includes("дальност") || k.includes("дистанц")) {
+                            currentWeapon.range = /\d$/.test(v) ? `${v}м` : v;
+                        } else if (k.includes("описан") || k.includes("примечан") || k.includes("особенност")) {
+                            currentWeapon.desc = currentWeapon.desc ? `${currentWeapon.desc}\n${v}` : v;
+                        }
+                    }
+                }
+            } else if (subSection === "GEAR") {
+                const clean = line.replace(/^[-*]\s*/, "").trim();
+                if (!clean || clean === "-") continue;
+                const repMatch = clean.match(/^Репутация\s*:\s*(\d+)/i);
+                if (repMatch) {
+                    out.reputation = repMatch[1];
+                } else {
+                    out.charGearList.push({ name: clean, desc: "" });
+                }
+            }
+        }
+    }
+
+    out.charSkills = skillsParts.join(", ");
+    if (armorZonesFound.length > 0) {
+        out.charArmorList.push({ name: "Броня (импорт OBR)", desc: armorZonesFound.join(" • ") });
+    }
+
+    return out;
+}
+
+window.applyCharMdImport = function () {
+    const rawText = document.getElementById("charMdImportTextarea")?.value || "";
+    if (!rawText.trim()) return;
+
+    const parsed = parseObrMarkdownToCharItem(rawText);
+    const preservedImages = [...builderGalleryImages];
+    const wasEditId = editingItemId;
+
+    parsed.images = preservedImages;
+    parsed.isUser = document.getElementById("builderShowAddedCheck")?.checked ?? true;
+    parsed.isNamed = document.getElementById("builderNamedCharCheck")?.checked ?? false;
+
+    closeCharMdImportModal();
+    setBuilderType("characters", parsed);
+    editingItemId = wasEditId;
 };
 
 // =========================================================================

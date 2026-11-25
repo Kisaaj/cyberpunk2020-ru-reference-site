@@ -1080,6 +1080,36 @@
       </div>
     </div>
   </div>
+  <!-- МОДАЛЬНОЕ ОКНО: ИМПОРТ ПЕРСОНАЖА ИЗ MARKDOWN (OBR) -->
+  <div id="charMdImportModal"
+    class="hidden fixed inset-0 z-[85] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4"
+    onclick="if(event.target===this) closeCharMdImportModal()">
+    <div class="max-w-2xl w-full bg-cp-panel border-2 border-cp-cyan shadow-[0_0_40px_rgba(0,240,255,0.35)] p-5 flex flex-col gap-3.5 cp-clip"
+      onclick="event.stopPropagation()">
+      <div class="flex items-center justify-between border-b border-gray-800 pb-2.5">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-widest text-cp-cyan">OWLBEAR RODEO // MARKDOWN PARSER</div>
+          <h3 class="font-display text-base font-black text-white uppercase mt-0.5">📥 Импорт персонажа из Markdown</h3>
+        </div>
+        <button type="button" onclick="closeCharMdImportModal()"
+          class="text-gray-400 hover:text-white text-lg font-bold px-2">✕</button>
+      </div>
+      <div class="text-[11px] text-gray-400 leading-relaxed">
+        Вставьте статблок в формате Markdown (из плагина Owlbear Rodeo или Генератора NPC) — конструктор автоматически заполнит имя, роль, статы, навыки, кибернетику, броню, оружие и снаряжение.
+      </div>
+      <textarea id="charMdImportTextarea" rows="12"
+        placeholder="# Имя персонажа&#10;&#10;## ХАРАКТЕРИСТИКИ&#10;| Характеристика | Значение |&#10;..."
+        class="w-full bg-cp-bg border border-gray-700 focus:border-cp-yellow p-3 text-xs font-mono text-gray-100 outline-none"></textarea>
+      <div class="flex items-center justify-end gap-2 pt-1 border-t border-gray-800">
+        <button type="button" onclick="closeCharMdImportModal()"
+          class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs font-bold uppercase border border-gray-700">Отмена</button>
+        <button type="button" onclick="applyCharMdImport()"
+          class="px-5 py-2 bg-cp-cyan hover:bg-cyan-300 text-black font-display font-black text-xs uppercase tracking-wider cp-clip">
+          ✓ Распознать и заполнить
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- ОКНО 1.6: ЗАГЛУШКА ДЛЯ БУДУЩИХ КОНСТРУКТОРОВ -->
   <main id="view-wip" class="hidden max-w-[1880px] w-full mx-auto px-6 py-10 flex-1 flex items-center justify-center">
