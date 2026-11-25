@@ -9306,7 +9306,11 @@ window.addBuiltVehicleToCart = function () {
     SHOPPING_CART.push({ sectionKey: "vehicles", itemId: id, qty: 1, customItem });
     saveShoppingCartToStorage();
     renderCartDropdownList();
-    alert(`«${title}» (${customItem.cost}) добавлен в Корзину!`);
+    const btn = document.querySelector('button[onclick="addBuiltVehicleToCart()"]');
+    if (btn) {
+        btn.textContent = "✓ В корзине";
+        setTimeout(() => { btn.textContent = "🛒 В корзину"; }, 1200);
+    }
 };
 
 function renderVehicleBuilderView() {
