@@ -4270,7 +4270,8 @@ function getRichToolbarHTML(textareaId) {
             <span class="text-gray-700 px-0.5">|</span>
             <button type="button" onclick="openCardRefPickerModal('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/25 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan text-[11px] font-bold transition-colors" title="Указать внутреннюю ссылку на другую карточку сайта">📌 Указать карточку</button>
             <button type="button" onclick="insertRichHyperlink('${textareaId}')" class="px-2.5 py-0.5 bg-cp-cyan/15 hover:bg-cp-cyan text-cp-cyan hover:text-black border border-cp-cyan/50 text-[11px] font-bold transition-colors" title="Вставить внешнюю веб-ссылку">🔗 Веб-ссылка</button>
-            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button></div>
+            <button type="button" onclick="toggleRichEmojiPicker('${textareaId}')" class="px-2.5 py-0.5 bg-cp-yellow/15 hover:bg-cp-yellow text-cp-yellow hover:text-black border border-cp-yellow/50 text-[11px] font-bold transition-colors" title="Открыть панель эмодзи">😀 Эмодзи</button>
+            <button type="button" onclick="insertRichTableTemplate('${textareaId}')" class="px-2.5 py-0.5 bg-cp-green/15 hover:bg-cp-green text-cp-green hover:text-black border border-cp-green/50 text-[11px] font-bold transition-colors" title="Вставить шаблон Вики-таблицы">📊 Таблица</button></div>
           <div id="emoji-picker-${textareaId}" class="hidden bg-cp-panel border border-cp-yellow/60 p-2 grid grid-cols-10 gap-1 shadow-lg">
             ${emojiButtons}
           </div>
@@ -4857,20 +4858,181 @@ function upgradeCardRefsInHtml(htmlStr) {
     );
 }
 
-// Расширяем formatRichTextWithLinks, чтобы она автоматически обрабатывала и внутренние ссылки на карточки
+// =========================================================================
+// ПАРСЕР ВИКИ-ТАБЛИЦ ({| ... |}) ДЛЯ ОПИСАНИЙ, МЕХАНИК И НОВОСТЕЙ
+// =========================================================================
+
+window.insertRichTableTemplate = function (textareaId) {
+    const area = document.getElementById(textareaId);
+    if (!area) return;
+    const tpl = `\n{|\n|+ Заголовок таблицы\n! Колонка 1 !! Колонка 2 !! Колонка 3\n|-\n| Ячейка 1 || Ячейка 2 || Ячейка 3\n|-\n| Ячейка 4 || Ячейка 5 || Ячейка 6\n|}\n`;
+    const start = area.selectionStart || 0;
+    const end = area.selectionEnd || 0;
+    const val = area.value;
+    area.value = val.slice(0, start) + tpl + val.slice(end);
+    area.focus();
+    const pos = start + tpl.length;
+    area.setSelectionRange(pos, pos);
+};
+
+function parseWikiTableAttrs(attrStr) {
+    const raw = String(attrStr || "").replace(/&quot;/g, '"').trim();
+    const res = {
+        colspan: "", rowspan: "", align: "", width: "",
+        color: "", bg: "", border: "", bold: false, compact: false
+    };
+    if (!raw) return res;
+
+    const getVal = (key) => {
+        const m = raw.match(new RegExp(`\\b${key}\\s*=\\s*(?:"([^"]+)"|'([^']+)'|([^\\s]+))`, "i"));
+        return m ? (m[1] || m[2] || m[3] || "").trim() : "";
+    };
+
+    res.colspan = getVal("colspan");
+    res.rowspan = getVal("rowspan");
+    res.align   = getVal("align").toLowerCase();
+    res.width   = getVal("width");
+    res.color   = getVal("color").toLowerCase();
+    res.bg      = getVal("bg").toLowerCase();
+    res.border  = getVal("border").toLowerCase();
+
+    if (!res.align) {
+        if (/\bcenter\b/i.test(raw)) res.align = "center";
+        else if (/\bright\b/i.test(raw)) res.align = "right";
+        else if (/\bleft\b/i.test(raw)) res.align = "left";
+    }
+    if (/\bbold\b/i.test(raw)) res.bold = true;
+    if (/\bcompact\b/i.test(raw)) res.compact = true;
+
+    return res;
+}
+
+function wikiColorToTextClass(c) {
+    const map = {
+        yellow: "text-cp-yellow", cyan: "text-cp-cyan", red: "text-cp-red",
+        green: "text-cp-green", purple: "text-purple-400", white: "text-white", gray: "text-gray-400"
+    };
+    return map[c] || "";
+}
+
+function wikiBgToClass(bg) {
+    const map = {
+        yellow: "bg-cp-yellow/15", cyan: "bg-cp-cyan/15", red: "bg-cp-red/15",
+        green: "bg-cp-green/15", purple: "bg-purple-500/15", dark: "bg-black/60"
+    };
+    return map[bg] || "";
+}
+
+function wikiBorderToClass(b) {
+    const map = {
+        yellow: "border-cp-yellow/60", cyan: "border-cp-cyan/60",
+        red: "border-cp-red/60", green: "border-cp-green/60"
+    };
+    return map[b] || "border-gray-700";
+}
+
+function parseWikiTablesInHtml(htmlStr) {
+    if (!htmlStr || typeof htmlStr !== "string" || !htmlStr.includes("{|")) return htmlStr;
+
+    return htmlStr.replace(/\{\|([\s\S]*?)\|\}/g, (fullMatch, inner) => {
+        const lines = inner.replace(/\r\n/g, "\n").split("\n");
+        const tableAttrs = parseWikiTableAttrs(lines[0] || "");
+        const padCls = tableAttrs.compact ? "px-2 py-1" : "px-3 py-1.5";
+        const borderCls = wikiBorderToClass(tableAttrs.border);
+        const tableWidthStyle = tableAttrs.width ? `style="width:${escapeHtmlAttr(tableAttrs.width)}"` : "";
+
+        let captionHtml = "";
+        const rows = [];
+        let curRow = { attrs: {}, cells: [] };
+
+        const pushCurRow = () => {
+            if (curRow.cells.length > 0) {
+                rows.push(curRow);
+                curRow = { attrs: {}, cells: [] };
+            }
+        };
+
+        const addCellsFromLine = (content, isHeader) => {
+            const splitter = isHeader ? "!!" : "||";
+            const parts = content.split(splitter);
+            parts.forEach(part => {
+                let attrObj = {};
+                let cellText = part.trim();
+                // Разделение параметров ячейки и текста через одиночный "|" (не затрагивая HTML-теги)
+                const pipeIdx = cellText.indexOf("|");
+                if (pipeIdx !== -1) {
+                    const beforePipe = cellText.slice(0, pipeIdx);
+                    if (!beforePipe.includes("<") && /(colspan|rowspan|align|width|color|bg|bold|left|center|right)/i.test(beforePipe)) {
+                        attrObj = parseWikiTableAttrs(beforePipe);
+                        cellText = cellText.slice(pipeIdx + 1).trim();
+                    }
+                }
+                curRow.cells.push({ isHeader, attrs: attrObj, html: cellText });
+            });
+        };
+
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            if (line.startsWith("|+")) {
+                captionHtml = `<caption class="text-left text-[11px] font-display font-bold uppercase text-cp-yellow pb-1.5">${line.slice(2).trim()}</caption>`;
+            } else if (line.startsWith("|-")) {
+                pushCurRow();
+                curRow.attrs = parseWikiTableAttrs(line.slice(2));
+            } else if (line.startsWith("!")) {
+                addCellsFromLine(line.slice(1), true);
+            } else if (line.startsWith("|")) {
+                addCellsFromLine(line.slice(1), false);
+            } else if (curRow.cells.length > 0) {
+                // Многострочный текст внутри последней ячейки
+                curRow.cells[curRow.cells.length - 1].html += `<br>${line}`;
+            }
+        }
+        pushCurRow();
+
+        if (rows.length === 0) return fullMatch;
+
+        const rowsHtml = rows.map(row => {
+            const rBg = wikiBgToClass(row.attrs.bg);
+            const rColor = wikiColorToTextClass(row.attrs.color);
+            const rAlign = row.attrs.align ? `text-${row.attrs.align}` : "";
+
+            const cellsHtml = row.cells.map(cell => {
+                const tag = cell.isHeader ? "th" : "td";
+                const cBg = wikiBgToClass(cell.attrs.bg) || (cell.isHeader ? "bg-cp-panel" : "");
+                const cColor = wikiColorToTextClass(cell.attrs.color) || (cell.isHeader ? "text-cp-cyan" : "");
+                const cAlign = cell.attrs.align ? `text-${cell.attrs.align}` : (cell.isHeader ? "text-left" : "");
+                const cBold = (cell.attrs.bold || cell.isHeader) ? "font-bold" : "";
+                const cSpan = cell.attrs.colspan ? ` colspan="${parseInt(cell.attrs.colspan, 10) || 1}"` : "";
+                const rSpan = cell.attrs.rowspan ? ` rowspan="${parseInt(cell.attrs.rowspan, 10) || 1}"` : "";
+                const cWidth = cell.attrs.width ? ` style="width:${escapeHtmlAttr(cell.attrs.width)}"` : "";
+
+                return `<${tag}${cSpan}${rSpan}${cWidth} class="border ${borderCls} ${padCls} ${cBg} ${cColor} ${cAlign} ${cBold}">${cell.html}</${tag}>`;
+            }).join("");
+
+            return `<tr class="hover:bg-white/5 transition-colors ${rBg} ${rColor} ${rAlign}">${cellsHtml}</tr>`;
+        }).join("");
+
+        return `<div class="my-2.5 overflow-x-auto whitespace-normal"><table ${tableWidthStyle} class="w-full border-collapse border ${borderCls} text-xs bg-cp-bg/90">${captionHtml}<tbody>${rowsHtml}</tbody></table></div>`;
+    });
+}
+
+// Расширяем formatRichTextWithLinks, чтобы она автоматически обрабатывала и внутренние ссылки на карточки, и Вики-таблицы
 const _prevFormatRichTextWithLinks = formatRichTextWithLinks;
 formatRichTextWithLinks = function (rawText) {
     const withUrls = _prevFormatRichTextWithLinks(rawText);
-    return upgradeCardRefsInHtml(withUrls);
+    return parseWikiTablesInHtml(upgradeCardRefsInHtml(withUrls));
 };
 
-// Прогоняем описания всех карточек и механик через форматировщик ссылок при рендере
+// Прогоняем описания всех карточек и механик через форматировщик ссылок и Вики-таблиц при рендере
 const _prevRenderDetailCardForRefs = renderDetailCard;
 renderDetailCard = function (item) {
     _prevRenderDetailCardForRefs(item);
     const box = document.getElementById("detailCard");
-    if (box && box.innerHTML.includes("data-card-ref")) {
-        box.innerHTML = upgradeCardRefsInHtml(box.innerHTML);
+    if (box) {
+        if (box.innerHTML.includes("data-card-ref")) box.innerHTML = upgradeCardRefsInHtml(box.innerHTML);
+        if (box.innerHTML.includes("{|")) box.innerHTML = parseWikiTablesInHtml(box.innerHTML);
     }
 };
 
@@ -4878,8 +5040,9 @@ const _prevRenderRulesSidebarForRefs = renderRulesSidebar;
 renderRulesSidebar = function () {
     _prevRenderRulesSidebarForRefs();
     const areaEl = document.getElementById("ruleContentArea");
-    if (areaEl && areaEl.innerHTML.includes("data-card-ref")) {
-        areaEl.innerHTML = upgradeCardRefsInHtml(areaEl.innerHTML);
+    if (areaEl) {
+        if (areaEl.innerHTML.includes("data-card-ref")) areaEl.innerHTML = upgradeCardRefsInHtml(areaEl.innerHTML);
+        if (areaEl.innerHTML.includes("{|")) areaEl.innerHTML = parseWikiTablesInHtml(areaEl.innerHTML);
     }
 };
 
